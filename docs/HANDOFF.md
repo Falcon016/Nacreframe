@@ -37,6 +37,9 @@ that repository.
 - The Anthropic and OpenAI adapters have only run against mocked streams (no API keys were used). Try them first.
 - Linux and macOS (CI will tell), Podman, the Docker image in `deploy/`, systemd unit.
 - The dashboard behind a real TLS reverse proxy.
+- `install.sh` and `nacre setup`: exercised on Linux only (dash and bash `--posix`, a real pseudo-terminal, shellcheck
+  clean). macOS (zsh/Homebrew), fish, and the wizard's arrow-key menus in Windows Terminal / PowerShell are untested.
+  There is no PowerShell installer yet, so native Windows installs by hand (see [install.md](install.md)).
 - Quality of summaries differs per model; `live-check` reports whether a model kept an early fact through compaction.
 
 ## Design decisions worth knowing

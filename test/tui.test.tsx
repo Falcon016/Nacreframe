@@ -72,6 +72,8 @@ async function boot(mode: 'ask' | 'auto' = 'ask') {
     stderr: stdout as never,
     exitOnCtrlC: false,
     patchConsole: false,
+    // Ink switches to "print only the last frame" when it sees CI=true; the fake terminal here is interactive.
+    interactive: true,
   });
   const screen = () => plain(out);
   const type = async (s: string) => {

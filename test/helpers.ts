@@ -15,7 +15,8 @@ import { ToolRegistry } from '../src/tools/registry.js';
 import { globTool, grepTool, lsTool } from '../src/tools/search-tools.js';
 
 export function tmpWorkspace(): { dir: string; cleanup: () => void } {
-  const dir = realpathSync(mkdtempSync(join(tmpdir(), 'nacre-test-')));
+  // .native expands Windows 8.3 short names (RUNNER~1), which the sandbox's own realpath does too.
+  const dir = realpathSync.native(mkdtempSync(join(tmpdir(), 'nacre-test-')));
   return {
     dir,
     cleanup: () => rmSync(dir, { recursive: true, force: true, maxRetries: 8, retryDelay: 150 }),

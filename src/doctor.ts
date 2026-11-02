@@ -1,4 +1,4 @@
-import { spawnSync } from 'node:child_process';
+import { execFile } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { AuthStore } from './config/auth.js';
@@ -7,16 +7,20 @@ import { appPaths } from './paths.js';
 import { detectShell } from './sandbox/shell.js';
 import { BIN, NAME, VERSION } from './version.js';
 
-interface Check {
+export interface Check {
+  /** Stable key so other commands (the setup wizard) can pick out a result. */
+  id: 'node' | 'shell' | 'git' | 'container' | 'browser' | 'config' | 'provider' | 'data';
   ok: boolean | 'warn';
   label: string;
   detail: string;
 }
 
-const run = (cmd: string, args: string[]) => {
-  const r = spawnSync(cmd, args, { encoding: 'utf8', windowsHide: true, timeout: 4000 });
-  return r.status === 0 ? r.stdout.trim().split('\n')[0] : undefined;
-};
+const run = (cmd: string, args: string[]): Promise<string | undefined> =>
+  new Promise((resolveRun) => {
+    execFile(cmd, args, { encoding: 'utf8', windowsHide: true, timeout: 4000 }, (err, stdout) =>
+      resolveRun(err ? undefined : stdout.trim().split('\n')[0]),
+    );
+  });
 
 async function reachable(url: string): Promise<boolean> {
   try {
@@ -51,21 +55,31 @@ function findChrome(): string | undefined {
   return candidates.find((c) => c && existsSync(c));
 }
 
-export async function doctor(cwd: string): Promise<number> {
+/** Checks about the machine itself (no configuration needed). Shared by `nacre doctor` and `nacre setup`. */
+export async function systemChecks(): Promise<Check[]> {
   const checks: Check[] = [];
   const major = Number(process.versions.node.split('.')[0]);
   checks.push({
+    id: 'node',
     ok: major >= 22,
     label: 'Node.js',
     detail: `v${process.versions.node}${major >= 22 ? '' : ' — need ≥ 22.18'}`,
   });
   const shell = detectShell();
-  checks.push({ ok: true, label: 'Shell for bash tool', detail: `${shell.name} (${shell.file})` });
-  const git = run('git', ['--version']);
-  checks.push({ ok: git ? true : 'warn', label: 'git', detail: git ?? 'not found' });
-  const docker = run('docker', ['version', '--format', '{{.Server.Version}}']);
-  const podman = docker ? undefined : run('podman', ['version', '--format', '{{.Version}}']);
   checks.push({
+    id: 'shell',
+    ok: true,
+    label: 'Shell for bash tool',
+    detail: `${shell.name} (${shell.file})`,
+  });
+  const [git, docker, podman] = await Promise.all([
+    run('git', ['--version']),
+    run('docker', ['version', '--format', '{{.Server.Version}}']),
+    run('podman', ['version', '--format', '{{.Version}}']),
+  ]);
+  checks.push({ id: 'git', ok: git ? true : 'warn', label: 'git', detail: git ?? 'not found' });
+  checks.push({
+    id: 'container',
     ok: docker || podman ? true : 'warn',
     label: 'Container runtime',
     detail: docker
@@ -76,17 +90,24 @@ export async function doctor(cwd: string): Promise<number> {
   });
   const chrome = findChrome();
   checks.push({
+    id: 'browser',
     ok: chrome ? true : 'warn',
     label: 'Chrome / Edge',
     detail:
       chrome ??
       'not found — set browser.channel to "chromium" and run `npx playwright-core install chromium`',
   });
+  return checks;
+}
+
+export async function doctor(cwd: string): Promise<number> {
+  const checks = await systemChecks();
 
   try {
     const loaded = loadConfig({ cwd });
     const auth = new AuthStore(loaded.paths);
     checks.push({
+      id: 'config',
       ok: true,
       label: 'Config',
       detail: `${loaded.userConfigPath}${loaded.projectConfigPath ? ` + ${loaded.projectConfigPath} (${loaded.projectTrusted ? 'trusted' : 'untrusted'})` : ''}`,
@@ -95,6 +116,7 @@ export async function doctor(cwd: string): Promise<number> {
       if (p.type === 'anthropic' || p.apiKeyEnv) {
         const has = !!(auth.get(id) ?? (p.apiKeyEnv ? process.env[p.apiKeyEnv] : undefined));
         checks.push({
+          id: 'provider',
           ok: has ? true : 'warn',
           label: `Provider ${id}`,
           detail: has
@@ -104,17 +126,19 @@ export async function doctor(cwd: string): Promise<number> {
       } else if (p.baseUrl) {
         const up = await reachable(p.baseUrl.replace(/\/+$/, '') + '/models');
         checks.push({
+          id: 'provider',
           ok: up ? true : 'warn',
           label: `Provider ${id}`,
           detail: up ? `${p.baseUrl} reachable` : `${p.baseUrl} not reachable`,
         });
       }
     }
-    for (const w of loaded.warnings) checks.push({ ok: 'warn', label: 'Config warning', detail: w });
+    for (const w of loaded.warnings)
+      checks.push({ id: 'config', ok: 'warn', label: 'Config warning', detail: w });
   } catch (e) {
-    checks.push({ ok: false, label: 'Config', detail: (e as Error).message });
+    checks.push({ id: 'config', ok: false, label: 'Config', detail: (e as Error).message });
   }
-  checks.push({ ok: true, label: 'Data directory', detail: appPaths().data });
+  checks.push({ id: 'data', ok: true, label: 'Data directory', detail: appPaths().data });
 
   console.log(`${NAME} ${VERSION} — environment check\n`);
   for (const c of checks) {

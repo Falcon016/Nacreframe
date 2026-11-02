@@ -27,6 +27,9 @@ jobs:
       # Lets the container-sandbox tests run for real on Linux runners (they skip when the image is absent).
       - if: runner.os == 'Linux'
         run: docker pull node:22-bookworm-slim
+      # The curl installer is plain POSIX sh; lint it where shellcheck is preinstalled.
+      - if: runner.os == 'Linux'
+        run: shellcheck -s sh install.sh
       - run: npm run typecheck
       - run: npm run lint
       - run: npm run format:check
