@@ -312,6 +312,9 @@ async function main(): Promise<number> {
     />,
     {
       exitOnCtrlC: false,
+      // We only get here on a real terminal (checked above). Without this, Ink treats a stray CI=true in the
+      // environment (dev containers, some IDE shells) as "not interactive" and never draws the live UI.
+      interactive: true,
     },
   );
   await app.waitUntilExit();
