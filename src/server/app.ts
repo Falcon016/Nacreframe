@@ -32,6 +32,7 @@ export interface ServerOptions {
 }
 
 const MAX_BODY = 1_000_000;
+const MAX_DISCARD = 32_000_000; // how much of an oversized upload is read and thrown away before the socket is cut
 const COOKIE = 'nacre_sid';
 const SESSION_TTL_MS = 7 * 24 * 3600 * 1000;
 
@@ -136,10 +137,17 @@ export async function startServer(opts: ServerOptions): Promise<RunningServer> {
       req.on('data', (c: Buffer) => {
         size += c.length;
         if (size > MAX_BODY) {
-          // Answer first, then close: destroying the socket here would drop the connection with no reply.
-          if (chunks.length) chunks.length = 0;
+          // Answer first, then close. Destroying the socket now drops the connection with no reply, and
+          // closing it while the client is still sending can reset it before the reply is read (seen on
+          // Windows). So discard the rest of the upload, within a limit, and let Connection: close end it.
+          chunks.length = 0;
           req.removeAllListeners('data');
-          req.pause();
+          let discarded = size;
+          req.on('data', (d: Buffer) => {
+            discarded += d.length;
+            if (discarded > MAX_DISCARD) req.destroy();
+          });
+          setTimeout(() => req.destroy(), 10_000).unref();
           reject(new HttpError(413, 'Request too large'));
         } else chunks.push(c);
       });
@@ -338,10 +346,7 @@ export async function startServer(opts: ServerOptions): Promise<RunningServer> {
     handle(req, res).catch((e: unknown) => {
       if (res.headersSent) return void res.end();
       if (e instanceof HttpError) {
-        if (e.status === 413) {
-          res.setHeader('connection', 'close');
-          res.once('finish', () => req.socket.destroy());
-        }
+        if (e.status === 413) res.setHeader('connection', 'close');
         return json(res, e.status, { error: e.message });
       }
       process.stderr.write(`[nacre serve] ${(e as Error).stack ?? e}\n`);
