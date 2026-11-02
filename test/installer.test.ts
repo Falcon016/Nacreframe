@@ -17,6 +17,8 @@ import { tmpWorkspace } from './helpers.js';
 const SCRIPT = resolve('install.sh');
 const hasSh = process.platform !== 'win32' && spawnSync('sh', ['-c', 'true']).status === 0;
 const hasGit = spawnSync('git', ['--version']).status === 0;
+// Where the installer puts the PATH entry for bash: macOS shells read .bash_profile, Linux ones .bashrc.
+const RC_NAME = process.platform === 'darwin' ? '.bash_profile' : '.bashrc';
 
 describe.skipIf(!hasSh || !hasGit)('install.sh', () => {
   let ws: ReturnType<typeof tmpWorkspace>;
@@ -123,7 +125,7 @@ describe.skipIf(!hasSh || !hasGit)('install.sh', () => {
     expect(readlinkSync(link)).toBe(join(home, '.nacreframe', 'dist', 'cli.js'));
     expect(existsSync(join(home, '.nacreframe', 'node_modules', 'typescript'))).toBe(false); // dev tools pruned
 
-    const rc = readFileSync(join(home, '.bashrc'), 'utf8');
+    const rc = readFileSync(join(home, RC_NAME), 'utf8');
     expect(rc).toContain('# >>> nacreframe >>>');
     expect(rc).toContain('export PATH="$HOME/.local/bin:$PATH"');
 
@@ -147,7 +149,7 @@ describe.skipIf(!hasSh || !hasGit)('install.sh', () => {
     expect(again.status, again.stdout + again.stderr).toBe(0);
     expect(again.stdout).toContain('is already up to date');
     expect(again.stdout).toContain('Nacreframe is up to date.');
-    expect(readFileSync(join(home, '.bashrc'), 'utf8').match(/>>> nacreframe >>>/g)).toHaveLength(1);
+    expect(readFileSync(join(home, RC_NAME), 'utf8').match(/>>> nacreframe >>>/g)).toHaveLength(1);
 
     // ---- a new version upstream is picked up ----
     const pkgPath = join(source, 'package.json');
@@ -169,7 +171,7 @@ describe.skipIf(!hasSh || !hasGit)('install.sh', () => {
       other,
     );
     expect(r.status, r.stdout + r.stderr).toBe(0);
-    expect(existsSync(join(other, '.bashrc'))).toBe(false);
+    expect(existsSync(join(other, RC_NAME))).toBe(false);
     expect(r.stdout).toContain('is not on your PATH');
     expect(r.stdout).toContain('export PATH=');
     expect(lstatSync(join(other, 'bin', 'nacre')).isSymbolicLink()).toBe(true);
@@ -190,7 +192,7 @@ describe.skipIf(!hasSh || !hasGit)('install.sh', () => {
     expect(r.status, r.stdout + r.stderr).toBe(0);
     expect(existsSync(join(home, '.nacreframe'))).toBe(false);
     expect(existsSync(join(home, '.local', 'bin', 'nacre'))).toBe(false);
-    expect(readFileSync(join(home, '.bashrc'), 'utf8')).not.toContain('nacreframe');
+    expect(readFileSync(join(home, RC_NAME), 'utf8')).not.toContain('nacreframe');
     expect(existsSync(join(home, 'nacre-home', 'config', 'config.json'))).toBe(true);
     expect(r.stdout).toContain('settings, API keys and sessions were kept');
     // And a second uninstall is harmless.
