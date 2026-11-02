@@ -225,13 +225,12 @@ describe('workspace and id validation', () => {
   it('rejects oversized or malformed bodies', async () => {
     const id = await newSession();
     expect((await api(`/api/sessions/${id}/prompt`, { method: 'POST', body: '[1,2]' })).status).toBe(400);
-    expect(
-      (
-        await api(`/api/sessions/${id}/prompt`, { method: 'POST', body: 'x'.repeat(1_100_000) }).catch(
-          () => ({ status: 413 }),
-        )
-      ).status,
-    ).toBe(413);
+    // A real 413 reply, not a dropped connection.
+    const big = await api(`/api/sessions/${id}/prompt`, { method: 'POST', body: 'x'.repeat(3_000_000) });
+    expect(big.status).toBe(413);
+    expect(((await big.json()) as { error: string }).error).toMatch(/too large/i);
+    // …and the server keeps serving afterwards.
+    expect((await api('/api/models')).status).toBe(200);
     await api(`/api/sessions/${id}`, { method: 'DELETE' });
   });
 });

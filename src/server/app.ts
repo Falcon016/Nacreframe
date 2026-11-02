@@ -136,8 +136,11 @@ export async function startServer(opts: ServerOptions): Promise<RunningServer> {
       req.on('data', (c: Buffer) => {
         size += c.length;
         if (size > MAX_BODY) {
+          // Answer first, then close: destroying the socket here would drop the connection with no reply.
+          if (chunks.length) chunks.length = 0;
+          req.removeAllListeners('data');
+          req.pause();
           reject(new HttpError(413, 'Request too large'));
-          req.destroy();
         } else chunks.push(c);
       });
       req.on('end', () => {
@@ -334,7 +337,13 @@ export async function startServer(opts: ServerOptions): Promise<RunningServer> {
   const listener = (req: IncomingMessage, res: ServerResponse) => {
     handle(req, res).catch((e: unknown) => {
       if (res.headersSent) return void res.end();
-      if (e instanceof HttpError) return json(res, e.status, { error: e.message });
+      if (e instanceof HttpError) {
+        if (e.status === 413) {
+          res.setHeader('connection', 'close');
+          res.once('finish', () => req.socket.destroy());
+        }
+        return json(res, e.status, { error: e.message });
+      }
       process.stderr.write(`[nacre serve] ${(e as Error).stack ?? e}\n`);
       json(res, 500, { error: 'Internal error' });
     });
