@@ -1,4 +1,6 @@
-/* Nacreframe dashboard: graphite and indigo, with a pearl highlight. No external requests; fonts are bundled (OFL). */
+/* Nacreframe dashboard: deep ink, warm pearl text, violet and rose from the same palette as the terminal UI.
+   Newsreader sets the assistant's prose and the headings, IBM Plex Sans the interface, JetBrains Mono the code.
+   No external requests; fonts are bundled (OFL). */
 @font-face {
   font-family: 'Newsreader';
   src: url('/fonts/newsreader-latin-wght-normal.woff2') format('woff2');
@@ -14,9 +16,9 @@
   font-display: swap;
 }
 @font-face {
-  font-family: 'Inter';
-  src: url('/fonts/inter-latin-wght-normal.woff2') format('woff2');
-  font-weight: 100 900;
+  font-family: 'IBM Plex Sans';
+  src: url('/fonts/ibm-plex-sans-latin-wght-normal.woff2') format('woff2');
+  font-weight: 100 700;
   font-display: swap;
 }
 @font-face {
@@ -29,41 +31,42 @@
 :root {
   color-scheme: dark;
 
-  /* surfaces, darkest to lightest */
-  --bg: #0b0d12;
-  --bg-2: #0f1218;
-  --surface: #141821;
-  --surface-2: #1a1f2a;
-  --surface-3: #232a38;
-  --code-bg: #090b0f;
+  /* surfaces, darkest to lightest: ink with a faint violet undertone */
+  --bg: #0e0d14;
+  --bg-2: #13121b;
+  --surface: #191823;
+  --surface-2: #211f2d;
+  --surface-3: #2c2a3b;
+  --code-bg: #0a0910;
 
   /* lines */
-  --border: #1f2531;
-  --border-strong: #2d3545;
+  --border: #262432;
+  --border-strong: #38364a;
 
-  /* text (all pass WCAG AA on --bg and --surface) */
-  --text: #e8ebf2;
-  --dim: #a4acbc;
-  --faint: #7a8296;
+  /* text: warm pearl (all pass WCAG AA on --bg and --surface) */
+  --text: #ebe6dc;
+  --dim: #b0abbd;
+  --faint: #8c879e;
 
-  /* accent */
-  --accent: #8c9bff;
-  --accent-strong: #a5b0ff;
-  --accent-ink: #0a0d1c;
-  --accent-soft: rgb(140 155 255 / 0.12);
-  --accent-line: rgb(140 155 255 / 0.4);
+  /* accent: the nacre violet used by the terminal UI */
+  --accent: #b4a7e8;
+  --accent-strong: #cbc1f3;
+  --accent-ink: #15111f;
+  --accent-soft: rgb(180 167 232 / 0.13);
+  --accent-line: rgb(180 167 232 / 0.42);
 
-  /* status and agent colours */
-  --teal: #4fd1c1;
-  --lavender: #b3a4ff;
-  --gold: #f0c674;
-  --green: #7ddba0;
-  --red: #f17b86;
-  --blue: #74b7ff;
-  --rose: #e692d6;
+  /* status and agent colours: identical to the terminal theme */
+  --teal: #8fd3c8;
+  --lavender: #b4a7e8;
+  --gold: #e6c384;
+  --green: #9fd4a8;
+  --red: #e58a8a;
+  --blue: #8db4f0;
+  --rose: #e3b7c4;
+  --orchid: #d79bd6;
 
   --serif: 'Newsreader', 'Iowan Old Style', 'Palatino Linotype', Georgia, serif;
-  --sans: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --sans: 'IBM Plex Sans', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
   --mono: 'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
 
   --radius: 12px;
@@ -102,7 +105,6 @@ body {
   background: var(--bg);
   color: var(--text);
   font: 15px/1.55 var(--sans);
-  letter-spacing: -0.003em;
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
   overflow: hidden;
@@ -129,7 +131,7 @@ a:hover {
   color: var(--accent-strong);
 }
 ::selection {
-  background: rgb(140 155 255 / 0.32);
+  background: rgb(180 167 232 / 0.32);
 }
 .sr-only {
   position: absolute;
@@ -149,7 +151,7 @@ a:hover {
   grid-template-columns: 264px minmax(0, 1fr) 324px;
 }
 #sidebar {
-  background: linear-gradient(180deg, rgb(140 155 255 / 0.06), transparent 240px), var(--bg-2);
+  background: linear-gradient(180deg, rgb(180 167 232 / 0.06), transparent 240px), var(--bg-2);
   border-right: 1px solid var(--border);
   display: flex;
   flex-direction: column;
@@ -183,7 +185,7 @@ a:hover {
 .brand svg {
   width: 22px;
   height: 22px;
-  filter: drop-shadow(0 0 8px rgb(140 155 255 / 0.35));
+  filter: drop-shadow(0 0 8px rgb(180 167 232 / 0.35));
 }
 .side-actions {
   padding: 2px 14px 12px;
@@ -198,9 +200,7 @@ a:hover {
 }
 .side-title {
   padding: 10px 10px 6px;
-  font: 600 11px/1 var(--sans);
-  letter-spacing: 0.09em;
-  text-transform: uppercase;
+  font: 500 12.5px/1 var(--sans);
   color: var(--faint);
 }
 .side-item {
@@ -280,7 +280,7 @@ a:hover {
 }
 .dot.run {
   background: var(--teal);
-  box-shadow: 0 0 0 3px rgb(79 209 193 / 0.18);
+  box-shadow: 0 0 0 3px rgb(143 211 200 / 0.18);
   animation: pulse 1.4s ease-in-out infinite;
 }
 .side-foot {
@@ -314,7 +314,7 @@ a:hover {
 }
 .btn:hover {
   background: var(--surface-3);
-  border-color: #3a4358;
+  border-color: #4a4760;
 }
 .btn:active {
   transform: translateY(1px);
@@ -332,11 +332,11 @@ a:hover {
 }
 .btn.danger {
   background: transparent;
-  border-color: rgb(241 123 134 / 0.45);
+  border-color: rgb(229 138 138 / 0.45);
   color: var(--red);
 }
 .btn.danger:hover {
-  background: rgb(241 123 134 / 0.12);
+  background: rgb(229 138 138 / 0.12);
   border-color: var(--red);
 }
 .btn.small {
@@ -393,7 +393,7 @@ textarea::placeholder {
   gap: 8px 10px;
   padding: 10px 18px;
   border-bottom: 1px solid var(--border);
-  background: rgb(11 13 18 / 0.88);
+  background: rgb(14 13 20 / 0.88);
   backdrop-filter: blur(10px);
 }
 #topbar .title {
@@ -421,10 +421,8 @@ textarea::placeholder {
   border: 1px solid var(--border);
   border-radius: 9px;
   background: var(--surface);
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.07em;
-  text-transform: uppercase;
+  font-size: 12.5px;
+  font-weight: 500;
   color: var(--faint);
 }
 .chip:focus-within {
@@ -438,8 +436,6 @@ textarea::placeholder {
   box-shadow: none;
   font-size: 13px;
   font-weight: 500;
-  letter-spacing: 0;
-  text-transform: none;
   color: var(--text);
   padding: 4px 4px 4px 2px;
   max-width: 100%;
@@ -472,43 +468,35 @@ textarea::placeholder {
   display: flex;
   align-items: center;
   gap: 8px;
-  height: 32px;
-  padding: 0 12px;
-  border: 1px solid var(--border);
-  border-radius: 9px;
-  background: var(--surface);
   font-size: 12px;
   color: var(--dim);
-  min-width: 210px;
+  min-width: 230px;
   font-variant-numeric: tabular-nums;
 }
 .meter > span:first-child {
-  font: 600 11px var(--sans);
-  letter-spacing: 0.07em;
-  text-transform: uppercase;
   color: var(--faint);
 }
 .meter-bar {
   position: relative;
   flex: 1;
-  height: 5px;
-  border-radius: 3px;
+  height: 4px;
+  border-radius: 2px;
   background: var(--surface-3);
 }
 .meter-fill {
   position: absolute;
   inset: 0 auto 0 0;
   border-radius: 3px;
-  background: linear-gradient(90deg, var(--teal), #7be0d2);
+  background: linear-gradient(90deg, var(--teal), var(--lavender));
   transition:
     width 0.3s,
     background 0.3s;
 }
 .meter-fill.warn {
-  background: linear-gradient(90deg, var(--gold), #f7d994);
+  background: linear-gradient(90deg, var(--gold), #f3dcae);
 }
 .meter-fill.hot {
-  background: linear-gradient(90deg, var(--red), #f7a1a8);
+  background: linear-gradient(90deg, var(--red), #f1b0b0);
 }
 .meter-tick {
   position: absolute;
@@ -537,24 +525,34 @@ textarea::placeholder {
   display: contents;
 }
 .msg-user {
-  align-self: flex-end;
-  max-width: 85%;
-  padding: 10px 14px;
-  border-radius: 14px 14px 4px 14px;
-  background: var(--surface-2);
-  border: 1px solid var(--border-strong);
+  align-self: stretch;
+  margin-top: 10px;
+  padding: 2px 0 2px 14px;
+  border-left: 2px solid var(--accent-line);
+  color: var(--text);
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
 .msg-assistant {
-  font: 15px/1.7 var(--sans);
+  font: 17px/1.7 var(--serif);
   overflow-wrap: anywhere;
 }
 .msg-assistant .who {
-  font: 600 11px/1 var(--sans);
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
+  font: 500 13px/1 var(--sans);
+  color: var(--faint);
   margin-bottom: 8px;
+}
+/* Only the edge of the live reply carries a sheen; finished text stays still. */
+#live > .msg-assistant:last-child .md > :last-child::after {
+  content: '';
+  display: inline-block;
+  width: 7px;
+  height: 1.05em;
+  margin-left: 3px;
+  vertical-align: text-bottom;
+  border-radius: 2px;
+  background: linear-gradient(180deg, var(--rose), var(--lavender));
+  animation: pulse 1.2s ease-in-out infinite;
 }
 .md > * + * {
   margin-top: 0.75em;
@@ -760,18 +758,18 @@ textarea::placeholder {
 }
 .notice.warn {
   color: var(--gold);
-  background: rgb(240 198 116 / 0.06);
-  border-color: rgb(240 198 116 / 0.28);
+  background: rgb(230 195 132 / 0.06);
+  border-color: rgb(230 195 132 / 0.28);
 }
 .notice.error {
   color: var(--red);
-  background: rgb(241 123 134 / 0.07);
-  border-color: rgb(241 123 134 / 0.32);
+  background: rgb(229 138 138 / 0.07);
+  border-color: rgb(229 138 138 / 0.32);
 }
 .notice.success {
   color: var(--green);
-  background: rgb(125 219 160 / 0.06);
-  border-color: rgb(125 219 160 / 0.28);
+  background: rgb(159 212 168 / 0.06);
+  border-color: rgb(159 212 168 / 0.28);
 }
 .channel {
   display: flex;
@@ -808,7 +806,7 @@ textarea::placeholder {
   max-width: 420px;
 }
 .empty svg {
-  filter: drop-shadow(0 0 22px rgb(140 155 255 / 0.4));
+  filter: drop-shadow(0 0 22px rgb(180 167 232 / 0.4));
 }
 .empty h2 {
   font: 500 32px/1.2 var(--serif);
@@ -818,6 +816,24 @@ textarea::placeholder {
 }
 .empty p {
   margin: 0 0 18px;
+}
+.empty .steps {
+  list-style: none;
+  margin: 0 0 22px;
+  padding: 0;
+  text-align: left;
+  display: grid;
+  gap: 8px;
+  font-size: 14px;
+}
+.empty .steps li {
+  padding-left: 14px;
+  border-left: 2px solid var(--border-strong);
+  color: var(--dim);
+}
+.empty .steps b {
+  color: var(--text);
+  font-weight: 500;
 }
 
 /* ------------------------------------------------------------------ composer & cards */
@@ -838,28 +854,25 @@ textarea::placeholder {
   box-shadow: var(--shadow);
 }
 .card.approval {
-  border-color: rgb(240 198 116 / 0.5);
+  border-color: rgb(230 195 132 / 0.5);
   box-shadow:
     inset 3px 0 0 var(--gold),
     var(--shadow);
 }
 .card.question {
-  border-color: rgb(79 209 193 / 0.5);
+  border-color: rgb(143 211 200 / 0.5);
   box-shadow:
     inset 3px 0 0 var(--teal),
     var(--shadow);
 }
 .card.banner-pause {
-  border-color: rgb(240 198 116 / 0.4);
-  background: #191a1a;
+  border-color: rgb(230 195 132 / 0.4);
   background: color-mix(in srgb, var(--gold) 7%, var(--surface));
 }
 .card h3 {
   margin: 0 0 6px;
-  font: 600 12px var(--sans);
-  letter-spacing: 0.07em;
-  text-transform: uppercase;
-  color: var(--dim);
+  font: 600 15px var(--serif);
+  color: var(--text);
 }
 .card.approval h3 {
   color: var(--gold);
@@ -930,8 +943,10 @@ textarea::placeholder {
   font-size: 12px;
   color: var(--faint);
   display: flex;
+  flex-wrap: wrap;
   justify-content: space-between;
-  gap: 12px;
+  align-items: center;
+  gap: 4px 16px;
   padding: 0 6px;
   font-variant-numeric: tabular-nums;
 }
@@ -941,9 +956,7 @@ textarea::placeholder {
   display: none;
   justify-content: space-between;
   align-items: center;
-  font: 600 11px var(--sans);
-  letter-spacing: 0.09em;
-  text-transform: uppercase;
+  font: 500 13px var(--sans);
   color: var(--faint);
 }
 .pcard {
@@ -954,10 +967,8 @@ textarea::placeholder {
 }
 .pcard h4 {
   margin: 0 0 10px;
-  font: 600 11px var(--sans);
-  letter-spacing: 0.09em;
-  text-transform: uppercase;
-  color: var(--faint);
+  font: 500 13px var(--sans);
+  color: var(--dim);
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -1015,7 +1026,7 @@ dialog {
   box-shadow: var(--shadow);
 }
 dialog::backdrop {
-  background: rgb(5 6 9 / 0.72);
+  background: rgb(6 5 9 / 0.72);
   backdrop-filter: blur(3px);
 }
 dialog form {
@@ -1064,8 +1075,8 @@ dialog .row {
   display: grid;
   place-items: center;
   background:
-    radial-gradient(900px 480px at 50% -10%, rgb(140 155 255 / 0.14), transparent 70%),
-    radial-gradient(600px 400px at 85% 110%, rgb(79 209 193 / 0.07), transparent 70%), var(--bg);
+    radial-gradient(900px 480px at 50% -10%, rgb(180 167 232 / 0.14), transparent 70%),
+    radial-gradient(600px 400px at 85% 110%, rgb(143 211 200 / 0.07), transparent 70%), var(--bg);
   z-index: 10;
 }
 #login form {
@@ -1088,7 +1099,7 @@ dialog .row {
   align-items: center;
 }
 #login h1 svg {
-  filter: drop-shadow(0 0 10px rgb(140 155 255 / 0.4));
+  filter: drop-shadow(0 0 10px rgb(180 167 232 / 0.4));
 }
 #login .err {
   color: var(--red);

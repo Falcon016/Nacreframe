@@ -32,6 +32,7 @@ export interface ServerOptions {
 }
 
 const MAX_BODY = 1_000_000;
+const MAX_DISCARD = 32_000_000; // how much of an oversized upload is read and thrown away before the socket is cut
 const COOKIE = 'nacre_sid';
 const SESSION_TTL_MS = 7 * 24 * 3600 * 1000;
 
@@ -136,8 +137,20 @@ export async function startServer(opts: ServerOptions): Promise<RunningServer> {
       req.on('data', (c: Buffer) => {
         size += c.length;
         if (size > MAX_BODY) {
+          // Answer first. Destroying the socket now drops the connection with no reply, and closing it while
+          // the client is still sending resets it before the reply is read (seen on Windows and macOS). So
+          // keep reading and discard the rest of the upload, within a size cap and a timeout.
+          chunks.length = 0;
+          req.removeAllListeners('data');
+          let discarded = size;
+          req.on('data', (d: Buffer) => {
+            discarded += d.length;
+            if (discarded > MAX_DISCARD) req.destroy();
+          });
+          const cut = setTimeout(() => req.destroy(), 10_000);
+          cut.unref();
+          req.once('close', () => clearTimeout(cut)); // never cut a connection that has moved on
           reject(new HttpError(413, 'Request too large'));
-          req.destroy();
         } else chunks.push(c);
       });
       req.on('end', () => {
@@ -334,7 +347,9 @@ export async function startServer(opts: ServerOptions): Promise<RunningServer> {
   const listener = (req: IncomingMessage, res: ServerResponse) => {
     handle(req, res).catch((e: unknown) => {
       if (res.headersSent) return void res.end();
-      if (e instanceof HttpError) return json(res, e.status, { error: e.message });
+      if (e instanceof HttpError) {
+        return json(res, e.status, { error: e.message });
+      }
       process.stderr.write(`[nacre serve] ${(e as Error).stack ?? e}\n`);
       json(res, 500, { error: 'Internal error' });
     });

@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="color-scheme" content="dark" />
-    <meta name="theme-color" content="#0b0d12" />
+    <meta name="theme-color" content="#0e0d14" />
     <meta name="referrer" content="no-referrer" />
     <title>Nacreframe</title>
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
@@ -71,18 +71,6 @@
             >Model
             <select id="model" aria-label="Model"></select>
           </label>
-          <div
-            class="meter"
-            id="meter"
-            title="Context window usage. The tick marks where automatic compaction starts."
-          >
-            <span>ctx</span>
-            <div class="meter-bar">
-              <div class="meter-fill" id="meter-fill"></div>
-              <div class="meter-tick" id="meter-tick"></div>
-            </div>
-            <span id="meter-text">–</span>
-          </div>
           <button class="btn small" id="compact" title="Summarise older messages now">Compact</button>
           <button class="btn small" id="toggle-panel" title="Tasks, swarm and browser">Panel</button>
         </header>
@@ -98,7 +86,19 @@
             <button class="btn primary" type="submit" id="send">Send</button>
           </form>
           <div class="hint">
-            <span id="hint">Enter to send · Shift+Enter for a new line</span><span id="queued"></span>
+            <span id="hint">Enter to send, Shift+Enter for a new line</span><span id="queued"></span>
+            <div
+              class="meter"
+              id="meter"
+              title="Context window usage. The tick marks where automatic compaction starts."
+            >
+              <span>Context</span>
+              <div class="meter-bar">
+                <div class="meter-fill" id="meter-fill"></div>
+                <div class="meter-tick" id="meter-tick"></div>
+              </div>
+              <span id="meter-text">–</span>
+            </div>
           </div>
         </div>
       </main>

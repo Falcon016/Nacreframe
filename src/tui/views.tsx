@@ -56,10 +56,14 @@ export function Banner({ info }: { info: BannerInfo }) {
         /help for commands · shift+tab changes mode · esc interrupts · {BIN} --help
       </Text>
       {info.warnings.map((w, i) => (
-        <Text key={i} color={t.gold}>
-          {' '}
-          ! {w}
-        </Text>
+        <Box key={i} paddingLeft={1}>
+          <Box width={2} flexShrink={0}>
+            <Text color={t.gold}>!</Text>
+          </Box>
+          <Box flexShrink={1}>
+            <Text color={t.gold}>{w}</Text>
+          </Box>
+        </Box>
       ))}
     </Box>
   );
@@ -129,9 +133,12 @@ export function ItemView({ item, banner }: { item: Item; banner: BannerInfo }) {
       const glyph = { info: '·', warn: '!', error: GLYPH.fail, success: GLYPH.ok }[item.level];
       return (
         <Box paddingLeft={1}>
-          <Text color={color}>
-            {glyph} {item.text}
-          </Text>
+          <Box width={2} flexShrink={0}>
+            <Text color={color}>{glyph}</Text>
+          </Box>
+          <Box flexShrink={1}>
+            <Text color={color}>{item.text}</Text>
+          </Box>
         </Box>
       );
     }
@@ -318,7 +325,7 @@ export function LiveArea({
       {snap.compacting ? (
         <Box paddingLeft={1} marginTop={1}>
           <Text color={t.gold}>
-            ⏸ Compacting context ({snap.compacting.pct}%) — chat paused, your input is queued
+            Compacting context ({snap.compacting.pct}%): chat paused, your input is queued
           </Text>
         </Box>
       ) : null}

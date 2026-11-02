@@ -224,7 +224,7 @@ install code you trust.
 
 The UI is built around a dark "nacre" palette: warm pearl text, violet-grey chrome, iridescent accents. The terminal's
 own background is left alone; matching colour schemes for Windows Terminal, Ghostty and Alacritty are in
-[assets/terminal-themes](assets/terminal-themes). The dashboard bundles Newsreader (serif), Inter and JetBrains Mono
+[assets/terminal-themes](assets/terminal-themes). The dashboard bundles Newsreader (serif), IBM Plex Sans and JetBrains Mono
 (all SIL OFL). `NO_COLOR=1` switches the terminal UI to monochrome.
 
 ## Development
