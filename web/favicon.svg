@@ -1,16 +1,16 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
   <defs>
     <linearGradient id="p" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0" stop-color="#f3d6df" />
-      <stop offset="0.4" stop-color="#b4a7e8" />
-      <stop offset="0.72" stop-color="#8fd3c8" />
-      <stop offset="1" stop-color="#e6c384" />
+      <stop offset="0" stop-color="#f4f1ff" />
+      <stop offset="0.4" stop-color="#a5b0ff" />
+      <stop offset="0.72" stop-color="#5fd8c8" />
+      <stop offset="1" stop-color="#f0c674" />
     </linearGradient>
     <symbol id="gem" viewBox="0 0 32 32">
       <path d="M16 2 29 16 16 30 3 16Z" fill="url(#p)" />
-      <path d="M16 2v28M3 16h26" stroke="#121118" stroke-opacity=".2" stroke-width="1.2" />
+      <path d="M16 2v28M3 16h26" stroke="#0b0d12" stroke-opacity=".22" stroke-width="1.2" />
     </symbol>
   </defs>
-  <rect width="32" height="32" rx="7" fill="#121118" />
+  <rect width="32" height="32" rx="7" fill="#0b0d12" />
   <use href="#gem" x="3" y="3" width="26" height="26" />
 </svg>

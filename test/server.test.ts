@@ -1,7 +1,8 @@
 import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import { request as httpRequest } from 'node:http';
 import { join } from 'node:path';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
+import { Runtime } from '../src/runtime.js';
 import { startServer, type RunningServer } from '../src/server/app.js';
 import type { WebState } from '../src/server/sessions.js';
 import { startMockLlm } from './mock-llm.js';
@@ -305,6 +306,45 @@ describe('sessions over the API', () => {
     expect((await api(`/api/sessions/${id}/settings`, { json: { model: 'nope/none' } })).status).toBe(400);
     w.close();
     await api(`/api/sessions/${id}`, { method: 'DELETE' });
+  });
+
+  it('tells connected browsers to start over when a new conversation begins', async () => {
+    const id = await newSession({ approval: 'auto' });
+    const w = await watch(id);
+    await until(() => w.states.length > 0);
+    await api(`/api/sessions/${id}/prompt`, { json: { text: 'first conversation' } });
+    await until(() => w.allItems().some((i) => i.kind === 'assistant') && !w.last().session.running);
+
+    const before = w.states.length;
+    expect((await api(`/api/sessions/${id}/new`, { json: {} })).status).toBe(200);
+    // Without a reset the page would keep drawing the old transcript above the new one.
+    await until(() => w.states.length > before && w.states.slice(before).some((s) => s.reset));
+    const reset = w.states.slice(before).find((s) => s.reset)!;
+    expect(reset.items).toEqual([]);
+
+    await api(`/api/sessions/${id}/prompt`, { json: { text: 'second conversation' } });
+    await until(() => w.states.slice(before).some((s) => s.items.some((i) => i.kind === 'assistant')));
+    const afterItems = w.states.slice(before).flatMap((s) => s.items);
+    expect(afterItems.some((i) => i.kind === 'user' && i.text === 'second conversation')).toBe(true);
+    expect(afterItems.some((i) => i.kind === 'user' && i.text === 'first conversation')).toBe(false);
+    w.close();
+    await api(`/api/sessions/${id}`, { method: 'DELETE' });
+  });
+
+  it('releases the runtime when a session fails halfway through being created', async () => {
+    const dispose = vi.spyOn(Runtime.prototype, 'dispose');
+    try {
+      const res = await api('/api/sessions', {
+        json: { cwd: work, model: 'mock/m', swarmResume: 'doesnotexist01' },
+      });
+      expect(res.status).toBe(400);
+      expect(dispose).toHaveBeenCalledTimes(1); // otherwise its browser and child processes would leak
+      expect(((await (await api('/api/sessions')).json()) as { sessions: unknown[] }).sessions).toEqual(
+        expect.not.arrayContaining([expect.objectContaining({ cwd: work, swarm: true })]),
+      );
+    } finally {
+      dispose.mockRestore();
+    }
   });
 
   it('runs a persistent swarm and lists it for resume', async () => {

@@ -109,10 +109,17 @@ export class WebSession {
       ...(typeof body.resume === 'string' && body.resume ? { resume: body.resume } : {}),
     });
     const s = new WebSession(runtime);
-    s.wire();
-    if (typeof body.resume === 'string' && body.resume) replayInto(s.store, runtime.agent.session.messages());
-    for (const w of runtime.warnings) s.store.notice(w, 'warn');
-    if (typeof body.swarmResume === 'string' && body.swarmResume) await s.swarm('resume', body.swarmResume);
+    try {
+      s.wire();
+      if (typeof body.resume === 'string' && body.resume)
+        replayInto(s.store, runtime.agent.session.messages());
+      for (const w of runtime.warnings) s.store.notice(w, 'warn');
+      if (typeof body.swarmResume === 'string' && body.swarmResume) await s.swarm('resume', body.swarmResume);
+    } catch (e) {
+      // Nobody holds a reference to this session yet, so nothing else will ever clean it up.
+      await s.dispose().catch(() => undefined);
+      throw e;
+    }
     return s;
   }
 
@@ -339,6 +346,11 @@ export class WebSession {
     if (this.runtime.agent.isRunning) throw new HttpError(409, 'Interrupt the current turn first');
     this.runtime.newSession();
     this.store.clear();
+    // Connected browsers keep what they already drew and only receive newer items, so tell them to start over.
+    for (const c of this.clients) {
+      c.first = true;
+      c.lastItemId = 0;
+    }
     this.push(true);
   }
 

@@ -345,7 +345,13 @@ export async function startServer(opts: ServerOptions): Promise<RunningServer> {
     : createHttp(listener);
   server.requestTimeout = 0; // SSE streams are long-lived
   server.headersTimeout = 15_000;
-  const hb = setInterval(() => manager.heartbeat(), 15_000);
+  const hb = setInterval(() => {
+    manager.heartbeat();
+    // Forget expired logins and old failed-login counters; otherwise they pile up for as long as the server runs.
+    const now = Date.now();
+    for (const [sid, exp] of authed) if (exp <= now) authed.delete(sid);
+    for (const [ip, a] of attempts) if (a.reset <= now) attempts.delete(ip);
+  }, 15_000);
   hb.unref();
 
   await new Promise<void>((ok, fail) => {

@@ -19,18 +19,19 @@ function h(tag, props, ...kids) {
   return el;
 }
 
-const PALETTE = ['#d79bd6', '#8fd3c8', '#e6c384', '#8db4f0', '#9fd4a8', '#e3b7c4', '#b4a7e8', '#f0a58f'];
+// Agent colours: kept in step with the --rose/--teal/--gold/... tokens in app.css.
+const PALETTE = ['#e692d6', '#4fd1c1', '#f0c674', '#74b7ff', '#7ddba0', '#8c9bff', '#b3a4ff', '#f4a98d'];
 const NAMED = {
-  magenta: '#d79bd6',
-  cyan: '#8fd3c8',
-  yellow: '#e6c384',
-  green: '#9fd4a8',
-  blue: '#8db4f0',
-  red: '#e58a8a',
+  magenta: '#e692d6',
+  cyan: '#4fd1c1',
+  yellow: '#f0c674',
+  green: '#7ddba0',
+  blue: '#74b7ff',
+  red: '#f17b86',
 };
 const colorOf = (name, preferred) => {
-  if (name === 'you') return '#e3b7c4';
-  if (name === 'system') return '#6c6780';
+  if (name === 'you') return '#8c9bff';
+  if (name === 'system') return '#7a8296';
   if (preferred && (NAMED[preferred] || /^#[0-9a-f]{6}$/i.test(preferred)))
     return NAMED[preferred] ?? preferred;
   let n = 0;
@@ -228,15 +229,31 @@ const S = {
   pinned: false,
   stickBottom: true,
   shotTimer: null,
+  shotSrc: null,
+  sideKey: undefined,
+  cardKey: undefined,
 };
 
+// Round before choosing the unit so 999,999 reads "1.0M" rather than "1000k".
 const fmt = (n) =>
-  n >= 1e6 ? `${(n / 1e6).toFixed(1)}M` : n >= 1000 ? `${(n / 1000).toFixed(n >= 1e4 ? 0 : 1)}k` : String(n);
+  n >= 999_500
+    ? `${(n / 1e6).toFixed(1)}M`
+    : n >= 1000
+      ? `${(n / 1000).toFixed(n >= 9950 ? 0 : 1)}k`
+      : String(n);
 const base = (p) => p.split(/[\\/]/).filter(Boolean).pop() ?? p;
 
 // ------------------------------------------------------------------------------------------------ login
+let pollTimer;
+
 function showLogin() {
   closeStream();
+  clearInterval(pollTimer);
+  pollTimer = undefined;
+  // Forget the old session view, otherwise signing back in leaves a frozen transcript behind.
+  S.id = null;
+  S.st = null;
+  S.rendered.clear();
   $('#app').hidden = true;
   $('#login').hidden = false;
   $('#login-token').focus();
@@ -246,10 +263,15 @@ async function doLogin(token) {
   $('#login-err').textContent = '';
   try {
     await api('/api/login', { method: 'POST', body: { token } });
+    $('#login-token').value = '';
     $('#login').hidden = true;
     await start();
   } catch (e) {
-    $('#login-err').textContent = e.message;
+    // The login form starts hidden (a #token= link skips it), so a wrong or stale token must bring it back.
+    if (!(e instanceof AuthError)) {
+      showLogin();
+      $('#login-err').textContent = e.message;
+    }
   }
 }
 
@@ -260,12 +282,26 @@ async function refreshSessions() {
   } catch {
     return;
   }
+  // The poll runs every few seconds; only rebuild the list when something changed, or keyboard focus is lost.
+  const key = JSON.stringify([
+    S.id,
+    S.sessions.map((s) => [s.id, s.cwd, s.model, s.mode, s.running, s.swarm]),
+  ]);
+  if (key === S.sideKey) return;
+  S.sideKey = key;
   const list = $('#side-list');
   list.replaceChildren(
     h('div', { class: 'side-title', text: 'Open sessions' }),
     ...(S.sessions.length
-      ? S.sessions.map((s) =>
-          h(
+      ? S.sessions.map((s) => {
+          const closeSession = guard(async (ev) => {
+            ev.stopPropagation();
+            await api(`/api/sessions/${s.id}`, { method: 'DELETE' });
+            if (S.id === s.id) closeSessionView();
+            S.sideKey = undefined;
+            refreshSessions();
+          });
+          return h(
             'button',
             {
               class: 'side-item',
@@ -282,18 +318,20 @@ async function refreshSessions() {
             h('span', {
               class: 'sub',
               title: 'Close session',
+              'aria-label': `Close session ${base(s.cwd)}`,
               role: 'button',
               tabindex: '0',
               text: '×',
-              onclick: guard(async (ev) => {
-                ev.stopPropagation();
-                await api(`/api/sessions/${s.id}`, { method: 'DELETE' });
-                if (S.id === s.id) closeSessionView();
-                refreshSessions();
-              }),
+              onclick: closeSession,
+              // A span is not a button: Enter and Space have to be wired by hand, and must not also open the session.
+              onkeydown: (ev) => {
+                if (ev.key !== 'Enter' && ev.key !== ' ') return;
+                ev.preventDefault();
+                closeSession(ev);
+              },
             }),
-          ),
-        )
+          );
+        })
       : [h('div', { class: 'note', text: 'No open sessions.' })]),
   );
 }
@@ -303,6 +341,7 @@ function closeStream() {
   S.es = null;
   clearInterval(S.shotTimer);
   S.shotTimer = null;
+  S.shotSrc = null;
 }
 
 function closeSessionView() {
@@ -313,6 +352,7 @@ function closeSessionView() {
   renderEmpty();
   renderTop();
   $('#cards').replaceChildren();
+  S.cardKey = undefined;
   $('#panel').hidden = true;
   $('#app').classList.remove('with-panel');
 }
@@ -352,6 +392,7 @@ function openSession(id) {
   S.id = id;
   S.st = null;
   S.rendered.clear();
+  S.stickBottom = true; // a new session starts at the latest message, even if the last one was scrolled up
   $('#transcript').replaceChildren(h('div', { class: 'notice', text: 'Connecting…' }));
   $('#sidebar').classList.remove('open');
   const es = new EventSource(`/api/sessions/${id}/events`);
@@ -548,7 +589,24 @@ function fillModelSelect(sel, models, current, withPlaceholder) {
 function renderCards() {
   const st = S.st;
   const cards = $('#cards');
-  if (!st) return void cards.replaceChildren();
+  if (!st) {
+    S.cardKey = undefined;
+    return void cards.replaceChildren();
+  }
+  // State arrives many times a second while the agent streams. Rebuilding the cards each time would wipe
+  // whatever the user is typing into an answer or note box, so rebuild only when their content changed.
+  // The session id is part of the key: approval ids are per session, and a stale card must never survive a switch.
+  const idKey = JSON.stringify([S.id, st.approval?.id ?? null, st.question?.id ?? null]);
+  const key = JSON.stringify([
+    idKey,
+    st.approval?.pending ?? null,
+    st.compacting ? (st.compacting.pct ?? 'c') : null,
+    st.compacting || /compact/i.test(st.status ?? '') ? 'compact' : (st.status ?? ''),
+  ]);
+  if (key === S.cardKey) return;
+  if (cards.querySelector('input:focus') && S.cardIdKey === idKey) return; // same card, only a counter changed
+  S.cardKey = key;
+  S.cardIdKey = idKey;
   const out = [];
   if (st.compacting || (st.status && /compact/i.test(st.status))) {
     out.push(
@@ -571,8 +629,17 @@ function renderCards() {
       placeholder: 'Or tell it what to do instead…',
       'aria-label': 'Feedback',
     });
-    const send = (body) =>
-      guard(() => api(`/api/sessions/${S.id}/approval`, { method: 'POST', body: { id: a.id, ...body } }))();
+    const sid = S.id;
+    let sent = false; // one decision per card: a double click or a held key must not post twice
+    const send = async (body) => {
+      if (sent) return;
+      sent = true;
+      const ok = await guard(async () => {
+        await api(`/api/sessions/${sid}/approval`, { method: 'POST', body: { id: a.id, ...body } });
+        return true;
+      })();
+      if (!ok) sent = false; // the request failed (already toasted): let the user try again
+    };
     out.push(
       h(
         'div',
@@ -647,8 +714,6 @@ function renderCards() {
       ),
     );
   }
-  const keep = cards.querySelector('input:focus');
-  if (keep && st.approval) return; // do not wipe what the user is typing into the feedback box
   cards.replaceChildren(...out);
 }
 
@@ -663,11 +728,7 @@ function diffNodes(lines) {
           : l.startsWith('@@')
             ? 'hunk'
             : '';
-    const span = h('span', { class: cls, text: l });
-    if (cls === 'add') span.style.color = 'var(--green)';
-    if (cls === 'del') span.style.color = 'var(--red)';
-    if (cls === 'hunk') span.style.color = 'var(--lavender)';
-    frag.append(span, i < lines.length - 1 ? '\n' : '');
+    frag.append(h('span', { class: cls, text: l }), i < lines.length - 1 ? '\n' : '');
   });
   return frag;
 }
@@ -683,9 +744,28 @@ function renderPanel() {
   const show = !!st && (S.pinned || hasTodos || swarm || browser);
   $('#app').classList.toggle('with-panel', show);
   panel.hidden = !show;
-  if (!show) return;
+  // Below 1100px the panel is an overlay that only shows with .open; without this the Panel button did nothing there.
+  panel.classList.toggle('open', S.pinned);
+  if (!show) return void scheduleShot(false);
 
-  const cards = [];
+  // Below 1100px the panel slides over the top bar, hiding the Panel button: give it a way to close itself.
+  // (CSS shows this header only in that overlay mode.)
+  const cards = [
+    h(
+      'div',
+      { class: 'panel-head' },
+      h('span', { text: 'Details' }),
+      h('button', {
+        class: 'btn small',
+        'aria-label': 'Close details panel',
+        onclick: () => {
+          S.pinned = false;
+          renderPanel();
+        },
+        text: 'Close',
+      }),
+    ),
+  ];
   if (hasTodos) {
     cards.push(
       h(
@@ -816,22 +896,34 @@ function renderPanel() {
     ),
   );
   panel.replaceChildren(...cards);
+  // The image element is rebuilt with the panel on every state update: put the last frame straight back so it
+  // does not blink empty until the next fetch.
+  const shot = $('#shot');
+  if (shot && S.shotSrc) shot.src = S.shotSrc;
   scheduleShot(!!browser);
 }
 
 function scheduleShot(on) {
-  clearInterval(S.shotTimer);
-  S.shotTimer = null;
-  const img = $('#shot');
-  if (!on || !img) return;
+  if (!on || !$('#shot')) {
+    clearInterval(S.shotTimer);
+    S.shotTimer = null;
+    S.shotSrc = null;
+    return;
+  }
+  // renderPanel runs on every streamed update; restarting the timer (and fetching at once) each time would
+  // hammer the server with screenshot requests. Start it once and let it run.
+  if (S.shotTimer) return;
   const tick = () => {
-    if (document.hidden || !S.id) return;
+    const sid = S.id;
+    if (document.hidden || !sid) return;
     const probe = new Image();
     probe.onload = () => {
+      if (S.id !== sid) return; // the user switched sessions while this frame was loading
+      S.shotSrc = probe.src;
       const target = $('#shot');
       if (target) target.src = probe.src;
     };
-    probe.src = `/api/sessions/${S.id}/browser.jpg?t=${Date.now()}`;
+    probe.src = `/api/sessions/${sid}/browser.jpg?t=${Date.now()}`;
   };
   tick();
   S.shotTimer = setInterval(tick, 1500);
@@ -840,9 +932,12 @@ function scheduleShot(on) {
 // ------------------------------------------------------------------------------------------------ composer
 const input = () => $('#input');
 
+// "/compact", "/mode auto"… but not a message that merely starts with a path, like "/home/me/notes.txt is empty".
+const isCommand = (text) => /^\/[a-z][\w-]*(\s|$)/i.test(text);
+
 async function sendMessage(text) {
   if (!S.id || !text.trim()) return;
-  if (text.startsWith('/')) return slash(text);
+  if (isCommand(text)) return slash(text);
   if (!S.st?.session.model) return toast('Pick a model first.', 'error');
   await api(`/api/sessions/${S.id}/prompt`, { method: 'POST', body: { text } });
 }
@@ -908,11 +1003,14 @@ async function openNewDialog() {
   loadSaved();
 }
 
+let savedSeq = 0;
 async function loadSaved() {
+  const seq = ++savedSeq;
   const sel = $('#nf-resume');
   sel.replaceChildren(h('option', { value: '', text: 'Start fresh' }));
   try {
     const saved = await api(`/api/saved?cwd=${encodeURIComponent($('#nf-cwd').value)}`);
+    if (seq !== savedSeq) return; // a newer lookup (typing continued) has superseded this answer
     for (const s of saved.sessions)
       sel.append(h('option', { value: `session:${s.id}`, text: `Conversation — ${s.preview}` }));
     for (const s of saved.swarms)
@@ -945,7 +1043,9 @@ async function start() {
   if (S.sessions.length === 1) openSession(S.sessions[0].id);
   else if (!S.id) renderEmpty();
   renderTop();
-  setInterval(refreshSessions, 6000);
+  // One poller only: signing in again (after the cookie expires) must not stack another.
+  clearInterval(pollTimer);
+  pollTimer = setInterval(refreshSessions, 6000);
 }
 
 function wire() {
@@ -998,10 +1098,22 @@ function wire() {
       e.preventDefault();
       const text = input().value;
       if (!text.trim()) return;
+      // Check before clearing the box, so a message is never silently thrown away.
+      if (!S.id) return toast('Open or create a session first.', 'error');
+      if (!isCommand(text) && !S.st?.session.model) return toast('Pick a model first.', 'error');
       input().value = '';
       autosize();
       S.stickBottom = true;
-      await sendMessage(text);
+      try {
+        await sendMessage(text);
+      } catch (err) {
+        // The request failed: give the text back (unless they already started typing something else).
+        if (!input().value) {
+          input().value = text;
+          autosize();
+        }
+        throw err;
+      }
     }),
   );
   input().addEventListener('input', autosize);
@@ -1053,16 +1165,23 @@ function wire() {
   document.addEventListener('keydown', (e) => {
     if (
       !S.st?.approval ||
-      /^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement?.tagName ?? '') ||
+      e.repeat || // a held key must not approve (or deny) several things in a row
       e.metaKey ||
-      e.ctrlKey
+      e.ctrlKey ||
+      e.altKey ||
+      /^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement?.tagName ?? '') ||
+      $('dialog[open]') // a modal is in front of the approval card: the keystroke is not meant for it
     )
       return;
-    const btn = $(`#cards [data-key="${e.key}"]`);
+    const btn = $(`#cards [data-key="${e.key.toLowerCase()}"]`); // Caps Lock gives "Y"
     if (btn) {
       e.preventDefault();
       btn.click();
     }
+  });
+  // On a phone the session list is an overlay: tapping the conversation should put it away.
+  $('#main').addEventListener('click', (e) => {
+    if (!e.target.closest('#menu-btn')) $('#sidebar').classList.remove('open');
   });
 }
 

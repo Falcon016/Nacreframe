@@ -72,6 +72,18 @@ describe.skipIf(!channel)('web dashboard in a real browser', () => {
     await shot('01-empty');
   });
 
+  it('shows the login form, with the reason, when a #token= link is wrong or stale', async () => {
+    // The login form starts hidden because a good link skips it; a bad one used to leave a blank page.
+    const ctx = await browser.newContext({ viewport: { width: 1000, height: 700 } });
+    const other = await ctx.newPage();
+    await other.goto(`${srv.url}/#token=${TOKEN}-stale`);
+    await other.locator('#login').waitFor({ state: 'visible' });
+    expect(await other.locator('#login-err').innerText()).toContain('Wrong token');
+    expect(await other.locator('#app').isVisible()).toBe(false);
+    expect(other.url()).not.toContain('token'); // the fragment is removed either way
+    await ctx.close();
+  });
+
   it('creates a session from the dialog with a detected model', async () => {
     await page.getByRole('button', { name: 'New session' }).first().click();
     await page.locator('#new-dialog[open]').waitFor();
@@ -115,8 +127,51 @@ describe.skipIf(!channel)('web dashboard in a real browser', () => {
     await page.locator('#input').blur();
     await page.keyboard.press('y');
     await page.waitForFunction(() => !document.querySelector('.card.approval'));
+    // The card goes as soon as the answer is accepted; the file is written a moment later.
+    await page.waitForSelector('.tool.ok:has-text("from-ui.txt")');
     expect(existsSync(join(work, 'from-ui.txt'))).toBe(true);
-    await page.waitForSelector('.tool.ok');
+  });
+
+  it('does not let the approval shortcut act while a dialog is in front of the card', async () => {
+    await page.fill('#input', 'write behind-dialog.txt');
+    await page.keyboard.press('Enter');
+    await page.waitForSelector('.card.approval');
+    await page.getByRole('button', { name: 'New session' }).first().click();
+    await page.locator('#new-dialog[open]').waitFor();
+    await page.locator('#nf-cancel').focus(); // a button, so the old "not in a text field" check let "y" through
+    await page.keyboard.press('y');
+    await page.waitForTimeout(400);
+    expect(await page.locator('.card.approval').count()).toBe(1);
+    expect(existsSync(join(work, 'behind-dialog.txt'))).toBe(false);
+    await page.locator('#nf-cancel').click();
+    await page.locator('#new-dialog:not([open])').waitFor({ state: 'attached' });
+    await page.locator('#input').blur();
+    await page.keyboard.press('Y'); // Caps Lock: still the approve shortcut once nothing is in the way
+    await page.waitForFunction(() => !document.querySelector('.card.approval'));
+    await page.waitForSelector('.tool.ok:has-text("behind-dialog.txt")');
+    expect(existsSync(join(work, 'behind-dialog.txt'))).toBe(true);
+    await page.waitForFunction(() => document.querySelector('#stop')?.hasAttribute('hidden'));
+  });
+
+  it('sends a message that starts with a path instead of treating it as a slash command', async () => {
+    await page.fill('#input', '/tmp/x.txt is empty');
+    await page.keyboard.press('Enter');
+    await page.waitForSelector('.msg-user:has-text("/tmp/x.txt is empty")');
+    expect(await page.locator('#toast').isVisible()).toBe(false); // no "Commands: …" help toast
+    await page.waitForFunction(() => document.querySelector('#stop')?.hasAttribute('hidden'));
+  });
+
+  it('starts the transcript over after /clear instead of leaving the old one on screen', async () => {
+    expect(await page.locator('.msg-user').count()).toBeGreaterThan(0);
+    await page.fill('#input', '/clear');
+    await page.keyboard.press('Enter');
+    await page.waitForFunction(() => document.querySelectorAll('.msg-user').length === 0);
+    expect(await page.locator('#transcript .notice').first().innerText()).toContain('Ready');
+    await page.fill('#input', 'a fresh start');
+    await page.keyboard.press('Enter');
+    await page.waitForSelector('.msg-user:has-text("a fresh start")');
+    expect(await page.locator('.msg-user').count()).toBe(1);
+    await page.waitForFunction(() => document.querySelector('#stop')?.hasAttribute('hidden'));
   });
 
   it('runs a swarm and shows the roster and channel', async () => {
@@ -151,13 +206,39 @@ describe.skipIf(!channel)('web dashboard in a real browser', () => {
     expect(wide).toEqual([]);
     await page.locator('#menu-btn').click();
     await page.waitForSelector('#sidebar.open');
+    // Let the 0.2s slide-in finish: the screenshot should show the open drawer, and resizing mid-slide is racy.
+    await page.waitForFunction(() => document.querySelector('#sidebar')!.getBoundingClientRect().x === 0);
     await shot('06-mobile');
+    await page.setViewportSize({ width: 1360, height: 860 });
+  });
+
+  it('can open and close the side panel below 1100px, where it is an overlay', async () => {
+    // The panel was pinned open by the swarm test. Below 1100px it only shows with the .open class,
+    // which nothing used to add, so the Panel button did nothing on tablets and phones.
+    await page.setViewportSize({ width: 900, height: 800 });
+    await page.locator('#panel.open').waitFor({ state: 'visible' });
+    await shot('06b-panel-overlay');
+    // The overlay covers the top bar (and the Panel button), so it carries its own Close button.
+    await page.getByRole('button', { name: 'Close details panel' }).click();
+    await page.locator('#panel').waitFor({ state: 'hidden' });
+    await page.getByRole('button', { name: 'Panel' }).click();
+    await page.locator('#panel.open').waitFor({ state: 'visible' });
     await page.setViewportSize({ width: 1360, height: 860 });
   });
 
   it('shows the login screen again after signing out, and raised no CSP or script errors', async () => {
     await page.locator('#logout').click();
     await page.locator('#login').waitFor({ state: 'visible' });
+    await shot('07-login');
     expect(problems).toEqual([]);
+  });
+
+  it('signs back in, clears the token field and reconnects to the open session', async () => {
+    await page.fill('#login-token', TOKEN);
+    await page.keyboard.press('Enter');
+    await page.locator('#app').waitFor({ state: 'visible' });
+    expect(await page.locator('#login-token').inputValue()).toBe(''); // the secret is not left in the field
+    await page.locator('.side-item').first().waitFor();
+    await page.waitForSelector('.msg-user:has-text("a fresh start")'); // the stream is live again
   });
 });
