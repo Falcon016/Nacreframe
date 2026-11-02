@@ -59,9 +59,10 @@ On Linux, macOS or WSL, one command installs Nacreframe and walks you through se
 curl -fsSL https://raw.githubusercontent.com/Falcon016/Nacreframe/main/install.sh | sh
 ```
 
-It needs **Node.js 22.18+** and **git** (it checks, and tells you what to do if one is missing), puts everything under
-`~/.nacreframe`, links `nacre` into `~/.local/bin`, never uses `sudo`, and asks before it edits your shell profile.
-Run it again to update; add `-s -- --uninstall` after `sh` to remove it. Options, troubleshooting and a Windows recipe:
+It sets up what Nacreframe needs: if Node.js 22.18+ is missing it downloads a private, checksum-verified copy (no
+`sudo`), and if git is missing it offers to install it with your package manager. Everything lives under
+`~/.nacreframe`, `nacre` goes into `~/.local/bin`, and it asks before it edits your shell profile. Run it again to
+update; add `-s -- --uninstall` after `sh` to remove it. Options, troubleshooting and a Windows recipe:
 [docs/install.md](docs/install.md).
 
 <details>
@@ -83,6 +84,7 @@ nacre setup       # guided setup
 ```bash
 nacre setup       # provider, API key, model and safety, in about a minute
 nacre doctor      # checks your environment any time
+nacre doctor --fix  # ...and repairs what it can: settings, keys, permissions, PATH, the install itself
 ```
 
 The wizard uses arrow-key menus, checks your API key with the provider before saving it, finds local model servers

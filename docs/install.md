@@ -6,18 +6,27 @@
 curl -fsSL https://raw.githubusercontent.com/Falcon016/Nacreframe/main/install.sh | sh
 ```
 
-You need **Node.js 22.18+** and **git**. The installer checks both and tells you how to get them if they are missing.
+Nacreframe needs **Node.js 22.18+** and **git**. The installer looks after both for you (see step 1).
 If you would like to read it before running it, download it first: `curl -fsSL <url> -o install.sh`, then `sh install.sh`.
 
 What happens, in order:
 
-1. **Checks your system**: Node.js, git, npm. Nothing is installed for you; you get clear next steps instead.
-2. **Downloads and builds** Nacreframe into `~/.nacreframe` (a shallow git checkout), then trims the build tools.
-3. **Links `nacre`** into `~/.local/bin`.
+1. **Checks your system and installs what is missing.**
+   - **Node.js 22.18+**: if it is missing or too old, the installer offers a private copy from nodejs.org
+     (about 40 MB, kept in `~/.nacreframe/runtime`, verified against nodejs.org's published SHA-256). It touches nothing
+     system-wide and needs no `sudo`. The `nacre` command uses it automatically.
+   - **git**: if it is missing, the installer shows the command for your package manager (`apt`, `dnf`, `brew`,
+     `pacman`, ...) and runs it only if you say yes, because that step needs `sudo`. With `--yes` it never runs it.
+   - **npm** comes with Node.js; the project's own dependencies are installed in step 2.
+2. **Downloads and builds** Nacreframe into `~/.nacreframe` (a shallow git checkout), installs its dependencies,
+   builds it, then trims the build tools.
+3. **Adds the `nacre` command** to `~/.local/bin`. It is a small launcher: it picks the right Node.js and, if
+   Nacreframe's files have gone missing, repairs them before starting.
 4. **Asks before touching your shell profile** to put `~/.local/bin` on your `PATH` (only if it is not already there).
 5. **Offers the setup wizard** (below).
 
-It never uses `sudo`, never writes outside those two folders without asking, and shows the tail of a log if a step fails.
+It never uses `sudo` unless you agree to installing git, never writes outside those two folders without asking, and
+shows the tail of a log if a step fails.
 The whole script runs from one function called on its last line, so a download that is cut short cannot run half a script.
 
 ### Options
@@ -50,7 +59,7 @@ something changed, and does not repeat the `PATH` entry.
 curl -fsSL https://raw.githubusercontent.com/Falcon016/Nacreframe/main/install.sh | sh -s -- --uninstall
 ```
 
-Uninstalling removes the program, the `nacre` link and the `PATH` entry it added. Your settings, API keys and
+Uninstalling removes the program, the `nacre` command and the `PATH` entry it added. Your settings, API keys and
 sessions stay where they are; the command prints the exact `rm -rf` line if you want those gone too.
 
 ### Windows
@@ -68,15 +77,36 @@ nacre setup
 
 ### If something goes wrong
 
-| You see                               | Do this                                                                                         |
-| ------------------------------------- | ----------------------------------------------------------------------------------------------- |
-| `Node.js vXX is too old`              | Install Node 22.18 or newer, e.g. with [fnm](https://github.com/Schniz/fnm) (`fnm install 22`). |
-| `nacre: command not found`            | Open a new terminal, or add `~/.local/bin` to `PATH` (the installer prints the exact line).     |
-| `Could not download Nacreframe`       | Check your connection. For a private repository, sign git in first (`gh auth login`).           |
-| Installing dependencies fails         | The last lines of the log are shown; usually a proxy or registry setting for npm.               |
-| Another `nacre` comes first on `PATH` | Remove it, or put `~/.local/bin` earlier in `PATH`.                                             |
+| You see                               | Do this                                                                                          |
+| ------------------------------------- | ------------------------------------------------------------------------------------------------ |
+| `Node.js is too old` / not found      | Say yes when it offers a private copy. (Alpine and other non-glibc Linux: `apk add nodejs npm`.) |
+| Anything stopped working              | Run `nacre doctor --fix`. If `nacre` itself will not start, run the install command again.       |
+| `nacre: command not found`            | Open a new terminal, or add `~/.local/bin` to `PATH` (the installer prints the exact line).      |
+| `Could not download Nacreframe`       | Check your connection. For a private repository, sign git in first (`gh auth login`).            |
+| Installing dependencies fails         | The last lines of the log are shown; usually a proxy or registry setting for npm.                |
+| Another `nacre` comes first on `PATH` | Remove it, or put `~/.local/bin` earlier in `PATH`.                                              |
 
-`nacre doctor` checks Node, git, Chrome/Edge, Docker/Podman, your config and your provider keys.
+## `nacre doctor`: check and repair
+
+`nacre doctor` checks Node.js, git, Chrome/Edge, Docker/Podman, your config, your provider keys, the key file's
+permissions, and (for an installer-made copy) the `nacre` command and your `PATH`. When something can be repaired it
+says so and asks; `nacre doctor --fix` goes ahead, and `-y` / `--yes` answers every question for you.
+
+| Problem                                              | What `--fix` does                                                                  |
+| ---------------------------------------------------- | ---------------------------------------------------------------------------------- |
+| Settings file is not valid JSON or settings          | Moves it aside (`config.json.broken-<time>`, nothing is deleted); defaults apply   |
+| No API key for the model you use                     | Asks for it (hidden) and stores it with owner-only permissions                     |
+| No default model yet                                 | Runs the setup wizard                                                              |
+| Key file readable by other users                     | Makes it owner-only                                                                |
+| Settings or data folder missing                      | Creates it                                                                         |
+| `nacre` command missing, not on `PATH`, Node too old | Runs the installer in repair mode: re-downloads, reinstalls, rebuilds, relinks     |
+| No Chrome or Edge for the browser tool               | Downloads Chromium (about 150 MB) after asking, and points `browser.channel` at it |
+| Ollama is your default and is not running            | Starts `ollama serve`                                                              |
+
+It cannot install git or Docker for you (that needs `sudo`); it says what to run.
+
+If `nacre` will not even start because its files are damaged, the launcher notices and repairs them on the spot. To do
+that by hand: `sh ~/.nacreframe/install.sh --repair`.
 
 ## The setup wizard
 

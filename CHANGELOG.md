@@ -20,6 +20,12 @@ First release of the ground-up rewrite (replaces the earlier turtlebot harness).
 - `nacre models`, `nacre doctor`, `npm run live-check`.
 - **One-command install** for Linux, macOS and WSL: `curl -fsSL .../install.sh | sh` checks Node/git/npm, builds into
   `~/.nacreframe`, links `nacre`, asks before touching your shell profile, updates by re-running, and `--uninstall`.
+  It installs what is missing: a private, checksum-verified Node.js when none is usable, and git through your package
+  manager if you agree. `nacre` is a launcher that picks that Node.js and repairs a damaged install on its own;
+  `install.sh --repair` does the same by hand.
+- **`nacre doctor --fix`** repairs broken or invalid settings, a missing API key, key-file permissions, missing folders, a
+  missing or off-`PATH` launcher, a too-old Node.js and (after asking) a missing browser; plain `nacre doctor` offers it.
+  The Node.js check now compares the minor version (22.18), not just the major.
 - **`nacre setup`**: guided wizard (arrow-key menus; provider, API key checked before saving, local-server detection,
   model, approval mode, sandbox, browser) that saves nothing until confirmed and keeps unrelated settings. `--yes`
   mode with flags for scripts and CI. `nacre doctor` and `setup` share their system checks.

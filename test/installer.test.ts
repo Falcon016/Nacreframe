@@ -6,9 +6,12 @@ import {
   lstatSync,
   mkdirSync,
   readFileSync,
-  readlinkSync,
+  readdirSync,
+  rmSync,
+  symlinkSync,
   writeFileSync,
 } from 'node:fs';
+import { createHash } from 'node:crypto';
 import { homedir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
@@ -91,14 +94,33 @@ describe.skipIf(!hasSh || !hasGit)('install.sh', () => {
     expect(existsSync(join(home, '.nacreframe'))).toBe(false);
   });
 
-  it('stops with a helpful message when Node.js is too old', () => {
+  const oldNode = () => {
     const stub = join(ws.dir, 'old-node');
-    mkdirSync(stub);
+    mkdirSync(stub, { recursive: true });
     writeFileSync(join(stub, 'node'), '#!/bin/sh\necho v18.19.0\n');
     chmodSync(join(stub, 'node'), 0o755);
-    const r = sh(['--yes'], { PATH: `${stub}:${process.env.PATH}` });
+    return stub;
+  };
+
+  it('replaces a Node.js that is too old, and says what to do if it cannot', () => {
+    // It offers a private copy by default; with the download unreachable it stops and explains.
+    const r = sh(['--yes'], { PATH: `${oldNode()}:${process.env.PATH}`, NACRE_NODE_DIST: 'file:///nowhere' });
     expect(r.status).toBe(1);
-    expect(r.stderr).toContain('Node.js v18.19.0 is too old');
+    expect(r.stdout).toContain('Node.js is too old');
+    expect(r.stdout).toContain('v18.19.0');
+    expect(r.stderr).toContain('Could not install Node.js');
+    expect(r.stderr).toContain('22.18');
+    expect(existsSync(join(home, '.nacreframe', 'package.json'))).toBe(false);
+  });
+
+  it('points to Node.js downloads on systems it has no build for', () => {
+    const stub = join(ws.dir, 'odd-uname');
+    mkdirSync(stub);
+    writeFileSync(join(stub, 'uname'), '#!/bin/sh\ncase "$1" in -s) echo SunOS ;; *) echo sparc ;; esac\n');
+    chmodSync(join(stub, 'uname'), 0o755);
+    const r = sh(['--yes'], { PATH: `${oldNode()}:${stub}:${process.env.PATH}` });
+    expect(r.status).toBe(1);
+    expect(r.stderr).toContain('no official Node.js download');
     expect(r.stderr).toContain('22.18');
     expect(r.stderr).toContain('fnm');
     expect(existsSync(join(home, '.nacreframe'))).toBe(false);
@@ -121,8 +143,10 @@ describe.skipIf(!hasSh || !hasGit)('install.sh', () => {
     expect(first.status, first.stdout + first.stderr).toBe(0);
     expect(first.stdout).toContain('Nacreframe is installed.');
     const link = join(home, '.local', 'bin', 'nacre');
-    expect(lstatSync(link).isSymbolicLink()).toBe(true);
-    expect(readlinkSync(link)).toBe(join(home, '.nacreframe', 'dist', 'cli.js'));
+    // `nacre` is a small launcher (it can use a private Node.js and repairs a damaged install), not a symlink.
+    expect(lstatSync(link).isSymbolicLink()).toBe(false);
+    expect(lstatSync(link).mode & 0o111).not.toBe(0);
+    expect(readFileSync(link, 'utf8')).toContain(`NACRE_DIR='${join(home, '.nacreframe')}'`);
     expect(existsSync(join(home, '.nacreframe', 'node_modules', 'typescript'))).toBe(false); // dev tools pruned
 
     const rc = readFileSync(join(home, RC_NAME), 'utf8');
@@ -174,7 +198,8 @@ describe.skipIf(!hasSh || !hasGit)('install.sh', () => {
     expect(existsSync(join(other, RC_NAME))).toBe(false);
     expect(r.stdout).toContain('is not on your PATH');
     expect(r.stdout).toContain('export PATH=');
-    expect(lstatSync(join(other, 'bin', 'nacre')).isSymbolicLink()).toBe(true);
+    expect(lstatSync(join(other, 'bin', 'nacre')).isSymbolicLink()).toBe(false);
+    expect(readFileSync(join(other, 'bin', 'nacre'), 'utf8')).toContain('NACRE_DIR=');
   }, 120_000);
 
   it('refuses to overwrite a folder or command it does not own', () => {
@@ -185,6 +210,112 @@ describe.skipIf(!hasSh || !hasGit)('install.sh', () => {
     expect(folder.status).toBe(1);
     expect(folder.stderr).toContain('is not a Nacreframe install');
     expect(readFileSync(join(squat, '.nacreframe', 'precious.txt'), 'utf8')).toBe('keep me');
+  });
+
+  // ---- a machine that is missing things -------------------------------------------------------------
+
+  /** A PATH holding only the basic tools the installer needs, so Node.js (or git) is genuinely absent. */
+  const bareTools = (name: string, omit: string[] = []) => {
+    const dir = join(ws.dir, name);
+    mkdirSync(dir);
+    const tools = `sh git curl tar gzip grep sed tr cut head tail awk mktemp uname sleep ls cat rm mkdir mv cp
+      chmod ln readlink dirname basename id kill date sha256sum shasum openssl find env xargs wc sort touch ldd`;
+    for (const t of tools.split(/\s+/)) {
+      if (omit.includes(t)) continue;
+      const found = spawnSync('sh', ['-c', `command -v ${t}`], { encoding: 'utf8' }).stdout.trim();
+      if (found) symlinkSync(found, join(dir, t));
+    }
+    return dir;
+  };
+  const nodePlatform = process.platform === 'darwin' ? 'darwin' : 'linux';
+  const nodeArch = { x64: 'x64', arm64: 'arm64' }[process.arch as string];
+
+  /** A stand-in for nodejs.org: the tarball holds shims that run the Node.js already on this machine. */
+  const fakeNodeDist = (name: string, corrupt = false) => {
+    const dir = join(ws.dir, name);
+    const top = `node-v22.99.0-${nodePlatform}-${nodeArch}`;
+    mkdirSync(join(dir, top, 'bin'), { recursive: true });
+    const npmPath = spawnSync('sh', ['-c', 'command -v npm'], { encoding: 'utf8' }).stdout.trim();
+    for (const [bin, target] of [
+      ['node', process.execPath],
+      ['npm', npmPath],
+    ] as const) {
+      writeFileSync(join(dir, top, 'bin', bin), `#!/bin/sh\nexec "${target}" "$@"\n`);
+      chmodSync(join(dir, top, 'bin', bin), 0o755);
+    }
+    const tgz = `${top}.tar.gz`;
+    expect(spawnSync('tar', ['-czf', tgz, top], { cwd: dir }).status).toBe(0);
+    const sum = createHash('sha256')
+      .update(readFileSync(join(dir, tgz)))
+      .digest('hex');
+    writeFileSync(join(dir, 'SHASUMS256.txt'), `${corrupt ? '0'.repeat(64) : sum}  ${tgz}\n`);
+    return `file://${dir}`;
+  };
+
+  it.skipIf(!nodeArch)(
+    'installs a private Node.js when there is none, and the nacre command uses it',
+    () => {
+      const bare = join(ws.dir, 'home-bare');
+      mkdirSync(bare);
+      const dist = fakeNodeDist('node-dist');
+      const env = { PATH: bareTools('tools-nonode', ['node', 'npm', 'npx']), NACRE_NODE_DIST: dist };
+      const r = sh(['--yes'], env, bare);
+      expect(r.status, r.stdout + r.stderr).toBe(0);
+      expect(r.stdout).toMatch(/Installed Node\.js v\d+\.\d+\.\d+, private copy/);
+      const nodeBin = join(bare, '.nacreframe', 'runtime', 'node', 'bin', 'node');
+      expect(existsSync(nodeBin)).toBe(true);
+
+      // Still no Node.js on PATH: the launcher finds the private one.
+      const cmd = join(bare, '.local', 'bin', 'nacre');
+      const run = (args: string[]) =>
+        spawnSync(cmd, args, {
+          encoding: 'utf8',
+          env: { PATH: env.PATH, HOME: bare, NACRE_HOME: join(bare, 'nh'), NACRE_REPO: source },
+        });
+      expect(run(['--version']).stdout).toMatch(/^Nacreframe \d+\.\d+\.\d+/);
+
+      // Damage the install: the next `nacre` repairs it before starting.
+      rmSync(join(bare, '.nacreframe', 'node_modules'), { recursive: true, force: true });
+      rmSync(join(bare, '.nacreframe', 'dist'), { recursive: true, force: true });
+      const healed = run(['--version']);
+      expect(healed.stderr).toContain('missing or damaged');
+      expect(healed.stdout).toMatch(/^Nacreframe \d+\.\d+\.\d+/);
+      expect(existsSync(join(bare, '.nacreframe', 'dist', 'cli.js'))).toBe(true);
+
+      // A later run reuses the private copy instead of downloading again.
+      const again = sh(['--yes', '--no-modify-path'], env, bare);
+      expect(again.status, again.stdout + again.stderr).toBe(0);
+      expect(again.stdout).toContain('(private copy)');
+    },
+    290_000,
+  );
+
+  it.skipIf(!nodeArch)('refuses a Node.js download whose checksum does not match', () => {
+    const other = join(ws.dir, 'home-badsum');
+    mkdirSync(other);
+    const r = sh(
+      ['--yes'],
+      {
+        PATH: bareTools('tools-badsum', ['node', 'npm', 'npx']),
+        NACRE_NODE_DIST: fakeNodeDist('bad-dist', true),
+      },
+      other,
+    );
+    expect(r.status).toBe(1);
+    expect(r.stderr + r.stdout).toContain('Checksum mismatch');
+    expect(existsSync(join(other, '.nacreframe', 'runtime', 'node'))).toBe(false);
+  });
+
+  it('says how to get git when it is missing, and never runs sudo on its own', () => {
+    const other = join(ws.dir, 'home-nogit');
+    mkdirSync(other);
+    const tools = bareTools('tools-nogit', ['git']);
+    symlinkSync(process.execPath, join(tools, 'node')); // Node.js is fine; only git is missing
+    const r = sh(['--yes'], { PATH: tools }, other);
+    expect(r.status).toBe(1);
+    expect(r.stdout + r.stderr).toContain('git was not found');
+    expect(r.stdout + r.stderr).toContain('run this installer again');
+    expect(readdirSync(other)).toEqual([]);
   });
 
   it('uninstalls: removes the program, link and PATH entry, keeps your settings', () => {

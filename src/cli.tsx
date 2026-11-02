@@ -26,7 +26,7 @@ Usage
   ${BIN} auth set <provider>       Store an API key (hidden prompt, or pipe it on stdin)
   ${BIN} auth list | remove <p>    Manage stored keys
   ${BIN} trust                     Trust this project's .nacreframe config, skills and extensions
-  ${BIN} doctor                    Check your environment
+  ${BIN} doctor [--fix]            Check your environment; --fix repairs what it can (-y: no questions)
 
 Options
   -m, --model <provider/model>     e.g. anthropic/claude-sonnet-5-5, ollama/qwen3:8b
@@ -202,6 +202,8 @@ async function main(): Promise<number> {
         print: { type: 'boolean', short: 'p' },
         version: { type: 'boolean', short: 'v' },
         help: { type: 'boolean', short: 'h' },
+        fix: { type: 'boolean' },
+        yes: { type: 'boolean', short: 'y' },
       },
     });
   } catch (e) {
@@ -220,7 +222,7 @@ async function main(): Promise<number> {
 
   const cwd = process.cwd();
   const [first, ...rest] = positionals;
-  if (first === 'doctor') return doctor(cwd);
+  if (first === 'doctor') return doctor(cwd, { fix: !!values.fix, yes: !!values.yes });
   if (first === 'models') return modelsCommand(cwd);
   if (first === 'serve') return serveCommand(rest);
   if (first === 'auth') return authCommand(rest);

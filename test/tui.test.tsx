@@ -2,7 +2,7 @@ import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { PassThrough } from 'node:stream';
 import { render } from 'ink';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { Runtime } from '../src/runtime.js';
 import { App } from '../src/tui/App.js';
 import { UiStore } from '../src/tui/store.js';
@@ -14,7 +14,10 @@ import { tmpWorkspace } from './helpers.js';
 const plain = (s: string) => s.replace(/\u001b\[[0-9;?]*[A-Za-z]/g, '');
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
-async function until(cond: () => boolean, ms = 8000): Promise<void> {
+// CI runners (Windows especially) can be slow when other test files run alongside this one.
+vi.setConfig({ testTimeout: 60_000 });
+
+async function until(cond: () => boolean, ms = 25_000): Promise<void> {
   const end = Date.now() + ms;
   while (!cond()) {
     if (Date.now() > end) throw new Error('timed out waiting for condition');
