@@ -121,7 +121,7 @@ describe('interactive UI', () => {
       await until(() => ui.screen().includes('Nacreframe'));
       await ui.type('write note.txt');
       ui.key('\r');
-      await until(() => ui.screen().includes('Approval needed'));
+      await until(() => ui.screen().includes('Approve this action?'));
       expect(existsSync(join(ui.work, 'note.txt'))).toBe(false);
       expect(ui.screen()).toContain('new file note.txt'); // diff preview
       await ui.type('y');
@@ -138,7 +138,7 @@ describe('interactive UI', () => {
       await until(() => ui.screen().includes('Nacreframe'));
       await ui.type('write nope.txt');
       ui.key('\r');
-      await until(() => ui.screen().includes('Approval needed'));
+      await until(() => ui.screen().includes('Approve this action?'));
       await ui.type('n');
       await until(() => ui.screen().includes('All done'));
       expect(existsSync(join(ui.work, 'nope.txt'))).toBe(false);

@@ -20,18 +20,18 @@ function h(tag, props, ...kids) {
 }
 
 // Agent colours: kept in step with the --rose/--teal/--gold/... tokens in app.css.
-const PALETTE = ['#e692d6', '#4fd1c1', '#f0c674', '#74b7ff', '#7ddba0', '#8c9bff', '#b3a4ff', '#f4a98d'];
+const PALETTE = ['#d79bd6', '#8fd3c8', '#e6c384', '#8db4f0', '#9fd4a8', '#b4a7e8', '#e3b7c4', '#f0a98e'];
 const NAMED = {
-  magenta: '#e692d6',
-  cyan: '#4fd1c1',
-  yellow: '#f0c674',
-  green: '#7ddba0',
-  blue: '#74b7ff',
-  red: '#f17b86',
+  magenta: '#d79bd6',
+  cyan: '#8fd3c8',
+  yellow: '#e6c384',
+  green: '#9fd4a8',
+  blue: '#8db4f0',
+  red: '#e58a8a',
 };
 const colorOf = (name, preferred) => {
-  if (name === 'you') return '#8c9bff';
-  if (name === 'system') return '#7a8296';
+  if (name === 'you') return '#b4a7e8';
+  if (name === 'system') return '#8c879e';
   if (preferred && (NAMED[preferred] || /^#[0-9a-f]{6}$/i.test(preferred)))
     return NAMED[preferred] ?? preferred;
   let n = 0;
@@ -291,7 +291,7 @@ async function refreshSessions() {
   S.sideKey = key;
   const list = $('#side-list');
   list.replaceChildren(
-    h('div', { class: 'side-title', text: 'Open sessions' }),
+    h('div', { class: 'side-title', text: 'Sessions' }),
     ...(S.sessions.length
       ? S.sessions.map((s) => {
           const closeSession = guard(async (ev) => {
@@ -377,9 +377,14 @@ function renderEmpty() {
       { class: 'empty' },
       gem(56),
       h('h2', { text: 'What shall we build?' }),
-      h('p', {
-        text: 'Open a session on one of your folders. Choose a model, how much to trust it, and how isolated it should be.',
-      }),
+      h('p', { text: 'A session works inside one folder on this machine. When you start one, you choose:' }),
+      h(
+        'ul',
+        { class: 'steps' },
+        h('li', null, h('b', { text: 'A model' }), ' to do the work.'),
+        h('li', null, h('b', { text: 'An approval mode' }), ' for how much it may do without asking.'),
+        h('li', null, h('b', { text: 'A sandbox' }), ' for how isolated its commands are.'),
+      ),
       h('button', { class: 'btn primary', onclick: () => openNewDialog(), text: 'New session' }),
     ),
   );
@@ -399,7 +404,7 @@ function openSession(id) {
   S.es = es;
   es.addEventListener('state', (ev) => onState(JSON.parse(ev.data)));
   es.onerror = async () => {
-    $('#hint').textContent = 'Connection lost — reconnecting…';
+    $('#hint').textContent = 'Connection lost. Reconnecting…';
     try {
       const { sessions } = await api('/api/sessions');
       if (!sessions.some((s) => s.id === id) && S.id === id) {
@@ -421,7 +426,7 @@ function onState(st) {
     tr.replaceChildren();
     S.rendered.clear();
   }
-  $('#hint').textContent = 'Enter to send · Shift+Enter for a new line';
+  $('#hint').textContent = 'Enter to send, Shift+Enter for a new line';
   const live = $('#live') ?? tr.appendChild(h('div', { id: 'live' }));
   for (const item of st.items) {
     if (item.kind === 'banner' || S.rendered.has(item.id)) continue;
@@ -555,7 +560,7 @@ function renderTop() {
   const tick = $('#meter-tick');
   tick.hidden = !win;
   if (win && st.session.target) tick.style.left = `${Math.round((st.session.target / win) * 100)}%`;
-  $('#meter-text').textContent = win ? `${pct}% · ${fmt(used)}/${fmt(win)}` : 'unknown window';
+  $('#meter-text').textContent = win ? `${pct}% (${fmt(used)} of ${fmt(win)})` : 'unknown window';
   $('#meter').title = win
     ? `Context ${used.toLocaleString()} of ${win.toLocaleString()} tokens (${st.session.contextSource}). Automatic compaction starts at ${st.session.target.toLocaleString()} tokens (the tick), and the chat pauses until it finishes.`
     : 'No model selected yet.';
@@ -565,7 +570,7 @@ function renderTop() {
   $('#input').placeholder = !st.session.model
     ? 'Pick a model first…'
     : st.session.swarm.active
-      ? `Message the team (lead: ${st.session.swarm.names[0]}) · @name to address one agent`
+      ? `Message the team (lead: ${st.session.swarm.names[0]}). Use @name to address one agent`
       : st.session.running
         ? 'Type to steer the agent…'
         : 'Ask anything…';
@@ -578,7 +583,7 @@ function fillModelSelect(sel, models, current, withPlaceholder) {
   const seen = new Set();
   for (const m of models) {
     seen.add(m.spec);
-    const ctx = m.contextWindow ? ` · ${fmt(m.contextWindow)}` : '';
+    const ctx = m.contextWindow ? ` (${fmt(m.contextWindow)})` : '';
     opts.push(h('option', { value: m.spec, text: `${m.spec}${ctx}${m.loaded ? ' ●' : ''}` }));
   }
   if (current && !seen.has(current)) opts.push(h('option', { value: current, text: current }));
@@ -613,7 +618,7 @@ function renderCards() {
       h(
         'div',
         { class: 'card banner-pause', role: 'status' },
-        h('h3', { text: `⏸ Compacting context (${st.compacting?.pct ?? '80+'}%) — chat paused` }),
+        h('h3', { text: `Compacting context (${st.compacting?.pct ?? '80+'}%): chat paused` }),
         h('div', {
           class: 'reason',
           text: 'Older messages are being summarised so the conversation never overflows. Nothing is deleted from the saved history. Anything you send now is queued and delivered right after.',
@@ -645,7 +650,7 @@ function renderCards() {
         'div',
         { class: 'card approval', role: 'alertdialog', 'aria-label': 'Approval needed' },
         h('h3', {
-          text: `Approval needed${a.agentId !== 'main' ? ` · ${a.agentId}` : ''}${a.pending > 1 ? ` · ${a.pending - 1} more waiting` : ''}`,
+          text: `${a.agentId !== 'main' ? `${a.agentId} needs approval` : 'Approve this action?'}${a.pending > 1 ? ` (${a.pending - 1} more waiting)` : ''}`,
         }),
         h('div', null, h('strong', { text: a.toolName }), ' ', h('span', { text: a.description })),
         h('div', { class: 'reason', text: a.reason }),
@@ -694,7 +699,7 @@ function renderCards() {
       h(
         'div',
         { class: 'card question' },
-        h('h3', { text: `Question${q.agent !== 'main' ? ` · ${q.agent}` : ''}` }),
+        h('h3', { text: q.agent !== 'main' ? `${q.agent} has a question` : 'A question for you' }),
         h('div', { text: q.question }),
         h(
           'div',

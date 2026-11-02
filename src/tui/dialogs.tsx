@@ -133,7 +133,7 @@ export function ApprovalDialog({
     <Box flexDirection="column" borderStyle="round" borderColor={t.gold} paddingX={1}>
       <Text>
         <Text bold color={t.gold}>
-          {GLYPH.brand} Approval needed
+          {GLYPH.brand} Approve this action?
         </Text>
         {req.agentId !== 'main' ? <Text color={color}> · {req.agentId}</Text> : null}
         {pending > 1 ? <Text color={t.faint}> · {pending - 1} more waiting</Text> : null}
