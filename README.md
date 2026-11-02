@@ -53,24 +53,50 @@ It has **no default model**: you pick one, and the harness reads that model's re
 
 ## Install
 
-Requires **Node.js 22.18 or newer**. Works on Linux, macOS and Windows.
+On Linux, macOS or WSL, one command installs Nacreframe and walks you through setup:
 
 ```bash
-git clone <this-repository-url> nacreframe
+curl -fsSL https://raw.githubusercontent.com/Falcon016/Nacreframe/main/install.sh | sh
+```
+
+It needs **Node.js 22.18+** and **git** (it checks, and tells you what to do if one is missing), puts everything under
+`~/.nacreframe`, links `nacre` into `~/.local/bin`, never uses `sudo`, and asks before it edits your shell profile.
+Run it again to update; add `-s -- --uninstall` after `sh` to remove it. Options, troubleshooting and a Windows recipe:
+[docs/install.md](docs/install.md).
+
+<details>
+<summary>Install by hand (any OS, including native Windows)</summary>
+
+```bash
+git clone https://github.com/Falcon016/Nacreframe.git nacreframe
 cd nacreframe
 npm ci
 npm run build
 npm link          # puts `nacre` on your PATH
-nacre doctor      # checks your environment
+nacre setup       # guided setup
 ```
+
+</details>
+
+## Set up
+
+```bash
+nacre setup       # provider, API key, model and safety, in about a minute
+nacre doctor      # checks your environment any time
+```
+
+The wizard uses arrow-key menus, checks your API key with the provider before saving it, finds local model servers
+(Ollama, LM Studio, llama.cpp) that are already running, and writes nothing until you confirm. For scripts and CI:
+`nacre setup --yes --provider anthropic --key-stdin --model <model>` ([all options](docs/install.md#the-setup-wizard)).
 
 ## First run
 
 ```bash
+cd your-project
+nacre                                       # no -m: the UI opens a model picker if you skipped it in setup
 nacre models                                # what your providers offer right now, with context windows
 nacre -m llamacpp/<model>                   # a local llama.cpp server (see below for non-default ports)
 nacre auth set anthropic && nacre -m anthropic/<model>
-nacre                                       # no -m: the UI opens a model picker
 ```
 
 Inside the UI: type a request, <kbd>Enter</kbd> to send, `\`+<kbd>Enter</kbd> or <kbd>Ctrl</kbd>+<kbd>J</kbd> for a

@@ -1,5 +1,8 @@
 # Configuration
 
+You rarely need to edit these files by hand: `nacre setup` asks a few questions and writes the user config (and stores
+your API key separately). See [install.md](install.md#the-setup-wizard). This page is the reference.
+
 ## Where config lives
 
 | Layer   | Path                                                                                                                                                 |

@@ -18,3 +18,8 @@ First release of the ground-up rewrite (replaces the earlier turtlebot harness).
   live browser view; Docker and systemd deployment files.
 - Extensions, skills, prompt templates, MCP client, `AGENTS.md`.
 - `nacre models`, `nacre doctor`, `npm run live-check`.
+- **One-command install** for Linux, macOS and WSL: `curl -fsSL .../install.sh | sh` checks Node/git/npm, builds into
+  `~/.nacreframe`, links `nacre`, asks before touching your shell profile, updates by re-running, and `--uninstall`.
+- **`nacre setup`**: guided wizard (arrow-key menus; provider, API key checked before saving, local-server detection,
+  model, approval mode, sandbox, browser) that saves nothing until confirmed and keeps unrelated settings. `--yes`
+  mode with flags for scripts and CI. `nacre doctor` and `setup` share their system checks.

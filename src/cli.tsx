@@ -8,6 +8,7 @@ import { doctor } from './doctor.js';
 import { runPrint } from './modes/print.js';
 import { runRpc } from './modes/rpc.js';
 import { Runtime } from './runtime.js';
+import { setupCommand } from './setup/index.js';
 import { App } from './tui/App.js';
 import { UiStore } from './tui/store.js';
 import { pickTheme } from './tui/theme.js';
@@ -21,6 +22,7 @@ Usage
   ${BIN} -p "prompt" [options]     Run once and print the answer (reads piped stdin as context)
   ${BIN} models                    List the models your providers offer (with context windows)
   ${BIN} serve [options]           Start the self-hosted web dashboard (\`${BIN} serve --help\`)
+  ${BIN} setup                     Guided setup: provider, API key, model and safety (\`${BIN} setup --help\`)
   ${BIN} auth set <provider>       Store an API key (hidden prompt, or pipe it on stdin)
   ${BIN} auth list | remove <p>    Manage stored keys
   ${BIN} trust                     Trust this project's .nacreframe config, skills and extensions
@@ -110,7 +112,7 @@ async function noModelMessage(runtime: Runtime): Promise<string> {
         .map((m) => `  ${m.spec}${m.contextWindow ? `  (${Math.round(m.contextWindow / 1000)}k ctx)` : ''}`)
         .join('\n')
     : '  (no provider answered — start a local server or run `nacre auth set <provider>`)';
-  return `No model selected. Choose one with --model <provider>/<model>, NACRE_MODEL, or "model" in your config.\n\nAvailable now:\n${list}`;
+  return `No model selected. Choose one with --model <provider>/<model>, NACRE_MODEL, or "model" in your config.\nNew here? \`${BIN} setup\` walks you through it.\n\nAvailable now:\n${list}`;
 }
 
 async function serveCommand(args: string[]): Promise<number> {
@@ -175,7 +177,7 @@ async function authCommand(args: string[]): Promise<number> {
 
 function friendlyStartupError(e: Error): string {
   if (/No API key/.test(e.message)) {
-    return `${e.message}\n\nTo use a local model instead:  ${BIN} -m ollama/<model>   (or lmstudio/<model>)`;
+    return `${e.message}\n\nNew here? \`${BIN} setup\` walks you through it.\nTo use a local model instead:  ${BIN} -m ollama/<model>   (or lmstudio/<model>)`;
   }
   return e.message;
 }
@@ -183,6 +185,7 @@ function friendlyStartupError(e: Error): string {
 async function main(): Promise<number> {
   // Subcommands with their own flags are dispatched before the interactive flags are parsed.
   if (process.argv[2] === 'serve') return serveCommand(process.argv.slice(3));
+  if (process.argv[2] === 'setup') return setupCommand(process.argv.slice(3));
   let parsed;
   try {
     parsed = parseArgs({
