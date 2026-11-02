@@ -6,9 +6,11 @@
 # Pass options after `-s --`:
 #   curl -fsSL .../install.sh | sh -s -- --help
 #
-# What it does: checks for Node.js (22.18+), git and npm, downloads Nacreframe to ~/.nacreframe, builds it,
-# links `nacre` into ~/.local/bin, and offers to run the setup wizard. It never uses sudo, and it only edits
-# your shell profile if you say yes. Run it again at any time to update; `--uninstall` removes it.
+# What it does: makes sure Node.js (22.18+) and git are there (installing a private copy of Node.js for you if
+# it is missing or too old), downloads Nacreframe to ~/.nacreframe, installs its dependencies, builds it, puts a
+# `nacre` command in ~/.local/bin, and offers to run the setup wizard. It never uses sudo unless you say yes to
+# installing git, and it only edits your shell profile if you say yes. Run it again at any time to update;
+# `--repair` fixes a damaged install; `--uninstall` removes it.
 #
 # Everything lives inside main(), which is called on the last line, so a download that is cut off halfway
 # cannot run a partial script.
@@ -29,6 +31,9 @@ ASSUME_YES=0
 RUN_SETUP=auto
 MODIFY_PATH=auto
 UNINSTALL=0
+REPAIR=0
+NODE_BIN=
+NODE_SEEN=
 SPIN_PID=
 LOG=
 OS=
@@ -193,12 +198,15 @@ Options
       --ref <ref>       Install a branch, tag or commit            (default: main)
       --dir <path>      Where to install                           (default: ~/.nacreframe)
       --bin-dir <path>  Where to put the `nacre` command           (default: ~/.local/bin)
+      --repair          Reinstall dependencies, rebuild and relink; use it if something stopped working
       --uninstall       Remove Nacreframe (your settings and sessions are kept)
   -h, --help            Show this help
 
 Environment
   NACRE_REF, NACRE_INSTALL_DIR, NACRE_BIN_DIR   Same as the options above
   NACRE_REPO                                    Git URL to install from
+  NACRE_NODE_DIST                               Where to download Node.js from if it is missing
+                                                (default: https://nodejs.org/dist/latest-v22.x)
   NO_COLOR                                      Plain output
 
 Run it again at any time to update to the latest version.
@@ -226,12 +234,78 @@ detect_os() {
   esac
 }
 
-node_help() {
+# node_version_ok <node binary>   Sets NODE_SEEN to the version it reports; succeeds when it is new enough.
+node_version_ok() {
+  NODE_SEEN=
+  _v=$("$1" --version 2>/dev/null || true)
+  _v=${_v#v}
+  NODE_SEEN=$_v
+  _major=${_v%%.*}
+  _rest=${_v#*.}
+  _minor=${_rest%%.*}
+  case "$_major$_minor" in
+    "" | *[!0-9]*) return 1 ;;
+  esac
+  [ "$_major" -gt "$MIN_NODE_MAJOR" ] && return 0
+  [ "$_major" -eq "$MIN_NODE_MAJOR" ] && [ "$_minor" -ge "$MIN_NODE_MINOR" ]
+}
+
+# Which platform's Node.js build to download. Fails where nodejs.org has no official build for us.
+node_platform() {
+  case "$(uname -s 2>/dev/null)" in
+    Linux*) NP_OS=linux ;;
+    Darwin*) NP_OS=darwin ;;
+    *) return 1 ;;
+  esac
+  case "$(uname -m 2>/dev/null)" in
+    x86_64 | amd64) NP_ARCH=x64 ;;
+    aarch64 | arm64) NP_ARCH=arm64 ;;
+    armv7l) NP_ARCH=armv7l ;;
+    ppc64le) NP_ARCH=ppc64le ;;
+    s390x) NP_ARCH=s390x ;;
+    *) return 1 ;;
+  esac
+  # The official Linux builds need glibc; Alpine and other musl systems should use their own package.
+  if [ "$NP_OS" = linux ] && { ldd --version 2>&1 || true; } | grep -qi musl; then return 1; fi
+  return 0
+}
+
+sha256_of() {
+  if have sha256sum; then sha256sum "$1" | cut -d ' ' -f 1
+  elif have shasum; then shasum -a 256 "$1" | cut -d ' ' -f 1
+  elif have openssl; then openssl dgst -sha256 -r "$1" | cut -d ' ' -f 1
+  else return 1
+  fi
+}
+
+# Download, verify (SHA-256 from nodejs.org's SHASUMS256.txt) and unpack Node.js into the install folder.
+do_node_download() {
+  _base="${NACRE_NODE_DIST:-https://nodejs.org/dist/latest-v22.x}"
+  _tmp="$INSTALL_DIR/runtime/.download"
+  rm -rf "$_tmp"
+  mkdir -p "$_tmp"
+  curl -fsSL "$_base/SHASUMS256.txt" -o "$_tmp/SHASUMS256.txt" || return 1
+  _file=$(grep -E " node-v[0-9.]+-$NP_OS-$NP_ARCH\.tar\.gz\$" "$_tmp/SHASUMS256.txt" | head -n 1 | tr -s ' ' | cut -d ' ' -f 2)
+  [ -n "$_file" ] || { echo "No Node.js build for $NP_OS-$NP_ARCH in $_base"; return 1; }
+  _want=$(grep -F " $_file" "$_tmp/SHASUMS256.txt" | head -n 1 | cut -d ' ' -f 1)
+  curl -fsSL "$_base/$_file" -o "$_tmp/$_file" || return 1
+  _got=$(sha256_of "$_tmp/$_file") || { echo "No sha256sum, shasum or openssl to verify the download with"; return 1; }
+  if [ -z "$_want" ] || [ "$_got" != "$_want" ]; then
+    echo "Checksum mismatch for $_file (expected $_want, got $_got)"
+    return 1
+  fi
+  tar -xzf "$_tmp/$_file" -C "$_tmp" || return 1
+  rm -rf "$INSTALL_DIR/runtime/node"
+  mv "$_tmp/${_file%.tar.gz}" "$INSTALL_DIR/runtime/node" || return 1
+  rm -rf "$_tmp"
+}
+
+node_manual_help() {
   blank >&2
   printf '    %sNode.js %s.%s or newer is required%s.%s\n' "$BOLD" "$MIN_NODE_MAJOR" "$MIN_NODE_MINOR" "$1" "$RESET" >&2
   case "$OS" in
     macOS) note "Homebrew:   brew install node" >&2 ;;
-    *) note "Your package manager may have it, or use a version manager such as fnm." >&2 ;;
+    *) note "Your package manager may have it (Alpine: apk add nodejs npm), or use a version manager such as fnm." >&2 ;;
   esac
   note "Version manager (any OS):  https://github.com/Schniz/fnm   then:  fnm install 22" >&2
   note "Or download an installer:  https://nodejs.org/en/download" >&2
@@ -239,36 +313,106 @@ node_help() {
   exit 1
 }
 
-check_prereqs() {
-  if ! have node; then
-    fail "Node.js was not found"
-    node_help ""
-  fi
-  _v=$(node --version 2>/dev/null || true)
-  _v=${_v#v}
-  _major=${_v%%.*}
-  _rest=${_v#*.}
-  _minor=${_rest%%.*}
-  case "$_major$_minor" in
-    "" | *[!0-9]*) fail "Could not read the Node.js version (got \"$_v\")"; node_help "" ;;
-  esac
-  if [ "$_major" -lt "$MIN_NODE_MAJOR" ] || { [ "$_major" -eq "$MIN_NODE_MAJOR" ] && [ "$_minor" -lt "$MIN_NODE_MINOR" ]; }; then
-    fail "Node.js v$_v is too old"
-    node_help " (you have v$_v)"
-  fi
-  ok "Node.js" "v$_v"
+# Leave nothing behind after a failed Node.js download (rmdir only removes folders that are empty).
+node_cleanup() {
+  rm -rf "$INSTALL_DIR/runtime/.download" "$INSTALL_DIR/runtime/node"
+  rmdir "$INSTALL_DIR/runtime" "$INSTALL_DIR" 2>/dev/null || true
+}
 
-  if ! have git; then
-    fail "git was not found"
-    case "$OS" in
-      macOS) note "Install it with:  xcode-select --install" >&2 ;;
-      *) note "Install it with your package manager, e.g.  sudo apt install git" >&2 ;;
-    esac
+# Find a usable Node.js, or install a private copy next to Nacreframe (no sudo, nothing system-wide).
+ensure_node() {
+  # A private copy from an earlier install comes first: it is the one the `nacre` command will use.
+  if [ -x "$INSTALL_DIR/runtime/node/bin/node" ] && node_version_ok "$INSTALL_DIR/runtime/node/bin/node"; then
+    NODE_BIN="$INSTALL_DIR/runtime/node/bin/node"
+    ok "Node.js" "v$NODE_SEEN (private copy)"
+  elif have node && node_version_ok node; then
+    NODE_BIN=$(command -v node)
+    ok "Node.js" "v$NODE_SEEN"
+  else
+    _have=
+    if have node; then
+      node_version_ok node || true
+      if [ -n "$NODE_SEEN" ]; then _have=" (you have v$NODE_SEEN)"; fi
+    fi
+    if [ -n "$_have" ]; then warn "Node.js is too old" "${_have# }"; else warn "Node.js was not found"; fi
+    if ! node_platform; then
+      fail "There is no official Node.js download for this system"
+      node_manual_help "$_have"
+    fi
+    if ! have curl || ! have tar; then
+      fail "curl and tar are needed to download Node.js"
+      node_manual_help "$_have"
+    fi
+    if ! ask_yes_no "Install a private copy of Node.js for Nacreframe? (about 40 MB, kept in $(tilde "$INSTALL_DIR/runtime"))" y y; then
+      node_manual_help "$_have"
+    fi
+    mkdir -p "$INSTALL_DIR/runtime"
+    if ! run_step "Downloading Node.js (checksum verified)" do_node_download; then
+      node_cleanup
+      step_failed "Could not install Node.js" "Check your internet connection, or install Node.js $MIN_NODE_MAJOR.$MIN_NODE_MINOR+ yourself and run this installer again."
+    fi
+    NODE_BIN="$INSTALL_DIR/runtime/node/bin/node"
+    node_version_ok "$NODE_BIN" || { node_cleanup; step_failed "The downloaded Node.js does not run on this system" "Install Node.js $MIN_NODE_MAJOR.$MIN_NODE_MINOR+ yourself and run this installer again."; }
+    ok "Installed Node.js" "v$NODE_SEEN, private copy"
+  fi
+  # npm and everything it runs must use the same Node.js.
+  PATH="$(dirname "$NODE_BIN"):$PATH"
+  export PATH
+}
+
+# Offer to install git with the system package manager. This is the one step that needs sudo, so it only
+# happens when you say yes, and never with --yes.
+install_git_cmd() {
+  _sudo=
+  if [ "$(id -u 2>/dev/null || echo 1)" != 0 ]; then
+    if have sudo; then _sudo="sudo "; else return 1; fi
+  fi
+  if have brew; then GIT_CMD="brew install git"
+  elif have apt-get; then GIT_CMD="${_sudo}apt-get install -y git"
+  elif have dnf; then GIT_CMD="${_sudo}dnf install -y git"
+  elif have yum; then GIT_CMD="${_sudo}yum install -y git"
+  elif have pacman; then GIT_CMD="${_sudo}pacman -S --noconfirm git"
+  elif have zypper; then GIT_CMD="${_sudo}zypper --non-interactive install git"
+  elif have apk; then GIT_CMD="${_sudo}apk add git"
+  else return 1
+  fi
+  return 0
+}
+
+ensure_git() {
+  if have git; then
+    ok "git" "$(git --version | sed 's/^git version //')"
+    return 0
+  fi
+  warn "git was not found" "it is used to download Nacreframe"
+  if [ "$OS" = macOS ] && ! have brew; then
+    note "Install it with:  xcode-select --install   (a window opens; come back when it finishes)" >&2
     note "Then run this installer again." >&2
     exit 1
   fi
-  ok "git" "$(git --version | sed 's/^git version //')"
+  GIT_CMD=
+  if install_git_cmd; then
+    if [ "$ASSUME_YES" != 1 ] && [ "$TTY_OK" = 1 ] \
+      && ask_yes_no "Install git now with \`$GIT_CMD\`?" y n; then
+      blank
+      # Run in the foreground with your terminal attached, so a sudo password prompt works.
+      if sh -c "$GIT_CMD" </dev/tty && have git; then
+        ok "Installed git" "$(git --version | sed 's/^git version //')"
+        return 0
+      fi
+      fail "That did not install git"
+    fi
+    note "To install it yourself:  $GIT_CMD" >&2
+  else
+    note "Install git with your package manager (for example: sudo apt install git)." >&2
+  fi
+  note "Then run this installer again." >&2
+  exit 1
+}
 
+check_prereqs() {
+  ensure_node
+  ensure_git
   if ! have npm; then
     die "npm was not found" "It normally comes with Node.js. Reinstall Node.js, then run this installer again."
   fi
@@ -308,11 +452,22 @@ do_build() {
   npm prune --omit=dev --no-audit --no-fund --loglevel=error
 }
 
+# True when the folder holds anything besides the private Node.js copy (runtime/).
+dir_has_files() {
+  [ -d "$1" ] || return 1
+  for _f in "$1"/* "$1"/.[!.]* "$1"/..?*; do
+    [ -e "$_f" ] || [ -L "$_f" ] || continue
+    [ "${_f##*/}" = runtime ] && continue
+    return 0
+  done
+  return 1
+}
+
 download_and_build() {
   UPDATING=0
   OLD_HEAD=
   OLD_VER=
-  if [ -e "$INSTALL_DIR" ] && [ -n "$(ls -A "$INSTALL_DIR" 2>/dev/null)" ]; then
+  if dir_has_files "$INSTALL_DIR"; then
     if ! is_our_checkout; then
       die "$(tilde "$INSTALL_DIR") already exists and is not a Nacreframe install" \
         "Choose another place with --dir, or move that folder away."
@@ -323,15 +478,19 @@ download_and_build() {
   fi
 
   if ! run_step "Downloading Nacreframe ($NACRE_REF)" do_fetch; then
-    step_failed "Could not download Nacreframe" \
-      "Check your internet connection. If the repository is private, make sure git is signed in" \
-      "(for example with \`gh auth login\`), or set NACRE_REPO to an SSH URL."
+    if [ "$REPAIR" = 1 ] && is_our_checkout; then
+      warn "Could not reach the download server" "repairing from the files already here"
+    else
+      step_failed "Could not download Nacreframe" \
+        "Check your internet connection. If the repository is private, make sure git is signed in" \
+        "(for example with \`gh auth login\`), or set NACRE_REPO to an SSH URL."
+    fi
   fi
   NEW_HEAD=$(git -C "$INSTALL_DIR" rev-parse HEAD 2>/dev/null || true)
   NEW_SHORT=$(git -C "$INSTALL_DIR" rev-parse --short HEAD 2>/dev/null || echo "?")
   NEW_VER=$(pkg_version "$INSTALL_DIR")
 
-  if [ "$UPDATING" = 1 ] && [ -n "$OLD_HEAD" ] && [ "$OLD_HEAD" = "$NEW_HEAD" ] \
+  if [ "$REPAIR" != 1 ] && [ "$UPDATING" = 1 ] && [ -n "$OLD_HEAD" ] && [ "$OLD_HEAD" = "$NEW_HEAD" ] \
     && [ -f "$INSTALL_DIR/dist/cli.js" ] && [ -d "$INSTALL_DIR/node_modules" ]; then
     ok "Nacreframe ${NEW_VER:-?} is already up to date" "($NACRE_REF @ $NEW_SHORT)"
     return 0
@@ -356,12 +515,51 @@ download_and_build() {
   ok "Built"
 }
 
+# Single-quote a value for safe use inside a shell script.
+sq() {
+  printf "'%s'" "$(printf '%s' "$1" | sed "s/'/'\\\\''/g")"
+}
+
+LAUNCHER_MARK="# nacre launcher written by the Nacreframe installer"
+
+# The `nacre` command is a small launcher, not a bare symlink: it uses the private Node.js when there is one,
+# and if Nacreframe's files have gone missing it repairs them before starting.
+write_launcher() {
+  _q_dir=$(sq "$INSTALL_DIR")
+  _q_bin=$(sq "$BIN_DIR")
+  cat >"$1" <<EOF
+#!/bin/sh
+$LAUNCHER_MARK
+NACRE_DIR=$_q_dir
+NACRE_BIN_DIR=$_q_bin
+if [ ! -f "\$NACRE_DIR/dist/cli.js" ] || [ ! -d "\$NACRE_DIR/node_modules" ]; then
+  if [ -f "\$NACRE_DIR/install.sh" ]; then
+    echo "Nacreframe's files are missing or damaged. Repairing (this needs an internet connection)..." >&2
+    sh "\$NACRE_DIR/install.sh" --repair --dir "\$NACRE_DIR" --bin-dir "\$NACRE_BIN_DIR" >&2 || exit 1
+  else
+    echo "Nacreframe's files are missing. Reinstall with:" >&2
+    echo "  curl -fsSL https://raw.githubusercontent.com/Falcon016/Nacreframe/main/install.sh | sh" >&2
+    exit 1
+  fi
+fi
+NODE="\$NACRE_DIR/runtime/node/bin/node"
+[ -x "\$NODE" ] || NODE=node
+exec "\$NODE" "\$NACRE_DIR/dist/cli.js" "\$@"
+EOF
+  chmod +x "$1"
+}
+
+is_our_launcher() {
+  [ -f "$1" ] && [ ! -L "$1" ] && grep -qF "$LAUNCHER_MARK" "$1" 2>/dev/null
+}
+
 link_binary() {
   _target="$INSTALL_DIR/dist/cli.js"
   _link="$BIN_DIR/nacre"
   chmod +x "$_target"
   mkdir -p "$BIN_DIR"
   if [ -L "$_link" ]; then
+    # An older version of this installer made a symlink; the launcher replaces it.
     _old=$(readlink "$_link" 2>/dev/null || true)
     case "$_old" in
       "$_target") ;;
@@ -369,11 +567,15 @@ link_binary() {
     esac
     rm -f "$_link"
   elif [ -e "$_link" ]; then
-    die "$(tilde "$_link") already exists and was not made by this installer" \
-      "Move or delete it, or pick another place with --bin-dir, then run this installer again."
+    if is_our_launcher "$_link"; then
+      rm -f "$_link"
+    else
+      die "$(tilde "$_link") already exists and was not made by this installer" \
+        "Move or delete it, or pick another place with --bin-dir, then run this installer again."
+    fi
   fi
-  ln -s "$_target" "$_link"
-  ok "Linked nacre" "$(tilde "$_link")"
+  write_launcher "$_link"
+  ok "Added the nacre command" "$(tilde "$_link")"
 }
 
 on_path() {
@@ -468,7 +670,9 @@ offer_setup() {
 finish() {
   # $1 = 1 when the wizard already printed its own next steps
   blank
-  if [ "$UPDATING" = 1 ]; then
+  if [ "$REPAIR" = 1 ]; then
+    printf '  %s%s%s %sNacreframe is repaired.%s\n' "$GREEN" "$S_OK" "$RESET" "$BOLD" "$RESET"
+  elif [ "$UPDATING" = 1 ]; then
     printf '  %s%s%s %sNacreframe is up to date.%s\n' "$GREEN" "$S_OK" "$RESET" "$BOLD" "$RESET"
   else
     printf '  %s%s%s %sNacreframe is installed.%s\n' "$GREEN" "$S_OK" "$RESET" "$BOLD" "$RESET"
@@ -485,7 +689,7 @@ finish() {
   if [ "${1:-0}" != 1 ]; then
     note "Next:"
     note "  nacre setup     guided setup: provider, API key, model, safety"
-    note "  nacre doctor    check your environment"
+    note "  nacre doctor    check your environment (add --fix to repair problems)"
   fi
   note "Start it inside a project folder:  cd your-project && nacre"
   note "Update later by running the install command again."
@@ -511,7 +715,10 @@ strip_profile_block() {
 do_uninstall() {
   banner
   _link="$BIN_DIR/nacre"
-  if [ -L "$_link" ]; then
+  if is_our_launcher "$_link" && grep -qF "NACRE_DIR=$(sq "$INSTALL_DIR")" "$_link" 2>/dev/null; then
+    rm -f "$_link"
+    ok "Removed $(tilde "$_link")"
+  elif [ -L "$_link" ]; then
     _t=$(readlink "$_link" 2>/dev/null || true)
     case "$_t" in
       "$INSTALL_DIR"/*)
@@ -520,6 +727,8 @@ do_uninstall() {
         ;;
       *) warn "Left $(tilde "$_link") alone" "it points to $_t" ;;
     esac
+  elif [ -e "$_link" ]; then
+    warn "Left $(tilde "$_link") alone" "it was not made for this install"
   fi
   if is_our_checkout && [ "$INSTALL_DIR" != "/" ] && [ "$INSTALL_DIR" != "$HOME" ]; then
     rm -rf "$INSTALL_DIR"
@@ -563,6 +772,7 @@ main() {
       --no-setup) RUN_SETUP=never ;;
       --no-modify-path) MODIFY_PATH=never ;;
       --uninstall) UNINSTALL=1 ;;
+      --repair) REPAIR=1; ASSUME_YES=1; RUN_SETUP=never ;;
       --ref) [ $# -ge 2 ] || die "--ref needs a value"; NACRE_REF=$2; shift ;;
       --ref=*) NACRE_REF=${1#--ref=} ;;
       --dir) [ $# -ge 2 ] || die "--dir needs a value"; NACRE_INSTALL_DIR=$2; shift ;;
@@ -601,7 +811,7 @@ main() {
   ok "$OS"
   check_prereqs
 
-  heading "Installing"
+  if [ "$REPAIR" = 1 ]; then heading "Repairing"; else heading "Installing"; fi
   download_and_build
   link_binary
 

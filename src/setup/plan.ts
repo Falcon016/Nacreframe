@@ -66,6 +66,25 @@ export function planToPatch(plan: SetupPlan): PartialConfig {
   return patch;
 }
 
+/** Merge `patch` into the user's config file (keeping a `.bak` of the old one). Used by `nacre doctor --fix`. */
+export function patchUserConfig(patch: PartialConfig, paths: AppPaths = appPaths()): void {
+  const configPath = join(paths.config, 'config.json');
+  mkdirSync(dirname(configPath), { recursive: true });
+  let current: PartialConfig = {};
+  if (existsSync(configPath)) {
+    try {
+      const parsed: unknown = JSON.parse(readFileSync(configPath, 'utf8'));
+      if (isPlain(parsed)) current = parsed;
+    } catch {
+      /* unreadable: start from an empty config; the old file is kept as .bak below */
+    }
+    copyFileSync(configPath, `${configPath}.bak`);
+  }
+  const tmp = `${configPath}.${process.pid}.tmp`;
+  writeFileSync(tmp, JSON.stringify(mergeConfig(current, patch), null, 2) + '\n');
+  renameSync(tmp, configPath);
+}
+
 /** Write the plan to the user's config and credential files. Safe to run repeatedly. */
 export function applyPlan(plan: SetupPlan, paths: AppPaths = appPaths()): ApplyResult {
   const configPath = join(paths.config, 'config.json');
