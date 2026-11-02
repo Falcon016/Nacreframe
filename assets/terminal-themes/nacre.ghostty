@@ -1,0 +1,22 @@
+# Ghostty: save as ~/.config/ghostty/themes/nacre, then set `theme = nacre`
+background = 121118
+foreground = e9e4da
+cursor-color = e3b7c4
+selection-background = 2d2a3a
+selection-foreground = e9e4da
+palette = 0=#1b1a23
+palette = 1=#e58a8a
+palette = 2=#9fd4a8
+palette = 3=#e6c384
+palette = 4=#8db4f0
+palette = 5=#b4a7e8
+palette = 6=#8fd3c8
+palette = 7=#e9e4da
+palette = 8=#5f5a70
+palette = 9=#f0a0a0
+palette = 10=#b4e2bc
+palette = 11=#f0d49c
+palette = 12=#a6c6f6
+palette = 13=#d79bd6
+palette = 14=#a8e2d8
+palette = 15=#fbf7ef

@@ -1,0 +1,27 @@
+# systemd unit for running the dashboard without Docker.
+#   sudo cp deploy/nacreframe.service /etc/systemd/system/ && sudo systemctl enable --now nacreframe
+# Edit User, WorkingDirectory, --root and the token file to match your machine.
+[Unit]
+Description=Nacreframe dashboard
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=nacre
+WorkingDirectory=/opt/nacreframe
+# Create the token once:  openssl rand -base64 24 | sudo tee /etc/nacreframe/token && sudo chmod 600 /etc/nacreframe/token
+EnvironmentFile=/etc/nacreframe/env
+ExecStart=/usr/bin/node dist/cli.js serve --host 127.0.0.1 --port 7437 --root /srv/projects
+Restart=on-failure
+RestartSec=3
+
+# Hardening: the agent runs commands as this user, so keep the unit itself tight.
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+ReadWritePaths=/srv/projects /var/lib/nacreframe
+Environment=NACRE_HOME=/var/lib/nacreframe
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,33 @@
+# Self-hosted Nacreframe dashboard. Put a TLS reverse proxy (Caddy, Traefik, nginx) or Tailscale in front of it:
+# the login token and your conversations should not cross the network in clear text.
+services:
+  nacreframe:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile
+    restart: unless-stopped
+    ports:
+      # Loopback only: the reverse proxy on this machine reaches it; the LAN does not. Remove "127.0.0.1:" to expose it.
+      - '127.0.0.1:7437:7437'
+    environment:
+      # Required on a network address. Generate one with:  openssl rand -base64 24
+      # Keep it in an .env file next to this compose file (git-ignored), not in this file.
+      NACRE_SERVER_TOKEN: ${NACRE_SERVER_TOKEN:?set NACRE_SERVER_TOKEN in deploy/.env}
+      # API keys for cloud providers, if you use them (leave unset for local-only setups).
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+    command: ['--allow-host', '${NACRE_PUBLIC_HOST:-localhost}', '--max-sessions', '8']
+    volumes:
+      - nacre-data:/data # sessions, swarms, browser profile, config
+      - ${NACRE_WORKSPACE:-./workspace}:/workspace # the folders agents may touch
+    # Reach a llama.cpp / Ollama server running on the Docker host (put its URL in /data/config/config.json):
+    extra_hosts:
+      - 'host.docker.internal:host-gateway'
+    security_opt:
+      - no-new-privileges:true
+    cap_drop: [ALL]
+    read_only: true
+    tmpfs: [/tmp]
+
+volumes:
+  nacre-data:

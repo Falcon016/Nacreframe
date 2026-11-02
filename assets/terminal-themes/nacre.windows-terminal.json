@@ -1,0 +1,23 @@
+{
+  "name": "Nacre",
+  "background": "#121118",
+  "foreground": "#e9e4da",
+  "cursorColor": "#e3b7c4",
+  "selectionBackground": "#2d2a3a",
+  "black": "#1b1a23",
+  "red": "#e58a8a",
+  "green": "#9fd4a8",
+  "yellow": "#e6c384",
+  "blue": "#8db4f0",
+  "purple": "#b4a7e8",
+  "cyan": "#8fd3c8",
+  "white": "#e9e4da",
+  "brightBlack": "#5f5a70",
+  "brightRed": "#f0a0a0",
+  "brightGreen": "#b4e2bc",
+  "brightYellow": "#f0d49c",
+  "brightBlue": "#a6c6f6",
+  "brightPurple": "#d79bd6",
+  "brightCyan": "#a8e2d8",
+  "brightWhite": "#fbf7ef"
+}

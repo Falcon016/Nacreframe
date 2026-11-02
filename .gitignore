@@ -1,0 +1,18 @@
+node_modules/
+dist/
+coverage/
+*.log
+*.tsbuildinfo
+
+# Secrets and local state - never commit these
+.env
+.env.*
+!.env.example
+auth.json
+*.pem
+*.key
+.nacreframe/local/
+.nacreframe/sessions/
+.nacreframe/browser-profile/
+.DS_Store
+Thumbs.db

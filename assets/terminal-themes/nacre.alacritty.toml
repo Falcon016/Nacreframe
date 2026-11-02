@@ -1,0 +1,32 @@
+# Alacritty: import with `general.import = ["~/.config/alacritty/nacre.toml"]`
+[colors.primary]
+background = "#121118"
+foreground = "#e9e4da"
+
+[colors.cursor]
+cursor = "#e3b7c4"
+text = "#121118"
+
+[colors.selection]
+background = "#2d2a3a"
+text = "#e9e4da"
+
+[colors.normal]
+black = "#1b1a23"
+red = "#e58a8a"
+green = "#9fd4a8"
+yellow = "#e6c384"
+blue = "#8db4f0"
+magenta = "#b4a7e8"
+cyan = "#8fd3c8"
+white = "#e9e4da"
+
+[colors.bright]
+black = "#5f5a70"
+red = "#f0a0a0"
+green = "#b4e2bc"
+yellow = "#f0d49c"
+blue = "#a6c6f6"
+magenta = "#d79bd6"
+cyan = "#a8e2d8"
+white = "#fbf7ef"

@@ -1,0 +1,50 @@
+{
+  "providers": {
+    "llamacpp": { "baseUrl": "http://127.0.0.1:11434/v1" },
+    "openrouter": {
+      "type": "openai",
+      "baseUrl": "https://openrouter.ai/api/v1",
+      "apiKeyEnv": "OPENROUTER_API_KEY"
+    }
+  },
+  "contextWindows": {
+    "llamacpp/some-model-without-reported-context": 32768
+  },
+  "approval": {
+    "mode": "ask",
+    "rules": [
+      { "tool": "bash", "match": "npm test*", "action": "allow" },
+      { "tool": "bash", "match": "npm run *", "action": "allow" },
+      { "tool": "bash", "match": "git push*", "action": "ask" },
+      { "tool": "write", "match": "**/*.lock", "action": "deny" },
+      { "tool": "browser_navigate", "match": "https://*.internal.example.com/*", "action": "deny" }
+    ]
+  },
+  "sandbox": {
+    "mode": "guard",
+    "allowPaths": [],
+    "container": { "runtime": "docker", "image": "node:22-bookworm-slim", "network": false }
+  },
+  "browser": {
+    "enabled": true,
+    "channel": "chrome",
+    "headless": false,
+    "blockedHosts": ["*.bank.example"]
+  },
+  "compaction": { "threshold": 0.8, "keepRecent": 6 },
+  "swarm": {
+    "maxAgents": 6,
+    "maxMessages": 60,
+    "agents": [
+      { "name": "architect", "role": "Lead. Plans the work and delegates.", "color": "magenta" },
+      { "name": "builder", "role": "Implements changes and runs the tests.", "color": "cyan" },
+      {
+        "name": "reviewer",
+        "role": "Reviews diffs for bugs and missing tests. Never edits files.",
+        "tools": ["read", "grep", "glob", "ls", "bash"],
+        "color": "yellow"
+      }
+    ]
+  },
+  "mcpServers": {}
+}

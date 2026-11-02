@@ -1,0 +1,154 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="dark" />
+    <meta name="referrer" content="no-referrer" />
+    <title>Nacreframe</title>
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="/app.css" />
+    <script type="module" src="/app.js"></script>
+  </head>
+  <body>
+    <div id="login" hidden>
+      <form id="login-form" autocomplete="off">
+        <h1>
+          <svg width="30" height="30" viewBox="0 0 32 32" aria-hidden="true">
+            <use href="/favicon.svg#gem" />
+          </svg>
+          Nacreframe
+        </h1>
+        <p class="note">Enter the login token printed by <code>nacre serve</code>.</p>
+        <label class="field"
+          >Token
+          <input id="login-token" type="password" required autofocus spellcheck="false" autocomplete="off" />
+        </label>
+        <div class="err" id="login-err" role="alert"></div>
+        <button class="btn primary" type="submit">Sign in</button>
+      </form>
+    </div>
+
+    <div id="app" hidden>
+      <aside id="sidebar" aria-label="Sessions">
+        <div class="brand">
+          <svg viewBox="0 0 32 32" aria-hidden="true"><use href="/favicon.svg#gem" /></svg>
+          <span>Nacreframe</span>
+        </div>
+        <div class="side-actions">
+          <button class="btn primary block" id="new-session">New session</button>
+        </div>
+        <div class="side-list" id="side-list"></div>
+        <div class="side-foot">
+          <span id="version"></span>
+          <button class="btn small" id="logout">Sign out</button>
+        </div>
+      </aside>
+
+      <main id="main">
+        <header id="topbar">
+          <button class="btn small" id="menu-btn" aria-label="Toggle sessions">☰</button>
+          <div class="title" id="title">Nacreframe</div>
+          <label class="chip"
+            >Mode
+            <select id="mode" aria-label="Approval mode">
+              <option value="ask">ask</option>
+              <option value="edits">edits</option>
+              <option value="auto">auto</option>
+              <option value="plan">plan</option>
+            </select>
+          </label>
+          <label class="chip"
+            >Sandbox
+            <select id="sandbox" aria-label="Sandbox level">
+              <option value="off">off</option>
+              <option value="guard">guard</option>
+              <option value="container">container</option>
+            </select>
+          </label>
+          <label class="chip chip-model"
+            >Model
+            <select id="model" aria-label="Model"></select>
+          </label>
+          <div
+            class="meter"
+            id="meter"
+            title="Context window usage. The tick marks where automatic compaction starts."
+          >
+            <span>ctx</span>
+            <div class="meter-bar">
+              <div class="meter-fill" id="meter-fill"></div>
+              <div class="meter-tick" id="meter-tick"></div>
+            </div>
+            <span id="meter-text">–</span>
+          </div>
+          <button class="btn small" id="compact" title="Summarise older messages now">Compact</button>
+          <button class="btn small" id="toggle-panel" title="Tasks, swarm and browser">Panel</button>
+        </header>
+
+        <div id="scroll"><div id="transcript" aria-live="polite"></div></div>
+
+        <div id="dock">
+          <div id="cards"></div>
+          <form id="composer">
+            <label class="sr-only" for="input">Message</label>
+            <textarea id="input" rows="1" placeholder="Ask anything…"></textarea>
+            <button class="btn danger" type="button" id="stop" hidden>Stop</button>
+            <button class="btn primary" type="submit" id="send">Send</button>
+          </form>
+          <div class="hint">
+            <span id="hint">Enter to send · Shift+Enter for a new line</span><span id="queued"></span>
+          </div>
+        </div>
+      </main>
+
+      <aside id="panel" aria-label="Details" hidden></aside>
+    </div>
+
+    <dialog id="new-dialog">
+      <form method="dialog" id="new-form">
+        <h2>New session</h2>
+        <label class="field"
+          >Folder
+          <input id="nf-cwd" type="text" list="roots" required spellcheck="false" />
+          <datalist id="roots"></datalist>
+        </label>
+        <label class="field"
+          >Model
+          <select id="nf-model"></select>
+        </label>
+        <div class="two">
+          <label class="field"
+            >Approval mode
+            <select id="nf-approval">
+              <option value="ask">ask — confirm every change</option>
+              <option value="edits">edits — auto-approve file edits</option>
+              <option value="auto">auto — approve within the sandbox</option>
+              <option value="plan">plan — read-only</option>
+            </select>
+          </label>
+          <label class="field"
+            >Sandbox
+            <select id="nf-sandbox">
+              <option value="guard">guard</option>
+              <option value="container">container (Docker)</option>
+              <option value="off">off</option>
+            </select>
+          </label>
+        </div>
+        <label class="field"
+          >Continue from
+          <select id="nf-resume">
+            <option value="">Start fresh</option>
+          </select>
+        </label>
+        <p class="note" id="nf-note"></p>
+        <div class="row">
+          <button class="btn" type="button" id="nf-cancel">Cancel</button>
+          <button class="btn primary" type="submit" id="nf-create">Create session</button>
+        </div>
+      </form>
+    </dialog>
+    <div id="toast" hidden role="status"></div>
+  </body>
+</html>

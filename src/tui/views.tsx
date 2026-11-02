@@ -1,0 +1,372 @@
+import { Box, Text, useAnimation, useWindowSize } from 'ink';
+import type { ApprovalMode } from '../config/schema.js';
+import type { TodoItem } from '../tools/types.js';
+import { BIN, NAME, VERSION } from '../version.js';
+import { agentColor, useTheme } from './context.js';
+import { diffColor, Markdown } from './markdown.js';
+import type { Item, LiveAgent, UiSnapshot } from './store.js';
+import { GLYPH, MODE_STYLE } from './theme.js';
+
+export function useSpinner(active: boolean): string {
+  const { frame } = useAnimation({ interval: 110, isActive: active });
+  return GLYPH.spinner[frame % GLYPH.spinner.length]!;
+}
+
+const fmtTokens = (n: number) =>
+  n >= 1_000_000
+    ? `${(n / 1e6).toFixed(1)}M`
+    : n >= 1000
+      ? `${(n / 1000).toFixed(n >= 10_000 ? 0 : 1)}k`
+      : String(n);
+const elapsed = (ms: number) =>
+  ms < 60_000
+    ? `${Math.floor(ms / 1000)}s`
+    : `${Math.floor(ms / 60_000)}m ${Math.floor((ms % 60_000) / 1000)}s`;
+
+export interface BannerInfo {
+  model: string;
+  cwd: string;
+  mode: ApprovalMode;
+  sandbox: string;
+  warnings: string[];
+}
+
+export function Banner({ info }: { info: BannerInfo }) {
+  const t = useTheme();
+  const home = process.env.HOME ?? process.env.USERPROFILE ?? '';
+  const cwd = home && info.cwd.startsWith(home) ? '~' + info.cwd.slice(home.length) : info.cwd;
+  return (
+    <Box flexDirection="column" marginBottom={1} paddingLeft={1}>
+      <Text>
+        <Text color={t.accent} bold>
+          {GLYPH.brand} {NAME}
+        </Text>
+        <Text color={t.faint}> v{VERSION}</Text>
+      </Text>
+      <Text color={t.dim}>
+        {' '}
+        {info.model} · {cwd}
+      </Text>
+      <Text color={t.dim}>
+        {' '}
+        <Text color={t[MODE_STYLE[info.mode].color]}>{info.mode}</Text> mode · {info.sandbox}
+      </Text>
+      <Text color={t.faint}>
+        {' '}
+        /help for commands · shift+tab changes mode · esc interrupts · {BIN} --help
+      </Text>
+      {info.warnings.map((w, i) => (
+        <Text key={i} color={t.gold}>
+          {' '}
+          ! {w}
+        </Text>
+      ))}
+    </Box>
+  );
+}
+
+export function ItemView({ item, banner }: { item: Item; banner: BannerInfo }) {
+  const t = useTheme();
+  switch (item.kind) {
+    case 'banner':
+      return <Banner info={banner} />;
+    case 'user':
+      return (
+        <Box marginTop={1} paddingLeft={1}>
+          <Text color={t.accent}>{GLYPH.user} </Text>
+          <Text bold>{item.text}</Text>
+        </Box>
+      );
+    case 'assistant': {
+      const c = item.agent === 'main' ? t.text : agentColor(t, item.agent);
+      return (
+        <Box marginTop={1} paddingLeft={1} flexDirection="column">
+          {item.agent !== 'main' ? (
+            <Text bold color={c}>
+              {GLYPH.brand} {item.agent}
+            </Text>
+          ) : null}
+          <Box>
+            <Box marginRight={1}>
+              <Text color={item.agent === 'main' ? t.accent : c}>
+                {item.agent === 'main' ? GLYPH.tool : ' '}
+              </Text>
+            </Box>
+            <Box flexDirection="column" flexGrow={1}>
+              <Markdown text={item.text} />
+            </Box>
+          </Box>
+        </Box>
+      );
+    }
+    case 'tool': {
+      const color = item.status === 'ok' ? t.teal : item.status === 'denied' ? t.gold : t.red;
+      const detail = item.detail ? item.detail.split('\n') : [];
+      return (
+        <Box flexDirection="column" paddingLeft={1}>
+          <Text>
+            <Text color={color}>{GLYPH.tool} </Text>
+            {item.agent !== 'main' ? <Text color={agentColor(t, item.agent)}>{item.agent} </Text> : null}
+            <Text bold>{item.name}</Text>
+            <Text color={t.dim}> {item.description === item.name ? '' : item.description}</Text>
+          </Text>
+          <Text color={item.status === 'ok' ? t.dim : color}>
+            {' '}
+            {GLYPH.result} {item.summary}
+          </Text>
+          {detail.slice(0, 14).map((l, i) => (
+            <Text key={i} color={item.name === 'bash' ? t.dim : diffColor(l, t)} wrap="truncate-end">
+              {' '}
+              {l || ' '}
+            </Text>
+          ))}
+          {detail.length > 14 ? <Text color={t.faint}> … +{detail.length - 14} more lines</Text> : null}
+        </Box>
+      );
+    }
+    case 'notice': {
+      const color = { info: t.dim, warn: t.gold, error: t.red, success: t.green }[item.level];
+      const glyph = { info: '·', warn: '!', error: GLYPH.fail, success: GLYPH.ok }[item.level];
+      return (
+        <Box paddingLeft={1}>
+          <Text color={color}>
+            {glyph} {item.text}
+          </Text>
+        </Box>
+      );
+    }
+    case 'channel': {
+      const from = agentColor(t, item.from);
+      return (
+        <Box paddingLeft={1} marginTop={item.from === 'you' ? 1 : 0}>
+          <Text>
+            <Text bold color={from}>
+              {item.from}
+            </Text>
+            {item.to ? (
+              <Text color={t.faint}>
+                {' '}
+                → <Text color={agentColor(t, item.to)}>{item.to}</Text>
+              </Text>
+            ) : null}
+            <Text color={t.faint}> </Text>
+            <Text color={item.from === 'system' ? t.faint : t.text}>{item.text}</Text>
+          </Text>
+        </Box>
+      );
+    }
+  }
+}
+
+function tail(text: string, n: number): string[] {
+  const lines = text.split('\n');
+  return lines.slice(-n);
+}
+
+export function TodoPanel({ todos }: { todos: TodoItem[] }) {
+  const t = useTheme();
+  if (!todos.length || todos.every((x) => x.status === 'completed')) return null;
+  return (
+    <Box flexDirection="column" paddingLeft={1} marginTop={1}>
+      {todos.map((x, i) => (
+        <Text
+          key={i}
+          color={x.status === 'completed' ? t.faint : x.status === 'in_progress' ? t.accent : t.dim}
+          {...(x.status === 'completed' ? { strikethrough: true } : {})}
+        >
+          {x.status === 'completed' ? '☑' : x.status === 'in_progress' ? '◐' : '☐'} {x.content}
+        </Text>
+      ))}
+    </Box>
+  );
+}
+
+function AgentChip({ a, spin }: { a: LiveAgent; spin: string }) {
+  const t = useTheme();
+  const c = agentColor(t, a.name, a.color);
+  return (
+    <Text>
+      <Text color={c}>
+        {a.running ? spin : '○'} {a.name}
+      </Text>
+      {a.running && a.lastTool ? <Text color={t.faint}> {a.lastTool.slice(0, 28)}</Text> : null}
+    </Text>
+  );
+}
+
+/** Split view: one pane per agent, live. */
+export function SwarmPanes({ agents, spin }: { agents: LiveAgent[]; spin: string }) {
+  const t = useTheme();
+  const { columns } = useWindowSize();
+  const narrow = columns < 90;
+  return (
+    <Box flexDirection={narrow ? 'column' : 'row'} paddingX={1} marginTop={1}>
+      {agents.map((a) => {
+        const c = agentColor(t, a.name, a.color);
+        const body = a.text ? tail(a.text, 5) : [];
+        return (
+          <Box
+            key={a.name}
+            flexDirection="column"
+            flexGrow={1}
+            flexBasis={0}
+            borderStyle="round"
+            borderColor={a.running ? c : t.faint}
+            paddingX={1}
+            height={9}
+            overflow="hidden"
+          >
+            <Text bold color={c} wrap="truncate-end">
+              {a.running ? spin : '○'} {a.name}
+            </Text>
+            <Text color={t.faint} wrap="truncate-end">
+              {a.role ?? ''}
+            </Text>
+            {a.tools.slice(-2).map((x) => (
+              <Text key={x.id} color={t.dim} wrap="truncate-end">
+                ▸ {x.description}
+              </Text>
+            ))}
+            {body.map((l, i) => (
+              <Text key={i} color={t.text} wrap="truncate-end">
+                {l}
+              </Text>
+            ))}
+            {!a.running && !body.length ? <Text color={t.faint}>idle</Text> : null}
+          </Box>
+        );
+      })}
+    </Box>
+  );
+}
+
+export function LiveArea({
+  snap,
+  todos,
+  showPanes,
+}: {
+  snap: UiSnapshot;
+  todos: TodoItem[];
+  showPanes: boolean;
+}) {
+  const t = useTheme();
+  const running = snap.live.some((a) => a.running);
+  const spin = useSpinner(running);
+  const main = snap.live.find((a) => a.name === 'main');
+  const started = Math.min(...snap.live.filter((a) => a.running).map((a) => a.startedAt), Date.now());
+
+  return (
+    <Box flexDirection="column">
+      {snap.swarmActive ? (
+        showPanes ? (
+          <SwarmPanes agents={snap.live} spin={spin} />
+        ) : (
+          <Box paddingLeft={1} marginTop={1} gap={2}>
+            {snap.live.map((a) => (
+              <AgentChip key={a.name} a={a} spin={spin} />
+            ))}
+          </Box>
+        )
+      ) : null}
+
+      {!snap.swarmActive && main?.text ? (
+        <Box marginTop={1} paddingLeft={1}>
+          <Box marginRight={1}>
+            <Text color={t.accent}>{GLYPH.tool}</Text>
+          </Box>
+          <Box flexDirection="column" flexGrow={1}>
+            <Markdown text={main.text} />
+          </Box>
+        </Box>
+      ) : null}
+
+      {!snap.swarmActive
+        ? main?.tools.map((x) => (
+            <Box key={x.id} flexDirection="column" paddingLeft={1}>
+              <Text>
+                <Text color={t.accent}>{spin} </Text>
+                <Text bold>{x.name}</Text>
+                <Text color={t.dim}> {x.description === x.name ? '' : x.description}</Text>
+              </Text>
+              {x.output
+                ? tail(x.output.trimEnd(), 3).map((l, i) => (
+                    <Text key={i} color={t.faint} wrap="truncate-end">
+                      {' '}
+                      {l}
+                    </Text>
+                  ))
+                : null}
+            </Box>
+          ))
+        : null}
+
+      <TodoPanel todos={todos} />
+
+      {snap.browser.open ? (
+        <Box paddingLeft={1} marginTop={1}>
+          <Text color={snap.browser.holder === 'user' ? t.gold : t.blue}>
+            ◉ browser{snap.browser.holder === 'user' ? ' (you have control)' : ''}
+          </Text>
+          <Text color={t.faint}>
+            {' '}
+            {snap.browser.url ? snap.browser.url.slice(0, 60) : ''}
+            {snap.browser.lastAction ? ` · ${snap.browser.lastAction}` : ''}
+          </Text>
+        </Box>
+      ) : null}
+
+      {snap.compacting ? (
+        <Box paddingLeft={1} marginTop={1}>
+          <Text color={t.gold}>
+            ⏸ Compacting context ({snap.compacting.pct}%) — chat paused, your input is queued
+          </Text>
+        </Box>
+      ) : null}
+
+      {running ? (
+        <Box paddingLeft={1} marginTop={1}>
+          <Text color={t.accent}>{spin} </Text>
+          <Text color={t.dim}>{snap.status ?? (main?.thinking ? 'Thinking' : 'Working')}… </Text>
+          <Text color={t.faint}>({elapsed(Date.now() - started)} · esc to interrupt)</Text>
+        </Box>
+      ) : null}
+    </Box>
+  );
+}
+
+export function Footer({
+  mode,
+  sandbox,
+  snap,
+  contextWindow,
+  swarmCount,
+  queued,
+}: {
+  mode: ApprovalMode;
+  sandbox: string;
+  snap: UiSnapshot;
+  contextWindow: number;
+  swarmCount: number;
+  queued: number;
+}) {
+  const t = useTheme();
+  const m = MODE_STYLE[mode];
+  const pct = Math.min(99, Math.round((snap.contextTokens / contextWindow) * 100));
+  return (
+    <Box justifyContent="space-between" paddingX={2}>
+      <Text>
+        <Text color={t[m.color]} bold>
+          ⏵⏵ {m.label}
+        </Text>
+        <Text color={t.faint}> (shift+tab) · {sandbox.split(' · ')[0]}</Text>
+        {swarmCount ? <Text color={t.rose}> · swarm ×{swarmCount}</Text> : null}
+        {snap.browser.open ? <Text color={t.blue}> · browser</Text> : null}
+        {queued ? <Text color={t.gold}> · {queued} queued</Text> : null}
+      </Text>
+      <Text color={t.faint}>
+        ctx <Text color={pct > 80 ? t.red : pct > 60 ? t.gold : t.dim}>{pct}%</Text> · ↑
+        {fmtTokens(snap.tokens.input)} ↓{fmtTokens(snap.tokens.output)}
+      </Text>
+    </Box>
+  );
+}

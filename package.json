@@ -1,0 +1,68 @@
+{
+  "name": "nacreframe",
+  "version": "0.1.0",
+  "description": "A terminal-native AI agent harness with sandboxing, approval modes, live browser control and collaborating agent swarms.",
+  "license": "MIT",
+  "type": "module",
+  "bin": {
+    "nacre": "dist/cli.js"
+  },
+  "exports": {
+    "./extensions": {
+      "types": "./dist/ext/extensions.d.ts",
+      "default": "./dist/ext/extensions.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist",
+    "web",
+    "assets",
+    "README.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=22.18"
+  },
+  "scripts": {
+    "dev": "tsx src/cli.tsx",
+    "build": "tsc -p tsconfig.build.json && node scripts/postbuild.mjs",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint .",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "scan-secrets": "node scripts/scan-secrets.mjs",
+    "check": "npm run typecheck && npm run lint && npm run test && npm run scan-secrets",
+    "prepublishOnly": "npm run check && npm run build",
+    "live-check": "tsx scripts/live-check.ts"
+  },
+  "keywords": [
+    "ai",
+    "agent",
+    "cli",
+    "tui",
+    "llm",
+    "coding-agent",
+    "swarm"
+  ],
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "1.32.2",
+    "ink": "8.0.0",
+    "playwright-core": "1.64.1",
+    "react": "19.3.1",
+    "zod": "4.6.7"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.0.0",
+    "@types/node": "^24.0.0",
+    "@types/react": "^19.3.0",
+    "eslint": "^9.0.0",
+    "prettier": "^3.0.0",
+    "tsx": "4.23.15",
+    "typescript": "6.0.3",
+    "typescript-eslint": "^8.0.0",
+    "vitest": "5.0.5"
+  }
+}

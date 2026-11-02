@@ -1,0 +1,76 @@
+# Configuration
+
+## Where config lives
+
+| Layer   | Path                                                                                                                                                 |
+| ------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
+| User    | Linux `~/.config/nacreframe/config.json` · macOS `~/Library/Application Support/nacreframe/config.json` · Windows `%APPDATA%\nacreframe\config.json` |
+| Project | `.nacreframe/config.json` in the project (or any parent directory)                                                                                   |
+| Env     | `NACRE_MODEL`, `NACRE_APPROVAL`, `NACRE_SANDBOX`                                                                                                     |
+| Flags   | `--model`, `--approval`, `--sandbox`, `--no-browser`                                                                                                 |
+
+Later layers win. List settings (`rules`, `denyPaths`, `allowPaths`, `allowedHosts`, `blockedHosts`, `agents`) are
+concatenated; objects are merged. Set `NACRE_HOME` to relocate everything (config/data/state) — handy for tests and
+containers. `nacre doctor` prints what it found.
+
+**Project config is untrusted by default.** Until you run `nacre trust` in the project, only these are applied:
+`model`, `theme`, `deny`/`ask` approval rules, extra `sandbox.denyPaths`, `browser.blockedHosts`. Everything else
+(including `approval.mode`, allow rules, `sandbox.mode`, `mcpServers`, `providers`) is ignored with a warning, and the
+project's skills, extensions, prompt templates and `SYSTEM.md` are not loaded.
+
+## Reference
+
+| Key                                              | Default                                                  | Notes                                                                                                                              |
+| ------------------------------------------------ | -------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
+| `model`                                          | _(none)_                                                 | `<provider>/<model>`. Deliberately no default: pick with `--model`, `NACRE_MODEL` or `/model`                                      |
+| `smallModel`                                     | = `model`                                                | Used for compaction summaries (same model by default: no model swap on a single-GPU server)                                        |
+| `contextWindows`                                 | `{}`                                                     | `{ "<provider>/<model>": tokens }` overrides what the server reports                                                               |
+| `maxTokens`                                      | `8192`                                                   | Output limit per model call                                                                                                        |
+| `thinkingBudget`                                 | `0`                                                      | Extended-thinking tokens (Anthropic); `0` disables                                                                                 |
+| `providers.<id>`                                 | anthropic, openai, ollama, lmstudio                      | `{ type: "anthropic" \| "openai", baseUrl?, apiKeyEnv?, headers?, contextWindow? }`                                                |
+| `approval.mode`                                  | `ask`                                                    | `ask` \| `edits` \| `auto` \| `plan`                                                                                               |
+| `approval.rules[]`                               | `[]`                                                     | `{ tool, match?, action: "allow"\|"ask"\|"deny" }`; `tool` is a glob, `match` globs the command/path/URL                           |
+| `sandbox.mode`                                   | `guard`                                                  | `off` \| `guard` \| `container`                                                                                                    |
+| `sandbox.allowPaths[]`                           | `[]`                                                     | Extra directories file tools may use                                                                                               |
+| `sandbox.denyPaths[]`                            | `.env`, `.env.*`, `**/.ssh/**`, `**/*.pem`, `**/id_rsa*` | Never readable/writable                                                                                                            |
+| `sandbox.container`                              | docker, `node:22-bookworm-slim`, no network, 2g, 2 cpus  | `{ runtime, image, network, memory, cpus }`                                                                                        |
+| `browser.enabled`                                | `true`                                                   |                                                                                                                                    |
+| `browser.channel`                                | `chrome`                                                 | `chrome` \| `msedge` \| `chromium` (the last needs `npx playwright-core install chromium`)                                         |
+| `browser.headless`                               | `false`                                                  | Headed by default so you can watch                                                                                                 |
+| `browser.allowedHosts[]` / `blockedHosts[]`      | `[]`                                                     | Host globs; if `allowedHosts` is non-empty everything else is blocked                                                              |
+| `swarm.agents[]`                                 | `[]`                                                     | `{ name, role, model?, tools?, color? }`                                                                                           |
+| `swarm.maxAgents` / `maxMessages` / `allowSpawn` | `6` / `60` / `true`                                      |                                                                                                                                    |
+| `compaction`                                     | `{ threshold: 0.8, keepRecent: 6 }`                      | Always on. `threshold` 0.3–0.8 (cannot exceed 80%); `keepRecent` newest messages kept verbatim. See [compaction.md](compaction.md) |
+| `mcpServers.<name>`                              | `{}`                                                     | `{ command, args?, env?, cwd? }` (stdio) or `{ url, headers? }` (HTTP)                                                             |
+| `maxToolIterations`                              | `60`                                                     | Model↔tool round trips per user message                                                                                            |
+| `theme`                                          | `nacre`                                                  | `nacre` \| `mono` (`NO_COLOR` also forces mono)                                                                                    |
+
+## Providers
+
+```json
+{
+  "providers": {
+    "unsloth": { "type": "openai", "baseUrl": "http://127.0.0.1:8888/v1" },
+    "openrouter": {
+      "type": "openai",
+      "baseUrl": "https://openrouter.ai/api/v1",
+      "apiKeyEnv": "OPENROUTER_API_KEY"
+    }
+  }
+}
+```
+
+Anything that speaks OpenAI's `/chat/completions` streaming protocol works (Ollama, LM Studio, vLLM, llama.cpp server,
+Unsloth Studio...). Local `localhost` endpoints need no key. The context window is read from the server (llama.cpp `--ctx-size` via the
+router's `/v1/models`, or `/props`; LM Studio; Ollama `/api/ps`). If it is not reported, 32,768 tokens is assumed and
+you get a warning: set `contextWindows` (or the provider's `contextWindow`) so compaction triggers at the right size.
+Built-in providers: `anthropic`, `openai`, `ollama` (:11434), `lmstudio` (:1234), `llamacpp` (:8080). Ollama's default
+port is also 11434, so if you run llama.cpp there, override `providers.llamacpp.baseUrl` and use the `llamacpp/` prefix. Tool calling must be supported by the model/server you pick.
+
+## Instructions, skills, templates
+
+- `AGENTS.md` / `NACREFRAME.md`: read from the config dir and every directory from `/` down to the working directory.
+- `SYSTEM.md` in the config dir (or a trusted project's `.nacreframe/`) replaces the built-in system prompt.
+- `skills/<name>/SKILL.md` with `name` and `description` front-matter: listed to the model, loaded on demand.
+- `prompts/<name>.md` → `/name`; `$ARGUMENTS` and `$1`…`$9` are substituted.
+- `extensions/*.{ts,js}`: see the README and [examples/extensions](../examples/extensions).
