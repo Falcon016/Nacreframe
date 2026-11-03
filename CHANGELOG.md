@@ -10,6 +10,12 @@ First release of the ground-up rewrite (replaces the earlier turtlebot harness).
   tool calls are repaired; tool results are capped.
 - Providers: Anthropic and any OpenAI-compatible endpoint (llama.cpp, Ollama, LM Studio, Unsloth Studio, vLLM...).
   Context windows are detected from the server. No default model.
+- **The context stays at or below 80%**: replies may only use the room left under the compaction line, and a reply
+  that reaches it is continued after compacting instead of being cut off; tool results that would cross it are made
+  room for first. Reasoning that the provider does not send back (OpenAI-compatible servers) no longer counts toward
+  the context, which made compaction start early.
+- **Tokens per second** in the terminal footer and the dashboard: live while a reply streams, then the reply's
+  measured speed. The footer now fits narrow windows by dropping its least useful parts instead of running together.
 - **No repeated text in the terminal**: a reply taller than the window used to leave copies of itself in the
   scrollback on every redraw. Each finished line of a reply is now printed as it arrives, and the live area (the
   unfinished part, the task list, running tools) always fits in the window.

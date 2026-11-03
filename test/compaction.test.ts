@@ -310,13 +310,14 @@ describe('hard limits', () => {
 });
 
 describe('reply size', () => {
-  it('asks for all the room left in the window by default', async () => {
+  it('asks for all the room left below the compaction line by default', async () => {
     const p = new AutoProvider([say('ok')]);
     const { agent } = makeAgent(ws.dir, p, { window: 100_000, tools: readOnly() });
     await agent.run('hi');
     const r = p.requests[0]!;
-    expect(r.maxTokens).toBeGreaterThan(95_000);
-    expect(r.maxTokens! + used(r)).toBeLessThan(100_000);
+    // Prompt + reply can reach 80% of the window, and no further.
+    expect(r.maxTokens).toBeGreaterThan(75_000);
+    expect(r.maxTokens! + used(r)).toBeLessThanOrEqual(80_000);
   });
 
   it('keeps a configured limit', async () => {
@@ -454,5 +455,68 @@ describe('what the summary tells the model', () => {
     expect(first).toContain('Task list when this summary was written');
     expect(first).toContain('[x] write the parser');
     expect(first).toContain('[ ] add tests');
+  });
+});
+
+describe('the context never passes the compaction line', () => {
+  const W = 20_000; // line at 16 000 tokens
+
+  it('continues a reply cut off at the line after compacting, instead of ending the turn', async () => {
+    const session = Session.create(ws.dir);
+    fill(session, 7, 3000); // ≈ 12 000 tokens: below the line, so the request goes out
+    const p = new AutoProvider([
+      [
+        { type: 'text', delta: 'The first half of a long answer' },
+        { type: 'usage', usage: { inputTokens: 12_000, outputTokens: 3900 } },
+        { type: 'done', stopReason: 'max_tokens' },
+      ],
+      say('and the second half.'),
+    ]);
+    const { agent, events } = makeAgent(ws.dir, p, { window: W, session, tools: readOnly() });
+    await agent.run('write a long answer');
+    expect(isSummary(p.requests[0]!)).toBe(false); // nothing to compact before the request
+    const [first, second] = mainCalls(p);
+    expect(first!.maxTokens! + used(first!)).toBeLessThanOrEqual(0.8 * W); // the reply was held below the line
+    expect(p.summaries.length).toBeGreaterThan(0); // reaching it compacted…
+    expect(text(second!.messages.at(-1)!)).toContain('[Continue]'); // …and the model carried on
+    expect(used(second!)).toBeLessThan(0.8 * W);
+    const end = events.find((e) => e.type === 'turn_end');
+    expect(end).toMatchObject({ stopReason: 'end_turn' }); // no "cut off" warning
+  });
+
+  it('makes room before tool output that would take the context past the line', async () => {
+    writeFileSync(join(ws.dir, 'big.txt'), 'line of a large file\n'.repeat(1200)); // capped to ≈ 1 600 tokens
+    const session = Session.create(ws.dir);
+    fill(session, 8, 3000); // ≈ 13 800 tokens: one more file read crosses the line
+    const p = new AutoProvider([callTool('r1', 'read', { path: 'big.txt' }), say('read it')]);
+    const { agent, events } = makeAgent(ws.dir, p, { window: W, session, tools: readOnly() });
+    await agent.run('read big.txt');
+    expect(isSummary(p.requests[0]!)).toBe(false);
+    const start = events.find((e) => e.type === 'compaction' && e.phase === 'start');
+    expect(start).toMatchObject({ incoming: expect.any(Number) });
+    // The summary went in before the tool output, which is kept whole after it.
+    const path = session.path();
+    const comp = path.findIndex((e) => e.type === 'compaction');
+    const result = path.findIndex(
+      (e) => e.type === 'message' && e.message.content.some((b) => b.type === 'tool_result'),
+    );
+    expect(comp).toBeGreaterThan(-1);
+    expect(result).toBeGreaterThan(comp);
+    for (const r of mainCalls(p)) expect(used(r)).toBeLessThan(0.8 * W);
+  });
+
+  it('does not count reasoning the provider does not send back', async () => {
+    const p = new AutoProvider([
+      [
+        { type: 'thinking', delta: 'r'.repeat(35_000) }, // ≈ 10 000 tokens of reasoning
+        { type: 'text', delta: 'ok' },
+        { type: 'usage', usage: { inputTokens: 500, outputTokens: 10_010 } },
+        { type: 'done', stopReason: 'end_turn' },
+      ],
+    ]);
+    const { agent, events } = makeAgent(ws.dir, p, { window: 100_000, tools: readOnly() });
+    await agent.run('think hard');
+    expect(agent.contextTokens).toBeLessThan(2000);
+    expect(events.filter((e) => e.type === 'compaction')).toHaveLength(0);
   });
 });

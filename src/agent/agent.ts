@@ -1,7 +1,7 @@
 import type { Config } from '../config/schema.js';
 import { assemble } from '../llm/assemble.js';
 import type { ResolvedModel } from '../llm/registry.js';
-import type { ContentBlock, Message, StopReason, Usage } from '../llm/types.js';
+import type { ContentBlock, Message, StopReason, StreamEvent, Usage } from '../llm/types.js';
 import { ProviderError } from '../llm/types.js';
 import type { PolicyEngine } from '../policy/engine.js';
 import { describeGrant, grantKey } from '../policy/engine.js';
@@ -35,9 +35,22 @@ export type AgentEvent =
   | { type: 'tool_progress'; id: string; text: string }
   | { type: 'tool_end'; id: string; name: string; result: ToolResult }
   | { type: 'tool_denied'; id: string; name: string; reason: string }
-  | { type: 'usage'; usage: Usage; total: Usage; contextTokens: number }
+  /** `tokensPerSecond`: how fast this reply was generated, from its first token to its last. */
+  | { type: 'usage'; usage: Usage; total: Usage; contextTokens: number; tokensPerSecond?: number }
+  /** How full the context is now (after a reply, tool results or compaction). */
+  | { type: 'context'; tokens: number }
+  /** Generation speed while a reply streams (an estimate from the text so far; `usage` has the final figure). */
+  | { type: 'speed'; tokensPerSecond: number }
   | { type: 'compacted'; droppedMessages: number }
-  | { type: 'compaction'; phase: 'start'; pct: number; usedTokens: number; windowTokens: number }
+  /** `incoming`: tokens about to be added (tool results), compacted for before they go in. */
+  | {
+      type: 'compaction';
+      phase: 'start';
+      pct: number;
+      usedTokens: number;
+      windowTokens: number;
+      incoming?: number;
+    }
   | { type: 'compaction'; phase: 'end'; ok: boolean; beforePct: number; afterPct: number }
   | { type: 'queued'; count: number }
   | { type: 'paused'; reason: string }
@@ -141,6 +154,19 @@ export function outputLimitFix(message: string): { maxOutput: number } | { room:
 
 /** Marks the harness's reminder to update the task list (a user message the user did not type). */
 export const TODO_CHECK = '[Task list check]';
+/** Marks the harness's request to carry on with a reply cut off at the compaction line. */
+export const CONTINUE_NOTE = '[Continue]';
+/** User messages the harness wrote itself, which UIs do not show as typed by the user. */
+export const isHarnessNote = (text: string) => text.startsWith(TODO_CHECK) || text.startsWith(CONTINUE_NOTE);
+
+/** Replies cut off at the compaction line that are carried on after compacting, per run. */
+const MAX_CONTINUATIONS = 4;
+/**
+ * The least room under the compaction line worth sending a request with (2% of the window, at most 1024 tokens):
+ * compaction starts this close to the line, and with less room than this after compacting, a reply may use the
+ * window's own room instead.
+ */
+const usefulReply = (window: number) => Math.max(64, Math.min(1024, Math.floor(window * 0.02)));
 
 const formatTodos = (todos: TodoItem[]) =>
   todos
@@ -165,6 +191,8 @@ export interface EnsureOptions {
   /** Called after a finished answer: failures are reported but do not end the turn as an error. */
   quiet?: boolean;
   instructions?: string | undefined;
+  /** Tokens about to be added (tool results): make room for them before they go in. */
+  incoming?: number;
 }
 
 export class Agent {
@@ -189,6 +217,8 @@ export class Agent {
   private todos: TodoItem[] = [];
   private workedThisRun = false;
   private todoReminded = false;
+  /** Whether the last request's reply size was set by the room left below the compaction line. */
+  private cappedAtLine = false;
 
   constructor(private o: AgentOptions) {
     this.id = o.id;
@@ -327,6 +357,7 @@ export class Agent {
     const max = this.o.config.maxToolIterations || Infinity; // 0 = no limit
     let recovered = false;
     let outputFixes = 0;
+    let continuations = 0;
     for (let iter = 0; iter < max; iter++) {
       if (signal.aborted) return 'aborted';
       this.drainSteering();
@@ -371,12 +402,39 @@ export class Agent {
       }
       const { message, stopReason, badToolCalls } = result;
       if (message.content.length) this.o.session.append(message, this.id);
-      this.noteReported(result.usage);
+      this.noteReported(result.usage, message);
       this.emit({ type: 'assistant', message });
+      this.emitContext();
 
       const calls = message.content.filter(
         (b): b is Extract<ContentBlock, { type: 'tool_use' }> => b.type === 'tool_use',
       );
+      if (
+        !calls.length &&
+        stopReason === 'max_tokens' &&
+        this.cappedAtLine &&
+        continuations < MAX_CONTINUATIONS
+      ) {
+        // The reply reached the compaction line: compact, then let the model carry on from where it stopped.
+        const { compacted } = await this.ensureRoom(signal, { force: true, quiet: true });
+        if (compacted) {
+          continuations++;
+          this.o.session.append(
+            {
+              role: 'user',
+              content: [
+                {
+                  type: 'text',
+                  text: `${CONTINUE_NOTE} Your reply was cut off because the context reached its limit, and the older conversation was summarised to make room. Continue exactly where you stopped, without repeating what you already wrote.`,
+                },
+              ],
+            },
+            this.id,
+          );
+          this.emitContext();
+          continue;
+        }
+      }
       if (!calls.length) {
         const reminder = stopReason === 'end_turn' ? this.todoReminder() : undefined;
         if (reminder) {
@@ -393,7 +451,12 @@ export class Agent {
 
       if (calls.some((c) => c.name !== 'todo_write')) this.workedThisRun = true;
       const results = await this.runTools(calls, badToolCalls, signal);
+      // Results that would take the context past the compaction line: make room first, so nothing is cut.
+      // (Quiet: if that fails, the results still go in and the next request pauses with them saved.)
+      const incoming = estimateMessages([{ role: 'user', content: results }]);
+      if (!signal.aborted) await this.ensureRoom(signal, { quiet: true, incoming });
       this.o.session.append({ role: 'user', content: results }, this.id);
+      this.emitContext();
       if (signal.aborted) return 'aborted';
     }
     this.emit({ type: 'status', text: `Stopped after ${max} tool iterations. Send a message to continue.` });
@@ -428,20 +491,41 @@ export class Agent {
   /** Tokens the next request would use: provider-reported when available, else a conservative estimate. */
   private promptTokens(): number {
     const msgs = this.view();
+    const thinking = this.keepsThinking;
     const fixed = estimateTokens(this.o.system()) + estimateSpecs(this.o.tools.specs());
-    const est = fixed + estimateMessages(msgs);
+    const est = fixed + estimateMessages(msgs, { thinking });
     const r = this.reported;
     if (r && msgs.length >= r.messages) {
-      return Math.max(r.tokens + estimateMessages(msgs.slice(r.messages)), Math.floor(est * 0.85));
+      return Math.max(
+        r.tokens + estimateMessages(msgs.slice(r.messages), { thinking }),
+        Math.floor(est * 0.85),
+      );
     }
     return est;
   }
 
-  private noteReported(u: Usage): void {
+  /** Whether reasoning stays in the context (sent back with the conversation) for this provider. */
+  private get keepsThinking(): boolean {
+    return this.o.model.provider.keepsThinking === true;
+  }
+
+  /** How full the context is right now, for UIs. */
+  private emitContext(): void {
+    this.contextTokens = this.promptTokens();
+    this.emit({ type: 'context', tokens: this.contextTokens });
+  }
+
+  private noteReported(u: Usage, message: Message): void {
     const prompt = u.inputTokens + (u.cacheReadTokens ?? 0) + (u.cacheWriteTokens ?? 0);
+    // The reply's reasoning counts as output but is not sent back by every provider: leave it out there.
+    const dropped = this.keepsThinking
+      ? 0
+      : estimateTokens(message.content.map((b) => (b.type === 'thinking' ? b.text : '')).join(''));
     // Some local servers omit usage; without it we keep estimating.
     this.reported =
-      prompt > 0 ? { tokens: prompt + u.outputTokens, messages: this.view().length } : undefined;
+      prompt > 0
+        ? { tokens: prompt + Math.max(0, u.outputTokens - dropped), messages: this.view().length }
+        : undefined;
   }
 
   /** The compaction trigger (never above 80% of the window) and the hard ceiling a request must stay under. */
@@ -473,13 +557,23 @@ export class Agent {
   async ensureRoom(signal: AbortSignal, opts: EnsureOptions = {}): Promise<{ compacted: boolean }> {
     const { window, target, hard } = this.limits();
     if (window <= 0 || this.compacting) return { compacted: false };
-    let used = this.promptTokens();
-    if (!opts.force && used < target) return { compacted: false };
+    const incoming = opts.incoming ?? 0;
+    let used = this.promptTokens() + incoming;
+    // Replies are kept below the line (see callModel), so compact once too little room is left under it for one.
+    const line = target - usefulReply(window);
+    if (!opts.force && used < line) return { compacted: false };
 
     const pct = (t: number) => Math.round((t / window) * 100);
     const before = used;
     this.compacting = true;
-    this.emit({ type: 'compaction', phase: 'start', pct: pct(used), usedTokens: used, windowTokens: window });
+    this.emit({
+      type: 'compaction',
+      phase: 'start',
+      pct: pct(used),
+      usedTokens: used,
+      windowTokens: window,
+      ...(incoming ? { incoming } : {}),
+    });
     let compacted = false;
     let failure: string | undefined;
     try {
@@ -498,8 +592,8 @@ export class Agent {
         failure = undefined;
         this.reported = undefined;
         this.emit({ type: 'compacted', droppedMessages: res.droppedMessages });
-        used = this.promptTokens();
-        if (used < target) break;
+        used = this.promptTokens() + incoming;
+        if (used < line) break;
       }
     } finally {
       this.compacting = false;
@@ -531,6 +625,7 @@ export class Agent {
     } else if (used >= target && !opts.force) {
       this.emit({ type: 'status', text: `Context is still ${pct(used)}% full after compaction.` });
     }
+    if (compacted) this.emitContext();
     return { compacted };
   }
 
@@ -587,7 +682,7 @@ export class Agent {
 
   private async callModel(signal: AbortSignal) {
     const m = this.o.model;
-    const { window } = this.limits();
+    const { window, target } = this.limits();
     const used = this.promptTokens();
     // As much output as the window holds on top of the prompt (less a margin for estimation error), unless the
     // config or the provider's own ceiling asks for less. With no known window, the server decides.
@@ -596,9 +691,15 @@ export class Agent {
       room = Math.min(room, this.roomOverride - 64);
       this.roomOverride = undefined;
     }
+    // Keep the reply below the compaction line too, so the context never passes it: a reply that reaches it is
+    // continued after compacting (see loop). If compaction could not make enough room, the window's room is used.
+    const toLine = window > 0 ? target - used : Infinity;
+    const byLine = toLine >= usefulReply(window) && toLine < room;
+    if (byLine) room = toLine;
     const want = Math.min(this.o.config.maxTokens || Infinity, m.maxOutput ?? Infinity, room);
     const maxTokens = Number.isFinite(want) ? Math.max(MIN_REPLY_TOKENS, want) : undefined;
     this.lastMaxTokens = maxTokens;
+    this.cappedAtLine = byLine && want === room;
     const stream = m.provider.stream({
       model: m.model,
       system: this.o.system(),
@@ -608,7 +709,8 @@ export class Agent {
       ...(this.o.config.thinkingBudget ? { thinkingBudget: this.o.config.thinkingBudget } : {}),
       signal,
     });
-    const r = await assemble(stream, {
+    const speed = new SpeedMeter((tps) => this.emit({ type: 'speed', tokensPerSecond: tps }));
+    const r = await assemble(speed.watch(stream), {
       onText: (delta) => this.emit({ type: 'text', delta }),
       onThinking: (delta) => this.emit({ type: 'thinking', delta }),
     });
@@ -619,11 +721,13 @@ export class Agent {
       (r.usage.cacheReadTokens ?? 0) +
       (r.usage.cacheWriteTokens ?? 0) +
       r.usage.outputTokens;
+    const tokensPerSecond = speed.final(r.usage.outputTokens);
     this.emit({
       type: 'usage',
       usage: r.usage,
       total: { ...this.totalUsage },
       contextTokens: this.contextTokens,
+      ...(tokensPerSecond ? { tokensPerSecond } : {}),
     });
     return r;
   }
@@ -796,6 +900,59 @@ export class Agent {
   private toolOutputCap(): number {
     const w = this.o.model.contextWindow;
     return w > 0 ? Math.max(3000, Math.floor(w * 0.08 * 3.5)) : 100_000;
+  }
+}
+
+/** The same rate as estimateTokens, without building a string. */
+const charsToTokens = (chars: number) => Math.ceil(chars / 3.5);
+
+/**
+ * Generation speed of one reply, timed from its first output token to its last (so the wait for the prompt to
+ * be read is not counted). While it streams, an estimate from the characters so far is reported twice a second;
+ * at the end the provider's token count replaces it (or the estimate, when the server reports no usage).
+ */
+export class SpeedMeter {
+  private first = 0;
+  private last = 0;
+  private chars = 0;
+  private reported = 0;
+  constructor(
+    private onLive: (tokensPerSecond: number) => void,
+    private now: () => number = () => performance.now(),
+  ) {}
+
+  async *watch(stream: AsyncIterable<StreamEvent>): AsyncGenerator<StreamEvent> {
+    for await (const e of stream) {
+      const n =
+        e.type === 'text' || e.type === 'thinking'
+          ? e.delta.length
+          : e.type === 'tool_call_delta'
+            ? e.json.length
+            : e.type === 'tool_call_start'
+              ? e.name.length
+              : 0;
+      if (n) this.add(n);
+      yield e;
+    }
+  }
+
+  add(chars: number): void {
+    const t = this.now();
+    if (!this.first) this.first = t;
+    this.last = t;
+    this.chars += chars;
+    if (t - this.reported >= 500 && t - this.first >= 500) {
+      this.reported = t;
+      this.onLive(Math.round(charsToTokens(this.chars) / ((t - this.first) / 1000)));
+    }
+  }
+
+  /** Tokens per second for the whole reply, or undefined when it was too short to time. */
+  final(outputTokens: number): number | undefined {
+    const seconds = (this.last - this.first) / 1000;
+    const tokens = outputTokens > 0 ? outputTokens : charsToTokens(this.chars);
+    if (seconds < 0.25 || tokens < 8) return undefined;
+    return Math.round(tokens / seconds);
   }
 }
 

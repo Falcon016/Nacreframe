@@ -1088,9 +1088,13 @@ textarea::placeholder {
   padding: 0 4px;
   font-variant-numeric: tabular-nums;
 }
-#budget {
+#budget,
+#speed {
   font-family: var(--mono);
   color: var(--fg-2);
+}
+#speed.live {
+  color: var(--violet-text);
 }
 #budget.warn {
   color: var(--amber);

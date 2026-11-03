@@ -22,7 +22,7 @@ It has **no default model**: you pick one, and the harness reads that model's re
 
 ## Highlights
 
-- **Compaction that cannot corrupt a conversation.** Always on, triggers at 80% of the _real_ context window, and
+- **Compaction that cannot corrupt a conversation.** Always on, keeps the context at or below 80% of the _real_ context window, and
   holds the chat (nothing is sent to the model) until the summary is done. It is transactional: the session is only
   touched if a valid summary was produced, the full history stays in the append-only session file, and if compaction
   fails or cannot free enough room the chat pauses with everything intact rather than sending an oversized request.

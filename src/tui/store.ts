@@ -1,5 +1,5 @@
 import type { AgentEvent } from '../agent/agent.js';
-import { TODO_CHECK, type Agent } from '../agent/agent.js';
+import { isHarnessNote, type Agent } from '../agent/agent.js';
 import type { BrowserEvent } from '../browser/service.js';
 import type { Message } from '../llm/types.js';
 import type { Swarm } from '../swarm/swarm.js';
@@ -64,11 +64,13 @@ export interface UiSnapshot {
   /** Messages typed while the agent was busy or compacting, not yet delivered. */
   queued: number;
   /** Set while context is being compacted: the chat is paused until it finishes. */
-  compacting?: { pct: number };
+  compacting?: { pct: number; incoming?: boolean };
   /** Show agents' reasoning in full (otherwise a one-line "thought for 8s"). */
   showThinking: boolean;
   /** Messages the swarm's agents have sent each other since you last spoke, against the limit (0 = none). */
   swarmBudget?: { used: number; limit: number };
+  /** Generation speed: replies streaming now (summed across agents), else the last finished reply. */
+  speed?: { tokensPerSecond: number; live: boolean };
 }
 
 /** How much live reasoning to keep per agent: enough to show its tail, not the whole essay. */
@@ -151,11 +153,13 @@ export class UiStore {
   private swarmActive = false;
   private status: string | undefined;
   private queued = 0;
-  private compacting: { pct: number } | undefined;
+  private compacting: { pct: number; incoming?: boolean } | undefined;
   private showThinking = false;
   private swarmBudget: { used: number; limit: number } | undefined;
   /** Per agent, for replies printed line by line: whether part is printed, and the full reasoning so far. */
   private streamed = new Map<string, { printed: boolean; thought: string }>();
+  private liveSpeed = new Map<string, number>();
+  private lastSpeed: number | undefined;
 
   /**
    * `printAsStreamed`: print each finished line of a reply as it arrives, so only the unfinished part stays in
@@ -183,6 +187,11 @@ export class UiStore {
       queued: this.queued,
       showThinking: this.showThinking,
       ...(this.swarmActive && this.swarmBudget ? { swarmBudget: this.swarmBudget } : {}),
+      ...(this.liveSpeed.size
+        ? { speed: { tokensPerSecond: [...this.liveSpeed.values()].reduce((a, b) => a + b, 0), live: true } }
+        : this.lastSpeed
+          ? { speed: { tokensPerSecond: this.lastSpeed, live: false } }
+          : {}),
       ...(this.compacting ? { compacting: this.compacting } : {}),
       ...(this.status ? { status: this.status } : {}),
     };
@@ -419,15 +428,25 @@ export class UiStore {
           output += t.output;
         }
         this.tokens = { input, output };
+        this.liveSpeed.delete(name);
+        if (e.tokensPerSecond) this.lastSpeed = e.tokensPerSecond;
         break;
       }
+      case 'context':
+        this.contextTokens = e.tokens;
+        break;
+      case 'speed':
+        this.liveSpeed.set(name, e.tokensPerSecond);
+        break;
       case 'queued':
         this.queued = e.count;
         break;
       case 'compaction':
         if (e.phase === 'start') {
-          this.compacting = { pct: e.pct };
-          this.status = `Context at ${e.pct}% — compacting. The chat is paused; anything you type is queued.`;
+          this.compacting = { pct: e.pct, ...(e.incoming ? { incoming: true } : {}) };
+          this.status = e.incoming
+            ? `New tool output would take the context to ${e.pct}%: compacting before it goes in. Anything you type is queued.`
+            : `Context at ${e.pct}%: compacting. The chat is paused; anything you type is queued.`;
         } else {
           this.compacting = undefined;
           this.status = undefined;
@@ -451,6 +470,7 @@ export class UiStore {
         this.notice(e.message, 'error');
         break;
       case 'turn_end':
+        this.liveSpeed.delete(name);
         a.running = false;
         a.tools = [];
         a.text = '';
@@ -513,7 +533,7 @@ export function replayInto(store: UiStore, messages: Message[]): void {
         store.push({ kind: 'thinking', agent: 'main', text: b.text.trim(), ms: 0 });
       } else if (b.type === 'text') {
         if (m.role === 'user') {
-          if (!b.text.startsWith(TODO_CHECK)) store.user(b.text);
+          if (!isHarnessNote(b.text)) store.user(b.text);
         } else store.push({ kind: 'assistant', text: b.text, agent: 'main' });
       } else if (b.type === 'tool_use') {
         calls.set(b.id, { name: b.name, description: JSON.stringify(b.input).slice(0, 80) });

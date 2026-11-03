@@ -180,3 +180,80 @@ describe('replaying a session', () => {
     expect(users.map((u) => (u.kind === 'user' ? u.text : ''))).toEqual(['build it']);
   });
 });
+
+describe('tokens per second', () => {
+  it('times a reply from its first token to its last, live and at the end', async () => {
+    const { SpeedMeter } = await import('../src/agent/agent.js');
+    let now = 1000;
+    const live: number[] = [];
+    const m = new SpeedMeter(
+      (tps) => live.push(tps),
+      () => now,
+    );
+    // 350 characters (≈ 100 tokens) every 250 ms → about 400 tokens a second.
+    for (let i = 0; i < 8; i++) {
+      m.add(350);
+      now += 250;
+    }
+    expect(live.length).toBeGreaterThan(0);
+    expect(live.at(-1)).toBeGreaterThan(350);
+    // The provider's count wins at the end: 600 tokens over the 1.75 s between first and last token.
+    expect(m.final(600)).toBe(343);
+    expect(new SpeedMeter(() => {}).final(500)).toBeUndefined(); // nothing streamed: nothing to time
+  });
+
+  it('shows the speed in the footer, and drops the least useful parts when the window is narrow', async () => {
+    const { Footer, fitFooter } = await import('../src/tui/views.js');
+    const parts = (ws: [number, number][]) => ws.map(([width, drop]) => ({ width, drop }));
+    const [l, r] = fitFooter(
+      parts([
+        [8, 0],
+        [9, 9],
+        [13, 5],
+      ]),
+      parts([
+        [10, 6],
+        [11, 0],
+        [12, 7],
+      ]),
+      54,
+    );
+    expect(l.map((p) => p.drop)).toEqual([0, 5]); // "shift+tab" (9) went first
+    expect(r.map((p) => p.drop)).toEqual([6, 0]); // then the token totals (7)
+
+    for (const columns of [120, 60]) {
+      class Tty extends PassThrough {
+        isTTY = true;
+        columns = columns;
+        rows = 24;
+      }
+      const stdout = new Tty();
+      let out = '';
+      stdout.on('data', (d: Buffer) => (out += d.toString()));
+      const snap: UiSnapshot = {
+        items: [],
+        live: [],
+        swarmActive: false,
+        browser: { open: false, holder: 'agent' },
+        contextTokens: 77_000,
+        tokens: { input: 145_000, output: 27_000 },
+        queued: 0,
+        showThinking: true,
+        speed: { tokensPerSecond: 42, live: true },
+      };
+      const app = render(
+        <Footer mode="auto" sandbox="guard" snap={snap} contextWindow={100_000} swarmCount={0} queued={0} />,
+        { stdout: stdout as never, patchConsole: false, interactive: true },
+      );
+      await sleep(50);
+      app.unmount();
+      const lines = plain(out)
+        .trimEnd()
+        .split('\n')
+        .filter((l) => l.trim());
+      expect(lines).toHaveLength(1); // one line, nothing run together
+      expect(lines[0]).toContain('context 77%');
+      if (columns === 120) expect(lines[0]).toContain('42 tok/s');
+    }
+  });
+});

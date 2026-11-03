@@ -26,7 +26,7 @@ untrusted work, use `--sandbox container`.
 
 ## Conversation integrity
 
-Compaction is always on, triggers at 80% of the context window, and holds the chat until a transactional summary is
+Compaction is always on, keeps the context at or below 80% of the window, and holds the chat until a transactional summary is
 committed; a failure pauses the chat instead of sending an oversized request (see [compaction.md](compaction.md)).
 Tool results are capped to a slice of the window, tool calls left dangling by a crash are closed before the next request,
 and session files are append-only, so no operation can silently truncate or corrupt a conversation.

@@ -619,6 +619,7 @@ function renderTop() {
     $('#meter-fill').style.width = '0%';
     $('#queued').textContent = '';
     $('#budget').hidden = true;
+    $('#speed').hidden = true;
     return;
   }
   const mode = $('#mode');
@@ -647,6 +648,12 @@ function renderTop() {
   $('#meter').title = win
     ? `Context ${used.toLocaleString()} of ${win.toLocaleString()} tokens (${st.session.contextSource}). Automatic compaction starts at ${st.session.target.toLocaleString()} tokens (the tick), and the chat pauses until it finishes.`
     : 'No model selected yet.';
+  const speed = $('#speed');
+  speed.hidden = !st.speed;
+  if (st.speed) {
+    speed.textContent = `${st.speed.tokensPerSecond} tok/s`;
+    speed.className = st.speed.live ? 'live' : '';
+  }
   const b = st.swarmBudget;
   const budget = $('#budget');
   budget.hidden = !b;
@@ -1164,9 +1171,10 @@ function wire() {
   $('#logout').addEventListener(
     'click',
     guard(async () => {
-      await api('/api/logout', { method: 'POST', body: {} });
+      // Stop the live stream and the polling first: anything still asking after the sign-out is refused (401).
       closeSessionView();
       showLogin();
+      await api('/api/logout', { method: 'POST', body: {} });
     }),
   );
   $('#new-session').addEventListener('click', () => openNewDialog());

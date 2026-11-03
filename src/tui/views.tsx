@@ -1,4 +1,5 @@
 import { Box, Text, useAnimation, useWindowSize } from 'ink';
+import type { ReactNode } from 'react';
 import type { ApprovalMode } from '../config/schema.js';
 import type { TodoItem } from '../tools/types.js';
 import { NAME, VERSION } from '../version.js';
@@ -634,7 +635,9 @@ export function LiveArea({
       {snap.compacting ? (
         <Box paddingLeft={1} marginTop={1}>
           <Text color={t.gold}>
-            Compacting context ({snap.compacting.pct}%): chat paused, your input is queued
+            {snap.compacting.incoming
+              ? 'Compacting to make room for new tool output: chat paused, your input is queued'
+              : `Compacting context (${snap.compacting.pct}%): chat paused, your input is queued`}
           </Text>
         </Box>
       ) : null}
@@ -669,10 +672,46 @@ function BudgetCounter({ used, limit }: { used: number; limit: number }) {
       <Text color={color}>
         {used}/{limit || '∞'}
       </Text>
-      {'   '}
     </Text>
   );
 }
+
+/** One item in the footer: its width when shown, and how readily it gives way when the line is too narrow. */
+interface FooterPart {
+  node: ReactNode;
+  width: number;
+  /** Higher gives way first; 0 never does. */
+  drop: number;
+}
+
+/** Drop the parts most willing to give way until both sides fit on one line of `columns`. */
+export function fitFooter<T extends { width: number; drop: number }>(
+  left: T[],
+  right: T[],
+  columns: number,
+): [T[], T[]] {
+  const gap = 3;
+  const width = (ps: T[]) => ps.reduce((n, p) => n + p.width, 0) + Math.max(0, ps.length - 1) * gap;
+  let l = [...left];
+  let r = [...right];
+  const room = columns - 4 - 2; // padding, and at least a little space between the two sides
+  while (width(l) + width(r) > room) {
+    const all = [...l, ...r].filter((p) => p.drop > 0);
+    if (!all.length) break;
+    const worst = all.reduce((a, b) => (b.drop > a.drop ? b : a));
+    l = l.filter((p) => p !== worst);
+    r = r.filter((p) => p !== worst);
+  }
+  return [l, r];
+}
+
+const joined = (parts: FooterPart[]) =>
+  parts.map((p, i) => (
+    <Text key={i}>
+      {i ? '   ' : ''}
+      {p.node}
+    </Text>
+  ));
 
 export function Footer({
   mode,
@@ -690,44 +729,76 @@ export function Footer({
   queued: number;
 }) {
   const t = useTheme();
+  const { columns } = useWindowSize();
   const m = MODE_STYLE[mode];
   const pct = Math.min(99, Math.round((snap.contextTokens / contextWindow) * 100));
+  const sb = sandbox.split(':')[0]!;
+  const tokens = `↑${fmtTokens(snap.tokens.input)} ↓${fmtTokens(snap.tokens.output)}`;
+  const part = (text: string, drop: number, node: ReactNode = text): FooterPart => ({
+    node,
+    width: text.length,
+    drop,
+  });
+
+  const left: FooterPart[] = [
+    part(
+      `⏵⏵ ${m.label}`,
+      0,
+      <Text color={t[m.color]} bold>
+        ⏵⏵ {m.label}
+      </Text>,
+    ),
+    part('shift+tab', 9, <Text color={t.faint}>shift+tab</Text>),
+    part(`sandbox ${sb}`, 5, <Text color={t.dim}>sandbox {sb}</Text>),
+    ...(swarmCount ? [part(`swarm ×${swarmCount}`, 3, <Text color={t.rose}>swarm ×{swarmCount}</Text>)] : []),
+    ...(snap.browser.open ? [part('browser', 4, <Text color={t.blue}>browser</Text>)] : []),
+    ...(queued ? [part(`${queued} queued`, 1, <Text color={t.gold}>{queued} queued</Text>)] : []),
+    ...(snap.showThinking
+      ? [
+          part(
+            `${GLYPH.think} thinking shown`,
+            8,
+            <Text color={t.lavender}>{GLYPH.think} thinking shown</Text>,
+          ),
+        ]
+      : []),
+  ];
+  const speed = snap.speed;
+  const right: FooterPart[] = [
+    ...(snap.swarmBudget
+      ? [
+          part(
+            `messages ${snap.swarmBudget.used}/${snap.swarmBudget.limit || '∞'}`,
+            2,
+            <BudgetCounter used={snap.swarmBudget.used} limit={snap.swarmBudget.limit} />,
+          ),
+        ]
+      : []),
+    ...(speed
+      ? [
+          part(
+            `${speed.tokensPerSecond} tok/s`,
+            6,
+            <Text color={t.faint}>
+              <Text color={speed.live ? t.accent : t.dim}>{speed.tokensPerSecond}</Text> tok/s
+            </Text>,
+          ),
+        ]
+      : []),
+    part(
+      `context ${pct}%`,
+      0,
+      <Text color={t.faint}>
+        context <Text color={pct >= 80 ? t.red : pct >= 60 ? t.gold : t.dim}>{pct}%</Text>
+      </Text>,
+    ),
+    part(tokens, 7, <Text color={t.faint}>{tokens}</Text>),
+  ];
+  const [l, r] = fitFooter(left, right, columns);
   return (
     <Box justifyContent="space-between" paddingX={2}>
-      <Text>
-        <Text color={t[m.color]} bold>
-          ⏵⏵ {m.label}
-        </Text>
-        <Text color={t.faint}> shift+tab</Text>
-        <Text color={t.dim}>
-          {'   '}sandbox {sandbox.split(':')[0]}
-        </Text>
-        {swarmCount ? (
-          <Text color={t.rose}>
-            {'   '}swarm ×{swarmCount}
-          </Text>
-        ) : null}
-        {snap.browser.open ? <Text color={t.blue}>{'   '}browser</Text> : null}
-        {queued ? (
-          <Text color={t.gold}>
-            {'   '}
-            {queued} queued
-          </Text>
-        ) : null}
-        {snap.showThinking ? (
-          <Text color={t.lavender}>
-            {'   '}
-            {GLYPH.think} thinking shown
-          </Text>
-        ) : null}
-      </Text>
-      <Text color={t.faint}>
-        {snap.swarmBudget ? (
-          <BudgetCounter used={snap.swarmBudget.used} limit={snap.swarmBudget.limit} />
-        ) : null}
-        context <Text color={pct > 80 ? t.red : pct > 60 ? t.gold : t.dim}>{pct}%</Text>
-        {'   '}↑{fmtTokens(snap.tokens.input)} ↓{fmtTokens(snap.tokens.output)}
-      </Text>
+      <Text wrap="truncate-end">{joined(l)}</Text>
+      <Text wrap="truncate-end">{joined(r)}</Text>
     </Box>
   );
 }
