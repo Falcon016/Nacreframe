@@ -189,7 +189,8 @@ export class WebSession {
         swarm: { active: !!swarm, ...(swarm?.id ? { id: swarm.id } : {}), names: swarm?.names ?? [] },
       },
       items,
-      live: snap.live,
+      // Live reasoning can run to thousands of characters and this is sent many times a second: send its tail.
+      live: snap.live.map((a) => (a.thought.length > 1200 ? { ...a, thought: a.thought.slice(-1200) } : a)),
       browser: snap.browser,
       tokens: snap.tokens,
       contextTokens: snap.contextTokens,

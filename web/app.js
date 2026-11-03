@@ -584,6 +584,16 @@ function renderLive(live, st) {
           text: `${swarm ? a.name + ' is ' : ''}${a.thinking ? 'thinking…' : 'working…'}`,
         }),
       );
+      // The reasoning as it arrives: the last few lines, under the same rule as a finished thought.
+      if (a.thought) {
+        const live = h(
+          'div',
+          { class: 'thought live' },
+          h('div', { class: 'body', text: a.thought.slice(-600) }),
+        );
+        if (swarm) live.style.setProperty('--agent', colorOf(a.name, a.color));
+        kids.push(live);
+      }
     }
   }
   live.replaceChildren(...kids);

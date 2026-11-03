@@ -369,4 +369,25 @@ describe('interactive UI', () => {
       await ui.stop();
     }
   });
+
+  it('streams reasoning as wrapped lines while the model thinks', async () => {
+    const ui = await boot();
+    try {
+      await until(() => ui.screen().includes('nacreframe'));
+      await ui.type('/thinking on');
+      ui.key('\r');
+      await until(() => ui.screen().includes('Showing thinking'));
+      await ui.type('deliberate please');
+      ui.key('\r');
+      // Mid-stream, the live block holds whole wrapped lines from the start of the reasoning, not a sliding tail.
+      // The first paragraph has no line break, yet it already spans two lines of the live block.
+      await until(() =>
+        /│ Let me work through this carefully before answering\.[^\n]*\n\s*│ \w/.test(ui.screen()),
+      );
+      expect(ui.screen()).not.toContain('Deliberated: the plan is ready.'); // still thinking at that point
+      await until(() => ui.screen().includes('Deliberated: the plan is ready.'));
+    } finally {
+      await ui.stop();
+    }
+  });
 });

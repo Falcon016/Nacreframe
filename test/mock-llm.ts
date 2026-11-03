@@ -9,6 +9,7 @@ import type { AddressInfo } from 'node:net';
  *   "run <cmd>"    → calls bash
  *   "think ..."    → streams reasoning (reasoning_content) before the reply
  *   "ponder ..."   → the same, written inline as <think>...</think> like some local models do
+ *   "deliberate"   → long reasoning streamed slowly (one word every 30 ms), to watch it arrive live
  *   anything else  → plain text reply
  * Each tool result is answered with a short wrap-up so the loop terminates.
  */
@@ -69,7 +70,26 @@ export function startMockLlm(port = 0): Promise<{ server: Server; url: string; r
         else if (m?.[1]!.toLowerCase() === 'write')
           call('write', { path: m[2], content: 'hello from the mock\n' });
         else if (m?.[1]!.toLowerCase() === 'run') call('bash', { command: u.replace(/^.*\brun\s+/i, '') });
-        else if (/\bthink\b/i.test(u)) {
+        else if (/\bdeliberate\b/i.test(u)) {
+          // Streams slowly, then finishes the response itself.
+          const words = (
+            'Let me work through this carefully before answering. First I will look at what the request asks for ' +
+            'and which files it touches, then I will consider the edge cases one at a time so nothing is missed. ' +
+            'The second paragraph keeps going without a line break for quite a while, the way real reasoning does ' +
+            'when a model talks itself through a problem, so the display has to wrap it rather than wait for one.\n\n' +
+            'Finally I will summarise the plan in one line.'
+          ).match(/\S+\s*/g)!;
+          void (async () => {
+            for (const w of words) {
+              send({ choices: [{ delta: { reasoning_content: w } }] });
+              await new Promise((r) => setTimeout(r, 30));
+            }
+            text('Deliberated: the plan is ready.');
+            send({ choices: [], usage: { prompt_tokens: 120, completion_tokens: 24 } });
+            res.end('data: [DONE]\n\n');
+          })();
+          return;
+        } else if (/\bthink\b/i.test(u)) {
           reason('The user wants me to think first.\nStep one: read the request.\nStep two: answer briefly.');
           text('Thought it through: the answer is 42.');
         } else if (/\bponder\b/i.test(u))

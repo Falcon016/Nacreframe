@@ -23,6 +23,11 @@ First release of the ground-up rewrite (replaces the earlier turtlebot harness).
   It installs what is missing: a private, checksum-verified Node.js when none is usable, and git through your package
   manager if you agree. `nacre` is a launcher that picks that Node.js and repairs a damaged install on its own;
   `install.sh --repair` does the same by hand.
+- **Fixes from a bug pass**: live reasoning is word-wrapped and grows line by line instead of sliding sideways in a
+  single cut-off line (it looked like it was buffering); the dashboard streams it too, and the server sends only
+  its tail. A teammate whose turns keep failing (model server down) pauses the team after three failures in a row
+  instead of being re-woken forever when there is no message limit; failed turns and turns stopped at the
+  tool-call limit are reported to the lead as such. Custom agents cannot be named `you`, `system` or `all`.
 - **Swarm limits**: `/swarm custom` asks how many messages the agents may send each other before checking in with
   you, and how many tool calls one agent may make per turn, and saves both to your config (0 / "No limit" allowed).
   `/swarm limit [n|off]` changes them any time, also for a running team. The footer shows `messages 12/60` beside

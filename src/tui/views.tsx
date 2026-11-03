@@ -306,6 +306,44 @@ export function ItemView({
   }
 }
 
+/**
+ * The last `n` lines of `text` once word-wrapped to `width`, for reasoning that streams in. Reasoning often
+ * runs for paragraphs without a line break; cutting such a line to fit made it slide sideways like a ticker
+ * instead of flowing. Wrapping it first lets new words land at the end of the last line, as in an editor.
+ * Only the tail is wrapped, so the cost stays flat however long the reasoning gets.
+ */
+export function wrapTail(text: string, width: number, n: number): string[] {
+  const w = Math.max(12, width);
+  const cut = text.length > w * n * 3;
+  const src = (cut ? text.slice(-w * n * 3) : text).replace(/\n{3,}/g, '\n\n');
+  const out: string[] = [];
+  src.split('\n').forEach((para, pi) => {
+    if (!para.trim()) {
+      if (out.length && out.at(-1) !== '') out.push('');
+      return;
+    }
+    let line = pi === 0 && cut ? '…' : '';
+    for (const word of para.trim().split(/\s+/)) {
+      for (let rest = word; rest;) {
+        const room = w - (line ? line.length + 1 : 0);
+        if (rest.length <= room) {
+          line = line ? `${line} ${rest}` : rest;
+          rest = '';
+        } else if (line) {
+          out.push(line);
+          line = '';
+        } else {
+          out.push(rest.slice(0, w)); // a single word wider than the column
+          rest = rest.slice(w);
+        }
+      }
+    }
+    if (line) out.push(line);
+  });
+  while (out.at(-1) === '') out.pop();
+  return out.slice(-n);
+}
+
 function tail(text: string, n: number): string[] {
   const lines = text.split('\n');
   return lines.slice(-n);
@@ -362,6 +400,8 @@ export function SwarmPanes({
   // out of reach and every redraw leaves a copy behind. So panes sit side by side, at most a quarter of
   // the window tall, and give way to the one-line roster when there is no room for them.
   const height = Math.max(5, Math.min(9, Math.floor(rows / 4)));
+  // Text width inside one pane: its share of the row, less border and padding.
+  const paneWidth = Math.floor((columns - 2) / Math.max(1, agents.length)) - 4;
   if (columns < 90 || rows < 24) {
     return (
       <Box paddingLeft={1} marginTop={1} gap={2} flexWrap="wrap">
@@ -413,9 +453,9 @@ export function SwarmPanes({
               </Text>
             ) : null}
             {thinking && showThinking
-              ? tail(a.thought, Math.max(1, room - 1)).map((l, i) => (
-                  <Text key={`t${i}`} color={t.dim} italic wrap="truncate-start">
-                    {l}
+              ? wrapTail(a.thought, paneWidth, Math.max(1, room - 1)).map((l, i) => (
+                  <Text key={`t${i}`} color={t.dim} italic wrap="truncate-end">
+                    {l || ' '}
                   </Text>
                 ))
               : null}
@@ -441,6 +481,9 @@ export function LiveArea({
   const spin = useSpinner(running);
   const main = snap.live.find((a) => a.name === 'main');
   const started = Math.min(...snap.live.filter((a) => a.running).map((a) => a.startedAt), Date.now());
+  const { columns, rows } = useWindowSize();
+  // Live reasoning: up to a fifth of the window, so the live area always fits on screen.
+  const thoughtLines = Math.max(3, Math.min(8, Math.floor(rows / 5)));
 
   return (
     <Box flexDirection="column">
@@ -471,10 +514,9 @@ export function LiveArea({
             borderColor={t.lavender}
             flexDirection="column"
           >
-            {/* The newest words matter most: long lines are cut at the start, not the end. */}
-            {tail(main.thought, 4).map((l, i) => (
-              <Text key={i} color={t.dim} italic wrap="truncate-start">
-                {l}
+            {wrapTail(main.thought, columns - 6, thoughtLines).map((l, i) => (
+              <Text key={i} color={t.dim} italic wrap="truncate-end">
+                {l || ' '}
               </Text>
             ))}
           </Box>

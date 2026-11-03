@@ -127,6 +127,15 @@ describe.skipIf(!channel)('web dashboard in a real browser', () => {
     await page.waitForSelector('.msg-assistant:has-text("the answer is 42")');
   });
 
+  it('streams reasoning live under "thinking…" while the model thinks', async () => {
+    await page.fill('#input', 'deliberate please');
+    await page.keyboard.press('Enter');
+    await page.waitForSelector('.thought.live .body:has-text("Let me work through this")');
+    await shot('03b-thinking-live');
+    await page.waitForSelector('.msg-assistant:has-text("Deliberated: the plan is ready.")');
+    expect(await page.locator('.thought.live').count()).toBe(0); // the live block gives way to the finished one
+  });
+
   it('asks for approval in ask mode and acts on the keyboard shortcut', async () => {
     await page.selectOption('#mode', 'ask');
     await page.waitForFunction(() => document.querySelector('#mode')?.className === 'mode-ask');

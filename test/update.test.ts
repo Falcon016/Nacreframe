@@ -58,3 +58,20 @@ describe('inline <think> reasoning from local models', () => {
     expect(run(['<think>never closed'])).toEqual({ thinking: 'never closed', text: '' });
   });
 });
+
+describe('live reasoning layout', () => {
+  it('word-wraps streaming reasoning and keeps the newest lines, so it flows instead of sliding sideways', async () => {
+    const { wrapTail } = await import('../src/tui/views.js');
+    const para = 'one two three four five six seven eight nine ten eleven twelve';
+    const lines = wrapTail(para, 20, 10);
+    expect(lines).toEqual(['one two three four', 'five six seven eight', 'nine ten eleven', 'twelve']);
+    for (const l of lines) expect(l.length).toBeLessThanOrEqual(20);
+    expect(wrapTail(para, 20, 2)).toEqual(['nine ten eleven', 'twelve']); // the tail, as words arrive
+    expect(wrapTail('first\n\n\n\nsecond', 20, 5)).toEqual(['first', '', 'second']); // one blank between paragraphs
+    expect(wrapTail('x'.repeat(30), 12, 5)).toEqual(['x'.repeat(12), 'x'.repeat(12), 'x'.repeat(6)]);
+    const long = Array.from({ length: 400 }, (_, i) => `w${i}`).join(' ');
+    const tailLines = wrapTail(long, 30, 3);
+    expect(tailLines).toHaveLength(3);
+    expect(tailLines.at(-1)).toMatch(/w399$/);
+  });
+});
