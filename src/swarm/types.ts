@@ -11,6 +11,8 @@ export interface BusMessage {
   to?: string;
   text: string;
   kind: 'chat' | 'system';
+  /** Sent by the harness on an agent's behalf: its end-of-turn report, routed because it did not send one. */
+  auto?: boolean;
 }
 
 export interface Teammate {
@@ -22,7 +24,8 @@ export interface Teammate {
 /** The handle each agent's swarm tools use. */
 export interface SwarmMember {
   readonly name: string;
-  say(text: string, to?: string): { ok: true } | { ok: false; error: string };
+  /** `note` explains a rerouting (a teammate's message to the user goes to the lead instead). */
+  say(text: string, to?: string): { ok: true; note?: string } | { ok: false; error: string };
   note(key: string, value: string): void;
   notes(): Record<string, string>;
   roster(): Teammate[];

@@ -830,7 +830,8 @@ textarea::placeholder {
 .channel.system {
   font-size: 13px;
 }
-.channel.system .text {
+.channel.system .text,
+.channel .text.auto {
   color: var(--fg-3);
 }
 .thinking {

@@ -18,6 +18,8 @@ export interface Theme {
   red: string;
   blue: string;
   rose: string;
+  /** Panel borders: quiet deep purple. */
+  frame: string;
   agents: string[];
 }
 
@@ -34,6 +36,7 @@ export const NACRE: Theme = {
   red: '#ef7b7b',
   blue: '#82aaf2',
   rose: '#e98bd0',
+  frame: '#4b3b7c',
   agents: ['#e98bd0', '#66cfc0', '#e2b866', '#82aaf2', '#74d19b', '#f0a3c0', '#b7a4ff', '#f0a98e'],
 };
 
@@ -51,6 +54,7 @@ export const MONO: Theme = {
   red: 'white',
   blue: 'white',
   rose: 'white',
+  frame: 'gray',
   agents: ['white'],
 };
 

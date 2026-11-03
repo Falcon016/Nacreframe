@@ -1,4 +1,4 @@
-import { Box, Static, useApp } from 'ink';
+import { Box, Static, useApp, useStdout } from 'ink';
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import type { ApprovalRequest, ApprovalResponse } from '../agent/agent.js';
 import type { ApprovalMode } from '../config/schema.js';
@@ -40,6 +40,34 @@ export function App({ runtime, store, theme, initialPrompt }: Props) {
   const [history, setHistory] = useState<string[]>([]);
   const [, force] = useState(0);
   const exitArmed = useRef(0);
+  const stdout = useStdout().stdout as NodeJS.WriteStream;
+  // Bumped after a resize to print the whole transcript again (see below).
+  const [staticKey, setStaticKey] = useState(0);
+
+  // Terminals reflow their contents when the window changes size (windowed to fullscreen, a split pane
+  // dragged), so what Ink believes is on screen no longer matches what is there. Redrawing in place then
+  // leaves stale copies of the live area behind. Once the resizing settles, start from a clean screen and
+  // print everything again at the new width.
+  useEffect(() => {
+    if (!stdout?.isTTY) return;
+    let size = `${stdout.columns}x${stdout.rows}`;
+    let timer: NodeJS.Timeout | undefined;
+    const onResize = () => {
+      clearTimeout(timer);
+      timer = setTimeout(() => {
+        const now = `${stdout.columns}x${stdout.rows}`;
+        if (now === size) return;
+        size = now;
+        stdout.write('\x1b[2J\x1b[3J\x1b[H'); // clear screen, scrollback, cursor home
+        setStaticKey((k) => k + 1);
+      }, 150);
+    };
+    stdout.on('resize', onResize);
+    return () => {
+      clearTimeout(timer);
+      stdout.off('resize', onResize);
+    };
+  }, [stdout]);
 
   const banner = useMemo<BannerInfo>(
     () => ({
@@ -201,8 +229,11 @@ export function App({ runtime, store, theme, initialPrompt }: Props) {
 
   return (
     <ThemeContext.Provider value={theme}>
-      <Static items={items}>{(item) => <ItemView key={item.id} item={item} banner={banner} />}</Static>
-      <LiveArea snap={snap} todos={todos} showPanes={showPanes} />
+      <Static key={staticKey} items={items}>
+        {(item) => <ItemView key={item.id} item={item} banner={banner} />}
+      </Static>
+      {/* Panes give way to a one-line roster while a dialog needs the room. */}
+      <LiveArea snap={snap} todos={todos} showPanes={showPanes && !dialogOpen} />
       <Box flexDirection="column" marginTop={1}>
         {approval ? (
           <ApprovalDialog req={approval.req} pending={runtime.broker.pending} onResolve={approval.resolve} />

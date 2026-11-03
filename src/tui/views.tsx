@@ -1,10 +1,11 @@
 import { Box, Text, useAnimation, useWindowSize } from 'ink';
 import type { ApprovalMode } from '../config/schema.js';
 import type { TodoItem } from '../tools/types.js';
-import { BIN, NAME, VERSION } from '../version.js';
+import { NAME, VERSION } from '../version.js';
 import { agentColor, useTheme } from './context.js';
 import { diffColor, Markdown } from './markdown.js';
 import type { Item, LiveAgent, UiSnapshot } from './store.js';
+import { Mascot } from './mascot.js';
 import { GLYPH, MODE_STYLE } from './theme.js';
 
 export function useSpinner(active: boolean): string {
@@ -47,43 +48,82 @@ export function Keys({ items }: { items: [key: string, what: string][] }) {
   );
 }
 
+/**
+ * The welcome panel printed at launch: a framed space with the wordmark set into its top edge, the mascot,
+ * where you are, and the handful of keys worth knowing. It fills the top of the terminal instead of leaving
+ * it bare, then scrolls away with the conversation.
+ */
 export function Banner({ info }: { info: BannerInfo }) {
   const t = useTheme();
+  const { columns } = useWindowSize();
   const home = process.env.HOME ?? process.env.USERPROFILE ?? '';
   const cwd = home && info.cwd.startsWith(home) ? '~' + info.cwd.slice(home.length) : info.cwd;
+  // As wide as the input box below it, so the two frames line up.
+  const width = Math.max(40, columns);
+  const showMascot = t.name !== 'mono' && width >= 72;
+  const title = ` ${NAME.toLowerCase()} `;
+  const version = ` v${VERSION} `;
+  // ╭─[●] nacreframe ─────────────── v0.1.0 ─╮
+  const rule = '─'.repeat(Math.max(1, width - 2 - 3 - title.length - version.length - 2));
+  const tips: [string, string][] = [
+    ['/model', 'pick or switch the model'],
+    ['/swarm duo', 'start a planner and a builder'],
+    ['/resume', 'pick up an earlier session'],
+    ['shift+tab', 'change how much it may do on its own'],
+    ['/help', 'everything else'],
+  ];
   return (
-    <Box flexDirection="column" marginBottom={1} paddingLeft={1}>
+    <Box flexDirection="column" marginBottom={1}>
       <Text>
+        <Text color={t.frame}>╭─</Text>
         <Text color={t.accent} bold>
           {GLYPH.mark[0]}
-          <Text color={t.text}>{GLYPH.mark[1]}</Text>
+        </Text>
+        <Text color={t.text}>{GLYPH.mark[1]}</Text>
+        <Text color={t.accent} bold>
           {GLYPH.mark[2]}
         </Text>
-        <Text bold> {NAME.toLowerCase()}</Text>
-        <Text color={t.faint}> v{VERSION}</Text>
+        <Text bold>{title}</Text>
+        <Text color={t.frame}>{rule}</Text>
+        <Text color={t.faint}>{version}</Text>
+        <Text color={t.frame}>─╮</Text>
       </Text>
-      {/* Details hang under the wordmark, past the mark. */}
-      <Box flexDirection="column" paddingLeft={4}>
-        <Text>
-          <Text color={t.text}>{info.model}</Text>
-          <Text color={t.faint}> in </Text>
-          <Text color={t.dim}>{cwd}</Text>
-        </Text>
-        <Text>
-          <Text color={t[MODE_STYLE[info.mode].color]}>{info.mode}</Text>
-          <Text color={t.faint}> mode, </Text>
-          <Text color={t.dim}>{info.sandbox}</Text>
-        </Text>
-        <Text>
-          <Keys
-            items={[
-              ['/help', 'commands'],
-              ['shift+tab', 'mode'],
-              ['esc', 'interrupt'],
-              [`${BIN} --help`, 'options'],
-            ]}
-          />
-        </Text>
+      <Box
+        width={width}
+        borderStyle="round"
+        borderTop={false}
+        borderColor={t.frame}
+        paddingX={3}
+        paddingY={1}
+        columnGap={5}
+      >
+        {showMascot ? (
+          <Box flexDirection="column" flexShrink={0}>
+            <Mascot />
+          </Box>
+        ) : null}
+        <Box flexDirection="column" flexGrow={1} flexShrink={1}>
+          <Text wrap="truncate-end">
+            <Text bold color={t.text}>
+              {info.model}
+            </Text>
+            <Text color={t.faint}> in </Text>
+            <Text color={t.dim}>{cwd}</Text>
+          </Text>
+          <Text>
+            <Text color={t[MODE_STYLE[info.mode].color]}>{info.mode}</Text>
+            <Text color={t.faint}> mode, </Text>
+            <Text color={t.dim}>{info.sandbox}</Text>
+          </Text>
+          <Box flexDirection="column" marginTop={1}>
+            {tips.map(([k, what]) => (
+              <Text key={k} wrap="truncate-end">
+                <Text color={t.lavender}>{k.padEnd(12)}</Text>
+                <Text color={t.faint}>{what}</Text>
+              </Text>
+            ))}
+          </Box>
+        </Box>
       </Box>
       {info.warnings.map((w, i) => (
         <Box key={i} paddingLeft={1}>
@@ -187,7 +227,12 @@ export function ItemView({ item, banner }: { item: Item; banner: BannerInfo }) {
               </Text>
             ) : null}
             <Text color={t.faint}> </Text>
-            <Text color={item.from === 'system' ? t.faint : t.text}>{item.text}</Text>
+            {/* An automatic report repeats what the agent just wrote above; just show where it went. */}
+            {item.auto ? (
+              <Text color={t.faint}>report delivered</Text>
+            ) : (
+              <Text color={item.from === 'system' ? t.faint : t.text}>{item.text}</Text>
+            )}
           </Text>
         </Box>
       );
@@ -234,13 +279,25 @@ function AgentChip({ a, spin }: { a: LiveAgent; spin: string }) {
 /** Split view: one pane per agent, live. */
 export function SwarmPanes({ agents, spin }: { agents: LiveAgent[]; spin: string }) {
   const t = useTheme();
-  const { columns } = useWindowSize();
-  const narrow = columns < 90;
+  const { columns, rows } = useWindowSize();
+  // The live area is redrawn in place, which only works while it fits on screen: anything taller scrolls
+  // out of reach and every redraw leaves a copy behind. So panes sit side by side, at most a quarter of
+  // the window tall, and give way to the one-line roster when there is no room for them.
+  const height = Math.max(5, Math.min(9, Math.floor(rows / 4)));
+  if (columns < 90 || rows < 24) {
+    return (
+      <Box paddingLeft={1} marginTop={1} gap={2} flexWrap="wrap">
+        {agents.map((a) => (
+          <AgentChip key={a.name} a={a} spin={spin} />
+        ))}
+      </Box>
+    );
+  }
   return (
-    <Box flexDirection={narrow ? 'column' : 'row'} paddingX={1} marginTop={1}>
+    <Box flexDirection="row" paddingX={1} marginTop={1}>
       {agents.map((a) => {
         const c = agentColor(t, a.name, a.color);
-        const body = a.text ? tail(a.text, 5) : [];
+        const body = a.text ? tail(a.text, Math.max(1, height - 4)) : [];
         return (
           <Box
             key={a.name}
@@ -250,7 +307,7 @@ export function SwarmPanes({ agents, spin }: { agents: LiveAgent[]; spin: string
             borderStyle="round"
             borderColor={a.running ? c : t.faint}
             paddingX={1}
-            height={9}
+            height={height}
             overflow="hidden"
           >
             <Text bold color={c} wrap="truncate-end">

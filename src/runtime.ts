@@ -25,7 +25,7 @@ import { editTool, readTool, writeTool } from './tools/fs-tools.js';
 import { askUserTool, skillTool, todoTool } from './tools/misc.js';
 import { ToolRegistry } from './tools/registry.js';
 import { globTool, grepTool, lsTool } from './tools/search-tools.js';
-import type { TodoItem } from './tools/types.js';
+import type { Question, TodoItem } from './tools/types.js';
 import { webFetchTool } from './tools/web.js';
 import { Emitter } from './util/emitter.js';
 
@@ -45,12 +45,12 @@ export const SWARM_PRESETS: Record<string, SwarmAgentConfig[]> = {
   duo: [
     {
       name: 'planner',
-      role: 'Lead. Break the task into small steps, delegate them to the builder, review results, and report to the user.',
+      role: 'Lead. Break the task into small steps, hand each one to the builder, review what comes back, and report the result to the user.',
       color: 'magenta',
     },
     {
       name: 'builder',
-      role: 'Implementer. Carry out the steps the planner gives you, run the tests, and report back concisely.',
+      role: 'Implementer. Carry out the steps the planner gives you, run the tests, and report back to the planner concisely.',
       color: 'cyan',
     },
   ],
@@ -62,12 +62,12 @@ export const SWARM_PRESETS: Record<string, SwarmAgentConfig[]> = {
     },
     {
       name: 'builder',
-      role: 'Implementer. Write the code the architect specifies, keeping changes small and tested.',
+      role: 'Implementer. Write the code the architect specifies, keeping changes small and tested, and report back to the architect.',
       color: 'cyan',
     },
     {
       name: 'reviewer',
-      role: 'Reviewer. Read what the builder changes, run checks, and point out bugs, risks and missing tests.',
+      role: 'Reviewer. Read what the builder changes, run checks, and report bugs, risks and missing tests to the architect.',
       color: 'yellow',
     },
   ],
@@ -274,6 +274,8 @@ export class Runtime {
   }
 
   private swarmCfg = new Map<string, SwarmAgentConfig>();
+  /** The first member of the current swarm: the only one that talks to the user. */
+  private swarmLead: string | undefined;
 
   private swarmPromptFor(name: string) {
     const cfg = this.swarmCfg.get(name);
@@ -281,6 +283,7 @@ export class Runtime {
     return {
       self: name,
       role: cfg.role,
+      lead: this.swarmLead ?? name,
       teammates: this.swarm
         .roster()
         .filter((t) => t.name !== name)
@@ -292,7 +295,8 @@ export class Runtime {
     const cfg = this.swarmCfg.get(name);
     const base = this.tools.subset(cfg?.tools);
     const reg = new ToolRegistry();
-    for (const t of base.all()) reg.register(t);
+    // Only the lead may ask the user anything; the others take questions to the lead.
+    for (const t of base.all()) if (t.name !== 'ask_user' || name === this.swarmLead) reg.register(t);
     for (const t of swarmTools) reg.register(t);
     return reg;
   }
@@ -419,6 +423,7 @@ export class Runtime {
       return m;
     };
     for (const a of agents) await resolveFor(a);
+    this.swarmLead = agents[0]?.name;
 
     const sw = new Swarm({
       maxAgents: this.config.swarm.maxAgents,
@@ -445,7 +450,7 @@ export class Runtime {
           hooks: this.hooks,
           services: {
             swarm: member,
-            ask: (q) => this.broker.ask(cfg.name, q),
+            ...(cfg.name === this.swarmLead ? { ask: (q: Question) => this.broker.ask(cfg.name, q) } : {}),
             ...(this.browser ? { browser: this.browser } : {}),
             skills: { get: (n) => this.skills.get(n), names: () => this.skills.names() },
           },
@@ -463,6 +468,7 @@ export class Runtime {
     this.swarm?.flush();
     this.swarm = undefined;
     this.swarmCfg.clear();
+    this.swarmLead = undefined;
   }
 
   async dispose(): Promise<void> {

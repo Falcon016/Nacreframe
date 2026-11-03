@@ -59,7 +59,7 @@ that repository.
 3. Dashboard: interactive remote view of the agent's browser (today: refreshed screenshot + pause), per-user accounts,
    file browser / diff review pane.
 4. `nacre serve` Docker image published to a registry; Chromium variant.
-5. Extension reload without restart; richer swarm topologies (explicit lead/worker).
+5. Extension reload without restart; richer swarm topologies (beyond lead and teammates).
 6. Podman and native OS sandboxes (bubblewrap / Seatbelt) behind the existing `Sandbox` interface.
 
 ## Conventions

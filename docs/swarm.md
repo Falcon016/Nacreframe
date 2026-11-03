@@ -21,6 +21,21 @@ A swarm is a set of agents in one shared **channel**. You watch the channel in y
   message — agents are told to speak only for results, questions, blockers and hand-offs.
 - A busy agent is **steered** (the message arrives before its next model call) rather than restarted.
 
+## Who reports to whom
+
+The **lead** (the first agent) is the only one that talks to you. Everyone else reports to the lead. The harness
+enforces this, so it holds even with small models that lose track of their role:
+
+- Only the lead has `ask_user`. A teammate's question goes to the lead, who decides whether you need to hear it.
+- A teammate's `swarm_say` to you, or to nobody in particular, is delivered to the lead instead (the tool says so).
+- A teammate that ends its turn without posting anything has its final text delivered as its **report** to whoever
+  woke it (normally the lead), which wakes them so the work carries on. The channel shows "report delivered".
+- If the lead starts a line with `@builder do X` in plain text instead of calling `swarm_say`, the builder still gets
+  it. A passing mention ("thanks to @builder") is not treated as a hand-off.
+- Every wake-up repeats the agent's role and who it answers to.
+- If you address a teammate directly (`@builder ...`), it answers you, and the lead gets the answer as context
+  without being woken.
+
 Agents use these tools: `swarm_say`, `swarm_roster`, `swarm_note` / `swarm_notes` (shared scratchpad) and, if
 `swarm.allowSpawn` is true, `swarm_spawn` to add a teammate.
 

@@ -23,6 +23,13 @@ First release of the ground-up rewrite (replaces the earlier turtlebot harness).
   It installs what is missing: a private, checksum-verified Node.js when none is usable, and git through your package
   manager if you agree. `nacre` is a launcher that picks that Node.js and repairs a damaged install on its own;
   `install.sh --repair` does the same by hand.
+- **Swarm reporting lines**: only the lead talks to you; teammates report to the lead. Teammates lose `ask_user`,
+  their messages to you are rerouted to the lead, a turn that ends without a message is delivered as a report (so
+  small models no longer stall the team), plain-text `@mentions` from the lead are delivered, and every wake-up
+  restates the agent's role.
+- **Terminal UI**: a framed welcome panel with the mascot (a pearl in its shell) at launch; the screen is cleared and
+  reprinted after a resize, which fixes ghost copies of the swarm panes when going fullscreen; swarm panes stay short
+  enough to fit the window and give way to a one-line roster in small windows or while a dialog is open.
 - **New look**: a black and deep-purple palette shared by the dashboard, terminal UI, installer, setup wizard and the
   bundled terminal schemes; a new logo (a pearl between two brackets, `[●]` in the terminal) replaces the diamond.
   The dashboard drops glows, gradient washes and floating cards for hairlines and surface steps, groups mode, sandbox

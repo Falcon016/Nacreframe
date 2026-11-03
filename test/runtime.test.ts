@@ -229,6 +229,24 @@ describe('runtime with the mock server', () => {
     }
   });
 
+  it('gives only the swarm lead the ask_user tool, and tells each member who it reports to', async () => {
+    const { ws, boot } = setup({ model: 'mock/m' });
+    const rt = await boot();
+    try {
+      await rt.startSwarm('duo');
+      const planner = rt.systemPrompt('planner');
+      const builder = rt.systemPrompt('builder');
+      expect(planner).toMatch(/Tools:.*ask_user/);
+      expect(builder).not.toMatch(/Tools:.*ask_user/);
+      expect(planner).toContain('You are the lead');
+      expect(builder).toContain('You report to planner');
+    } finally {
+      rt.stopSwarm();
+      await rt.dispose();
+      ws.cleanup();
+    }
+  });
+
   it('compacts a swarm member exactly like the main agent (80% rule, summary, no loss)', async () => {
     const { ws, boot } = setup({ model: 'mock/m', contextWindows: { 'mock/m': 4000 } });
     const rt = await boot();

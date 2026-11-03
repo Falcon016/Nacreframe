@@ -11,16 +11,21 @@ export const swarmTools: AnyTool[] = [
   defineTool({
     name: 'swarm_say',
     description:
-      'Post a message to the shared team channel (visible live to the user). Set `to` to address one teammate and wake them; omit it to speak to everyone. Be brief and concrete; do not send acknowledgements.',
+      'Post a message to the shared team channel (visible live to the user). Set `to` to address one teammate and wake them. Only the lead talks to the user; everyone else reports to the lead (omitting `to` sends it to the lead). Be brief and concrete; do not send acknowledgements.',
     risk: 'agent',
     schema: z.object({
       text: z.string().min(1).max(4000),
-      to: z.string().optional().describe('Teammate name, "you" for the user, or omit for everyone'),
+      to: z
+        .string()
+        .optional()
+        .describe(
+          'Teammate name. The lead may use "you" for the user or omit it for everyone; others omit it for the lead',
+        ),
     }),
     describe: (i) => `say${i.to ? ` → ${i.to}` : ''}: ${i.text.slice(0, 60)}`,
     async execute(i, ctx) {
       const r = member(ctx).say(i.text, i.to);
-      return r.ok ? { content: 'Sent.' } : { content: r.error, isError: true };
+      return r.ok ? { content: r.note ?? 'Sent.' } : { content: r.error, isError: true };
     },
   }),
   defineTool({
@@ -31,7 +36,7 @@ export const swarmTools: AnyTool[] = [
     describe: () => 'roster',
     async execute(_i, ctx) {
       const r = member(ctx).roster();
-      return { content: r.map((t) => `${t.name} — ${t.role}${t.running ? ' (working)' : ''}`).join('\n') };
+      return { content: r.map((t) => `${t.name}: ${t.role}${t.running ? ' (working)' : ''}`).join('\n') };
     },
   }),
   defineTool({
