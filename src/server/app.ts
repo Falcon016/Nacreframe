@@ -9,7 +9,7 @@ import {
 import { createServer as createHttps } from 'node:https';
 import type { AddressInfo } from 'node:net';
 import { extname, join, normalize, resolve, sep } from 'node:path';
-import { Runtime } from '../runtime.js';
+import { Runtime, SWARM_PRESETS } from '../runtime.js';
 import { VERSION } from '../version.js';
 import { HttpError, SessionManager } from './sessions.js';
 
@@ -264,7 +264,10 @@ export async function startServer(opts: ServerOptions): Promise<RunningServer> {
           approval: catalog.config.approval.mode,
           sandbox: catalog.config.sandbox.mode,
         },
-        swarmPresets: ['duo', 'trio', ...(catalog.config.swarm.agents.length ? ['config'] : [])],
+        swarmPresets: [
+          ...Object.keys(SWARM_PRESETS),
+          ...(catalog.config.swarm.agents.length ? ['config'] : []),
+        ],
       });
     }
     if (path === '/api/models' && method === 'GET')

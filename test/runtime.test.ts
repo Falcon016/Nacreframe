@@ -1,10 +1,11 @@
-import { mkdirSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, utimesSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { loadConfig } from '../src/config/load.js';
 import { AuthStore } from '../src/config/auth.js';
 import { contextFromArgs, OpenAICompatProvider } from '../src/llm/openai.js';
 import { ProviderRegistry } from '../src/llm/registry.js';
+import { projectKey } from '../src/paths.js';
 import { Runtime } from '../src/runtime.js';
 import { startMockLlm } from './mock-llm.js';
 import { tmpWorkspace } from './helpers.js';
@@ -240,6 +241,90 @@ describe('runtime with the mock server', () => {
       expect(builder).not.toMatch(/Tools:.*ask_user/);
       expect(planner).toContain('You are the lead');
       expect(builder).toContain('You report to planner');
+    } finally {
+      rt.stopSwarm();
+      await rt.dispose();
+      ws.cleanup();
+    }
+  });
+
+  it('does not offer swarm_spawn unless adding teammates is allowed, so a team stays the size you chose', async () => {
+    const { ws, boot } = setup({ model: 'mock/m' });
+    const rt = await boot();
+    try {
+      const sw = await rt.startSwarm('trio');
+      expect(sw.names).toEqual(['architect', 'builder', 'reviewer']);
+      expect(rt.systemPrompt('architect')).not.toContain('swarm_spawn');
+    } finally {
+      rt.stopSwarm();
+      await rt.dispose();
+      ws.cleanup();
+    }
+  });
+
+  it('flushes old saved conversations and swarms, never the current one, and only this folder unless asked', async () => {
+    const { ws, boot } = setup({ model: 'mock/m' });
+    const rt = await boot();
+    try {
+      const data = join(ws.dir, '.home', 'data');
+      const here = join(data, 'sessions', projectKey(rt.cwd));
+      const elsewhere = join(data, 'sessions', 'some-other-folder');
+      mkdirSync(here, { recursive: true });
+      mkdirSync(elsewhere, { recursive: true });
+      const old = Date.now() / 1000 - 60 * 86_400;
+      const make = (dir: string, name: string, aged: boolean) => {
+        const f = join(dir, name);
+        writeFileSync(f, '{"type":"session"}\n');
+        if (aged) utimesSync(f, old, old);
+        return f;
+      };
+      const oldHere = make(here, 'old.jsonl', true);
+      const newHere = make(here, 'new.jsonl', false);
+      const oldThere = make(elsewhere, 'old.jsonl', true);
+      const current = rt.agent.session.filePath!;
+      writeFileSync(current, '{"type":"session"}\n');
+      utimesSync(current, old, old); // even an old-looking current conversation is kept
+
+      const swarmDir = join(data, 'swarms', projectKey(rt.cwd), 'run1');
+      mkdirSync(swarmDir, { recursive: true });
+      writeFileSync(join(swarmDir, 'channel.jsonl'), 'x');
+      utimesSync(join(swarmDir, 'channel.jsonl'), old, old);
+
+      const recent = rt.flushPlan({ olderThanDays: 30 });
+      expect(recent.sessions).toEqual([oldHere]);
+      expect(recent.swarms).toEqual([swarmDir]);
+      expect(recent.bytes).toBeGreaterThan(0);
+
+      expect(rt.flushPlan({}).sessions.sort()).toEqual([newHere, oldHere].sort());
+      expect(rt.flushPlan({ olderThanDays: 30, allFolders: true }).sessions.sort()).toEqual(
+        [oldHere, oldThere].sort(),
+      );
+
+      const done = rt.flush(rt.flushPlan({ olderThanDays: 30, allFolders: true }));
+      expect(done).toMatchObject({ sessions: 2, swarms: 1 });
+      expect(existsSync(oldHere) || existsSync(oldThere) || existsSync(swarmDir)).toBe(false);
+      expect(existsSync(newHere) && existsSync(current)).toBe(true);
+      expect(existsSync(elsewhere)).toBe(false); // emptied folders are tidied away
+    } finally {
+      await rt.dispose();
+      ws.cleanup();
+    }
+  });
+
+  it('saves a custom team so /swarm config starts it again', async () => {
+    const { ws, boot } = setup({ model: 'mock/m' });
+    const rt = await boot();
+    try {
+      const team = [
+        { name: 'lead', role: 'Lead. Run it.' },
+        { name: 'doer', role: 'Do it. Report back to lead.' },
+      ];
+      rt.saveSwarmTeam(team);
+      const saved = JSON.parse(readFileSync(join(ws.dir, '.home', 'config', 'config.json'), 'utf8'));
+      expect(saved.swarm.agents).toEqual(team);
+      expect(saved.model).toBe('mock/m'); // the rest of the settings are kept
+      const sw = await rt.startSwarm('config');
+      expect(sw.names).toEqual(['lead', 'doer']);
     } finally {
       rt.stopSwarm();
       await rt.dispose();

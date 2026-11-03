@@ -5,13 +5,20 @@ import type { ApprovalMode, SandboxMode } from '../config/schema.js';
 import { trustProject } from '../config/load.js';
 import { projectKey } from '../paths.js';
 import type { Runtime } from '../runtime.js';
-import { SWARM_PRESETS } from '../runtime.js';
+import { SWARM_PRESETS, type FlushPlan } from '../runtime.js';
+import { assembleTeam, parseTeam, PRESET_SUMMARY, roleByKey, ROLES, type TeamSlot } from '../swarm/roles.js';
 import { BIN } from '../version.js';
 import type { Choice } from './dialogs.js';
 import { replayInto, type UiStore } from './store.js';
 import { MODE_STYLE } from './theme.js';
 
-export type Overlay = { title: string; items: Choice<unknown>[]; initial?: number; onSelect(v: never): void };
+export type Overlay = {
+  title: string;
+  items: Choice<unknown>[];
+  initial?: number;
+  onSelect(v: never): void;
+  onCancel?(): void;
+};
 
 export interface CmdCtx {
   runtime: Runtime;
@@ -22,6 +29,109 @@ export interface CmdCtx {
   exit(): void;
   togglePanes(): void;
   refresh(): void;
+  /** Ask the user for a line of text; undefined if they skip it. */
+  ask(question: string): Promise<string | undefined>;
+}
+
+/** Show a picker and wait for the choice; undefined if the user presses esc. */
+function pick<T>(c: CmdCtx, title: string, items: Choice<T>[], initial?: number): Promise<T | undefined> {
+  return new Promise((resolve) =>
+    c.overlay({
+      title,
+      items: items as Choice<unknown>[],
+      ...(initial !== undefined ? { initial } : {}),
+      onSelect: (v: never) => resolve(v as T),
+      onCancel: () => resolve(undefined),
+    }),
+  );
+}
+
+const fmtBytes = (n: number) =>
+  n < 1024 ? `${n} B` : n < 1024 ** 2 ? `${(n / 1024).toFixed(0)} KB` : `${(n / 1024 ** 2).toFixed(1)} MB`;
+const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
+
+function describePlan(p: FlushPlan): string {
+  if (!p.sessions.length && !p.swarms.length) return 'nothing to delete';
+  const parts = [
+    p.sessions.length ? plural(p.sessions.length, 'conversation') : '',
+    p.swarms.length ? plural(p.swarms.length, 'swarm') : '',
+  ].filter(Boolean);
+  return `${parts.join(' and ')}, ${fmtBytes(p.bytes)}`;
+}
+
+/** `/swarm custom`: choose how many agents and what each one does, then start (and optionally save) the team. */
+async function customTeam(words: string[], c: CmdCtx): Promise<void> {
+  const { runtime, store } = c;
+  let slots: TeamSlot[];
+  const own = async (n: number): Promise<TeamSlot | undefined> => {
+    const name = await c.ask(`Agent ${n}: a one-word name (for example "tester")`);
+    if (!name?.trim()) return undefined;
+    const role = await c.ask(`What should ${name.trim()} do? One or two sentences.`);
+    if (!role?.trim()) return undefined;
+    return { name: name.trim(), role: role.trim() };
+  };
+  if (words.length) {
+    const parsed = parseTeam(words);
+    if ('error' in parsed) return store.notice(parsed.error, 'error');
+    if (parsed.slots.length < 2) return store.notice('A team needs at least two agents.', 'warn');
+    slots = parsed.slots;
+  } else {
+    const max = Math.max(2, runtime.config.swarm.maxAgents);
+    const count = await pick(
+      c,
+      'How many agents?',
+      Array.from({ length: max - 1 }, (_, i) => ({
+        label: `${i + 2} agents`,
+        value: i + 2,
+        hint: i === 0 ? 'a lead and one teammate' : `a lead and ${i + 1} teammates`,
+      })),
+      1,
+    );
+    if (!count) return;
+    const OWN = '__own__';
+    const choose = async (title: string, lead: boolean, n: number): Promise<TeamSlot | undefined> => {
+      const key = await pick<string>(c, title, [
+        ...ROLES.filter((r) => r.lead === lead).map((r) => ({
+          label: r.label,
+          value: r.key,
+          hint: r.summary,
+        })),
+        { label: 'Write my own role', value: OWN, hint: 'name it and describe what it does' },
+      ]);
+      if (!key) return undefined;
+      return key === OWN ? own(n) : { template: roleByKey(key)! };
+    };
+    slots = [];
+    const lead = await choose('Who leads? The lead talks to you and hands out the work.', true, 1);
+    if (!lead) return;
+    slots.push(lead);
+    for (let i = 2; i <= count; i++) {
+      const s = await choose(`Agent ${i} of ${count}: what does it do?`, false, i);
+      if (!s) return;
+      slots.push(s);
+    }
+  }
+  const team = assembleTeam(slots);
+  store.notice(
+    ['Your team:', ...team.map((a, i) => `  ${a.name}${i === 0 ? ' (lead)' : ''}: ${a.role}`)].join('\n'),
+  );
+  const go = await pick(c, 'Start this team?', [
+    { label: 'Start', value: 'start' },
+    { label: 'Start and save it as my team', value: 'save', hint: '/swarm config starts it again' },
+    { label: 'Cancel', value: 'cancel' },
+  ]);
+  if (!go || go === 'cancel') return store.notice('Team not started.');
+  try {
+    if (go === 'save') runtime.saveSwarmTeam(team);
+    const sw = await runtime.startSwarm(team);
+    store.attachSwarm(sw);
+    store.notice(
+      `Swarm is up: ${sw.names.join(', ')}.${go === 'save' ? ' Saved as your team; /swarm config starts it again.' : ''} Type to talk to ${sw.names[0]} (the lead), or @name to address anyone.`,
+      'success',
+    );
+  } catch (e) {
+    store.notice((e as Error).message, 'error');
+  }
 }
 
 export interface BuiltinCommand {
@@ -52,8 +162,8 @@ export const BUILTINS: BuiltinCommand[] = [
         ...BUILTINS.map((c) => `  /${(c.usage ?? c.name).padEnd(26)} ${c.description}`),
         ...runtime.commands.map((c) => `  /${c.name.padEnd(26)} ${c.description}`),
         '',
-        'Keys   enter send · \\+enter or ctrl+j newline · shift+tab cycle mode · esc interrupt · ↑/↓ history',
-        'Swarm  @name text → address one agent · plain text → the lead · /swarm panes toggles split view',
+        'Keys   enter send, \\+enter or ctrl+j newline, shift+tab cycle mode, esc interrupt, ↑/↓ history',
+        'Swarm  plain text goes to the lead; @name text addresses one agent; /swarm panes toggles split view',
       ];
       store.notice(lines.join('\n'));
     },
@@ -161,6 +271,61 @@ export const BUILTINS: BuiltinCommand[] = [
     },
   },
   {
+    name: 'flush',
+    usage: 'flush [all|<days>] [everywhere]',
+    description: 'Delete old saved conversations and swarms',
+    async run(args, c) {
+      const { runtime, store } = c;
+      type Scope = { olderThanDays?: number; allFolders?: boolean };
+      let scope: Scope | undefined;
+      const words = args.trim().toLowerCase().split(/\s+/).filter(Boolean);
+      if (words.length) {
+        scope = {};
+        for (const w of words) {
+          const days = /^(\d+)d?$/.exec(w);
+          if (days) scope.olderThanDays = Number(days[1]);
+          else if (w === 'everywhere') scope.allFolders = true;
+          else if (w !== 'all')
+            return store.notice(
+              'Usage: /flush [all|<days>] [everywhere], for example /flush 30 or /flush all',
+              'warn',
+            );
+        }
+      } else {
+        const options: { label: string; value: Scope }[] = [
+          { label: 'Older than 30 days, this folder', value: { olderThanDays: 30 } },
+          { label: 'Older than 7 days, this folder', value: { olderThanDays: 7 } },
+          { label: 'Everything saved for this folder', value: {} },
+          { label: 'Older than 30 days, every folder', value: { olderThanDays: 30, allFolders: true } },
+          { label: 'Everything saved, every folder', value: { allFolders: true } },
+        ];
+        scope = await pick(
+          c,
+          'Delete which saved conversations and swarms? The current conversation is always kept.',
+          options.map((o) => ({ ...o, hint: describePlan(runtime.flushPlan(o.value)) })),
+        );
+      }
+      if (!scope) return;
+      const plan = runtime.flushPlan(scope);
+      if (!plan.sessions.length && !plan.swarms.length) return store.notice('Nothing to delete.');
+      const ok = await pick(
+        c,
+        `Delete ${describePlan(plan)}? This cannot be undone.`,
+        [
+          { label: 'Delete', value: true },
+          { label: 'Keep everything', value: false },
+        ],
+        1,
+      );
+      if (!ok) return store.notice('Nothing was deleted.');
+      runtime.flush(plan);
+      store.notice(
+        `Deleted ${describePlan({ ...plan })}. The current conversation${runtime.swarm ? ' and the running swarm were' : ' was'} kept.`,
+        'success',
+      );
+    },
+  },
+  {
     name: 'clear',
     description: 'Start a fresh conversation',
     run(_a, { runtime, store }) {
@@ -228,12 +393,16 @@ export const BUILTINS: BuiltinCommand[] = [
   },
   {
     name: 'swarm',
-    usage: 'swarm [duo|trio|config|resume|stop|panes|status]',
+    usage: 'swarm [duo|trio|quad|custom|config|resume|stop|panes|status]',
     description: 'Start collaborating agents in a shared channel',
     async run(args, c) {
       const { runtime, store } = c;
       const a = args.trim() || 'status';
       if (a === 'panes') return c.togglePanes();
+      if (a === 'custom' || a.startsWith('custom ')) {
+        if (runtime.swarm) return store.notice('A swarm is already running. Use /swarm stop first.', 'warn');
+        return customTeam(a.split(/\s+/).slice(1), c);
+      }
       if (a === 'resume') {
         const saved = runtime.listSwarms();
         if (!saved.length) return store.notice('No saved swarms for this folder yet.');
@@ -263,7 +432,14 @@ export const BUILTINS: BuiltinCommand[] = [
       if (a === 'status') {
         if (!runtime.swarm)
           return store.notice(
-            `No swarm running. Start one with /swarm ${Object.keys(SWARM_PRESETS).join(' | /swarm ')}`,
+            [
+              'No swarm running. Start one with:',
+              ...Object.keys(SWARM_PRESETS).map((k) => `  /swarm ${k.padEnd(8)} ${PRESET_SUMMARY[k] ?? ''}`),
+              '  /swarm custom   choose how many agents and what each one does',
+              ...(runtime.config.swarm.agents.length
+                ? ['  /swarm config   the team saved in your config']
+                : []),
+            ].join('\n'),
           );
         return store.notice(
           runtime.swarm

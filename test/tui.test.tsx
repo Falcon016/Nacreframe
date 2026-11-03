@@ -1,8 +1,9 @@
 import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import { PassThrough } from 'node:stream';
 import { render } from 'ink';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
+import { projectKey } from '../src/paths.js';
 import { Runtime } from '../src/runtime.js';
 import { App } from '../src/tui/App.js';
 import { UiStore } from '../src/tui/store.js';
@@ -134,6 +135,9 @@ describe('interactive UI', () => {
       await until(() => ui.screen().includes('Approve this action?'));
       expect(existsSync(join(ui.work, 'note.txt'))).toBe(false);
       expect(ui.screen()).toContain('new file note.txt'); // diff preview
+      // The dialog is drawn a moment before its key handler is listening; a keypress in between is lost.
+      // That gap grows on a busy CI runner, which is what made this test flaky.
+      await sleep(250);
       await ui.type('y');
       await until(() => existsSync(join(ui.work, 'note.txt')));
       await until(() => ui.screen().includes('All done'));
@@ -149,6 +153,7 @@ describe('interactive UI', () => {
       await ui.type('write nope.txt');
       ui.key('\r');
       await until(() => ui.screen().includes('Approve this action?'));
+      await sleep(250); // see above: let the dialog start listening
       await ui.type('n');
       await until(() => ui.screen().includes('All done'));
       expect(existsSync(join(ui.work, 'nope.txt'))).toBe(false);
@@ -213,6 +218,87 @@ describe('interactive UI', () => {
       ui.stdout.emit('resize');
       await sleep(400);
       expect(ui.raw().slice(settled)).not.toContain('\x1b[2J');
+    } finally {
+      await ui.stop();
+    }
+  });
+
+  it('builds a custom swarm from the quick form and starts it', async () => {
+    const ui = await boot('auto');
+    try {
+      await until(() => ui.screen().includes('nacreframe'));
+      await ui.type('/swarm custom architect builder security');
+      ui.key('\r');
+      await until(() => ui.screen().includes('Start this team?'));
+      expect(ui.screen()).toContain('security: Security advisor.');
+      ui.key('\r'); // Start
+      await until(() => ui.screen().includes('Swarm is up: architect, builder, security'));
+      expect(ui.runtime.swarm?.names).toEqual(['architect', 'builder', 'security']);
+    } finally {
+      ui.runtime.stopSwarm();
+      await ui.stop();
+    }
+  });
+
+  it('walks through /swarm custom: size, lead, roles and a role of your own', async () => {
+    const ui = await boot('auto');
+    const press = async (k: string, wait: string) => {
+      const mark = ui.raw().length;
+      ui.key(k);
+      await until(() => plain(ui.raw().slice(mark)).includes(wait));
+      await sleep(60);
+    };
+    try {
+      await until(() => ui.screen().includes('nacreframe'));
+      await ui.type('/swarm custom');
+      await press('\r', 'How many agents?');
+      await press('\r', 'Who leads?'); // 3 agents is highlighted
+      await press('\r', 'Agent 2 of 3'); // Planner
+      await press('\r', 'Agent 3 of 3'); // Builder
+      for (let i = 0; i < 6; i++) {
+        ui.key('\u001b[B');
+        await sleep(40);
+      }
+      await press('\r', 'one-word name'); // Write my own role
+      await ui.type('perf');
+      await press('\r', 'What should perf do?');
+      await ui.type('Profile the hot paths');
+      await press('\r', 'Start this team?');
+      expect(ui.screen()).toContain('perf: Profile the hot paths. Report back to planner.');
+      await press('\r', 'Swarm is up');
+      expect(ui.runtime.swarm?.names).toEqual(['planner', 'builder', 'perf']);
+    } finally {
+      ui.runtime.stopSwarm();
+      await ui.stop();
+    }
+  });
+
+  it('asks before /flush deletes anything, defaults to keeping it, and deletes on yes', async () => {
+    const ui = await boot();
+    try {
+      await until(() => ui.screen().includes('nacreframe'));
+      // This test runtime keeps its own conversation in memory; put a saved one where /flush looks.
+      const saved = join(dirname(ui.work), '.home', 'data', 'sessions', projectKey(ui.runtime.cwd));
+      mkdirSync(saved, { recursive: true });
+      const other = join(saved, 'older.jsonl');
+      writeFileSync(other, '{"type":"session"}\n');
+      await ui.type('/flush all');
+      ui.key('\r');
+      await until(() => ui.screen().includes('cannot be undone'));
+      ui.key('\r'); // the highlighted choice is "Keep everything"
+      await until(() => ui.screen().includes('Nothing was deleted.'));
+      expect(existsSync(other)).toBe(true);
+
+      const mark = ui.raw().length;
+      await ui.type('/flush all');
+      ui.key('\r');
+      await until(() => ui.raw().slice(mark).includes('cannot be undone'));
+      await sleep(100);
+      ui.key('\u001b[A'); // up to "Delete"
+      await sleep(100);
+      ui.key('\r');
+      await until(() => ui.screen().includes('Deleted 1 conversation'));
+      expect(existsSync(other)).toBe(false);
     } finally {
       await ui.stop();
     }

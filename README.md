@@ -116,18 +116,20 @@ Point one somewhere else in your config, e.g. a llama.cpp server on port 11434:
 Context windows are detected from the server (llama.cpp router/`/props`, LM Studio, Ollama `/api/ps`). If a server does
 not report one, 32,768 tokens is assumed and you are told; set `"contextWindows": { "<provider>/<model>": 100000 }`.
 
-| Command                                         | What it does                                            |
-| ----------------------------------------------- | ------------------------------------------------------- |
-| `/model [provider/model]`                       | Pick a model (lists what your providers offer)          |
-| `/mode [ask\|edits\|auto\|plan]`                | Approval mode                                           |
-| `/sandbox [off\|guard\|container]`              | Sandbox level                                           |
-| `/swarm duo\|trio\|config\|resume\|stop\|panes` | Start, resume or stop a team; toggle split panes        |
-| `/browser [status\|takeover\|release\|close]`   | Live browser control                                    |
-| `/tree` · `/resume` · `/clear`                  | Branch from an earlier message · resume · start fresh   |
-| `/compact [focus]`                              | Summarise older context now (it also happens by itself) |
-| `/skills` · `/tools` · `/mcp`                   | Inspect what is loaded                                  |
-| `/export [file]`                                | Save the conversation as Markdown                       |
-| `/trust`                                        | Trust this project's `.nacreframe` config               |
+| Command                                       | What it does                                               |
+| --------------------------------------------- | ---------------------------------------------------------- |
+| `/model [provider/model]`                     | Pick a model (lists what your providers offer)             |
+| `/mode [ask\|edits\|auto\|plan]`              | Approval mode                                              |
+| `/sandbox [off\|guard\|container]`            | Sandbox level                                              |
+| `/swarm duo\|trio\|quad\|custom`              | Start a team (2, 3 or 4 agents, or one you put together)   |
+| `/swarm config\|resume\|stop\|panes`          | Your saved team; resume or stop a team; toggle split panes |
+| `/browser [status\|takeover\|release\|close]` | Live browser control                                       |
+| `/tree` · `/resume` · `/clear`                | Branch from an earlier message · resume · start fresh      |
+| `/flush [all\|<days>] [everywhere]`           | Delete old saved conversations and swarms (asks first)     |
+| `/compact [focus]`                            | Summarise older context now (it also happens by itself)    |
+| `/skills` · `/tools` · `/mcp`                 | Inspect what is loaded                                     |
+| `/export [file]`                              | Save the conversation as Markdown                          |
+| `/trust`                                      | Trust this project's `.nacreframe` config                  |
 
 ### Web dashboard
 

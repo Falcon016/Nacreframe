@@ -1,5 +1,5 @@
-import { existsSync, readFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { existsSync, readdirSync, readFileSync, rmdirSync, rmSync, statSync } from 'node:fs';
+import { dirname, join, resolve } from 'node:path';
 import { Agent, type AgentHooks } from './agent/agent.js';
 import { Broker } from './agent/broker.js';
 import { buildSystemPrompt } from './agent/prompt.js';
@@ -8,7 +8,7 @@ import { browserTools } from './browser/tools.js';
 import { BrowserService } from './browser/service.js';
 import { AuthStore } from './config/auth.js';
 import { loadConfig, trustProject, type LoadedConfig } from './config/load.js';
-import type { ApprovalMode, Config, SandboxMode, SwarmAgentConfig } from './config/schema.js';
+import type { ApprovalMode, Config, PartialConfig, SandboxMode, SwarmAgentConfig } from './config/schema.js';
 import { loadExtensions, loadPromptTemplates, type SlashCommand } from './ext/extensions.js';
 import { SkillStore } from './ext/skills.js';
 import { connectAll, type McpConnection } from './ext/mcp.js';
@@ -17,8 +17,10 @@ import { projectKey } from './paths.js';
 import { PolicyEngine } from './policy/engine.js';
 import { createSandbox } from './sandbox/index.js';
 import type { Sandbox } from './sandbox/types.js';
+import { SWARM_PRESETS } from './swarm/roles.js';
 import { Swarm } from './swarm/swarm.js';
 import { SwarmStore, type SwarmSummary } from './swarm/store.js';
+import { patchUserConfig } from './setup/plan.js';
 import { swarmTools } from './swarm/tools.js';
 import { bashTool } from './tools/bash.js';
 import { editTool, readTool, writeTool } from './tools/fs-tools.js';
@@ -41,37 +43,50 @@ export interface RuntimeOptions {
   fetchImpl?: typeof fetch;
 }
 
-export const SWARM_PRESETS: Record<string, SwarmAgentConfig[]> = {
-  duo: [
-    {
-      name: 'planner',
-      role: 'Lead. Break the task into small steps, hand each one to the builder, review what comes back, and report the result to the user.',
-      color: 'magenta',
-    },
-    {
-      name: 'builder',
-      role: 'Implementer. Carry out the steps the planner gives you, run the tests, and report back to the planner concisely.',
-      color: 'cyan',
-    },
-  ],
-  trio: [
-    {
-      name: 'architect',
-      role: 'Lead. Design the approach and interfaces, split work between builder and reviewer, and report to the user.',
-      color: 'magenta',
-    },
-    {
-      name: 'builder',
-      role: 'Implementer. Write the code the architect specifies, keeping changes small and tested, and report back to the architect.',
-      color: 'cyan',
-    },
-    {
-      name: 'reviewer',
-      role: 'Reviewer. Read what the builder changes, run checks, and report bugs, risks and missing tests to the architect.',
-      color: 'yellow',
-    },
-  ],
+export { SWARM_PRESETS } from './swarm/roles.js';
+
+export interface FlushPlan {
+  sessions: string[];
+  swarms: string[];
+  bytes: number;
+}
+
+const safeList = (dir: string): string[] => {
+  try {
+    return readdirSync(dir);
+  } catch {
+    return [];
+  }
 };
+const safeStat = (p: string) => {
+  try {
+    return statSync(p);
+  } catch {
+    return undefined;
+  }
+};
+const childDirs = (dir: string): string[] =>
+  safeList(dir)
+    .map((n) => join(dir, n))
+    .filter((p) => safeStat(p)?.isDirectory());
+/** Total size and latest modification time of everything under a folder. */
+function treeInfo(dir: string): { newest: number; bytes: number } {
+  let newest = 0;
+  let bytes = 0;
+  for (const n of safeList(dir)) {
+    const st = safeStat(join(dir, n));
+    if (!st) continue;
+    if (st.isDirectory()) {
+      const sub = treeInfo(join(dir, n));
+      newest = Math.max(newest, sub.newest);
+      bytes += sub.bytes;
+    } else {
+      newest = Math.max(newest, st.mtimeMs);
+      bytes += st.size;
+    }
+  }
+  return { newest, bytes };
+}
 
 export interface AvailableModel {
   /** `<provider>/<model>`, ready to pass to --model or /model. */
@@ -297,7 +312,8 @@ export class Runtime {
     const reg = new ToolRegistry();
     // Only the lead may ask the user anything; the others take questions to the lead.
     for (const t of base.all()) if (t.name !== 'ask_user' || name === this.swarmLead) reg.register(t);
-    for (const t of swarmTools) reg.register(t);
+    // swarm_spawn only when adding teammates is allowed, so models are not offered a tool that always fails.
+    for (const t of swarmTools) if (t.name !== 'swarm_spawn' || this.config.swarm.allowSpawn) reg.register(t);
     return reg;
   }
 
@@ -380,6 +396,63 @@ export class Runtime {
 
   listSwarms(): SwarmSummary[] {
     return SwarmStore.list(this.swarmRoot());
+  }
+
+  /** Save a team as the user's `swarm.agents`, so `/swarm config` starts it again. */
+  saveSwarmTeam(agents: SwarmAgentConfig[]): void {
+    patchUserConfig({ swarm: { agents } } as PartialConfig, this.loaded.paths);
+    this.config.swarm.agents = agents;
+  }
+
+  /**
+   * Saved conversations and swarms that `/flush` would delete. Never the conversation in use or the running
+   * swarm. `olderThanDays` keeps anything touched more recently; `allFolders` looks beyond this folder.
+   */
+  flushPlan(opts: { olderThanDays?: number; allFolders?: boolean } = {}): FlushPlan {
+    const data = this.loaded.paths.data;
+    const cutoff = opts.olderThanDays ? Date.now() - opts.olderThanDays * 86_400_000 : Infinity;
+    const keep = new Set(
+      [this.agent.session.filePath, this.swarm ? join(this.swarmRoot(), this.swarm.id ?? '') : undefined]
+        .filter((p): p is string => !!p)
+        .map((p) => resolve(p)),
+    );
+    const roots = (kind: 'sessions' | 'swarms') =>
+      opts.allFolders ? childDirs(join(data, kind)) : [join(data, kind, projectKey(this.cwd))];
+    const plan: FlushPlan = { sessions: [], swarms: [], bytes: 0 };
+    for (const dir of roots('sessions'))
+      for (const f of safeList(dir)) {
+        const file = join(dir, f);
+        if (!f.endsWith('.jsonl') || keep.has(resolve(file))) continue;
+        const st = safeStat(file);
+        if (!st || st.mtimeMs >= cutoff) continue;
+        plan.sessions.push(file);
+        plan.bytes += st.size;
+      }
+    for (const root of roots('swarms'))
+      for (const id of safeList(root)) {
+        const dir = join(root, id);
+        if (keep.has(resolve(dir))) continue;
+        const { newest, bytes } = treeInfo(dir);
+        if (newest >= cutoff) continue;
+        plan.swarms.push(dir);
+        plan.bytes += bytes;
+      }
+    return plan;
+  }
+
+  /** Delete what `flushPlan` listed. Returns how much was removed. */
+  flush(plan: FlushPlan): { sessions: number; swarms: number; bytes: number } {
+    for (const f of plan.sessions) rmSync(f, { force: true });
+    for (const d of plan.swarms) rmSync(d, { recursive: true, force: true });
+    // Tidy up per-folder directories that are now empty.
+    for (const p of [...plan.sessions, ...plan.swarms]) {
+      try {
+        rmdirSync(dirname(p));
+      } catch {
+        /* not empty, or already gone */
+      }
+    }
+    return { sessions: plan.sessions.length, swarms: plan.swarms.length, bytes: plan.bytes };
   }
 
   /** Start a new collaborating swarm from a preset name or an explicit agent list. */

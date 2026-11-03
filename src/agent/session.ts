@@ -52,6 +52,11 @@ export class Session {
     this.id = id;
   }
 
+  /** Where this session is saved (undefined for in-memory sessions). */
+  get filePath(): string | undefined {
+    return this.file;
+  }
+
   static create(cwd: string, dir?: string): Session {
     const id = sortableId();
     const ts = Date.now();
