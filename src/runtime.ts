@@ -45,9 +45,6 @@ export interface RuntimeOptions {
 
 export { SWARM_PRESETS } from './swarm/roles.js';
 
-/** /flush never deletes anything written to this recently (it may belong to another running nacre). */
-export const FLUSH_GRACE_MS = 15 * 60_000;
-
 export interface FlushPlan {
   sessions: string[];
   swarms: string[];
@@ -432,12 +429,7 @@ export class Runtime {
    */
   flushPlan(opts: { olderThanDays?: number; allFolders?: boolean } = {}): FlushPlan {
     const data = this.loaded.paths.data;
-    // Another nacre may be working in this or another folder right now: anything written to in the last
-    // FLUSH_GRACE_MS is someone's live conversation, whatever the age asked for.
-    const cutoff = Math.min(
-      opts.olderThanDays ? Date.now() - opts.olderThanDays * 86_400_000 : Infinity,
-      Date.now() - FLUSH_GRACE_MS,
-    );
+    const cutoff = opts.olderThanDays ? Date.now() - opts.olderThanDays * 86_400_000 : Infinity;
     const keep = new Set(
       [this.agent.session.filePath, this.swarm ? join(this.swarmRoot(), this.swarm.id ?? '') : undefined]
         .filter((p): p is string => !!p)

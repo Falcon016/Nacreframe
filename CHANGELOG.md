@@ -25,8 +25,7 @@ First release of the ground-up rewrite (replaces the earlier turtlebot harness).
   `install.sh --repair` does the same by hand.
 - **Fixes from a bug pass**: live reasoning is word-wrapped and grows line by line instead of sliding sideways in a
   single cut-off line (it looked like it was buffering); the dashboard streams it too, and the server sends only
-  its tail. `/flush` never deletes anything used in the last 15 minutes, since it may belong to another running
-  nacre. A teammate whose turns keep failing (model server down) pauses the team after three failures in a row
+  its tail. A teammate whose turns keep failing (model server down) pauses the team after three failures in a row
   instead of being re-woken forever when there is no message limit; failed turns and turns stopped at the
   tool-call limit are reported to the lead as such. Custom agents cannot be named `you`, `system` or `all`.
 - **Swarm limits**: `/swarm custom` asks how many messages the agents may send each other before checking in with

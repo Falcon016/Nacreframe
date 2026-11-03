@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, readFileSync, utimesSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { PassThrough } from 'node:stream';
 import { render } from 'ink';
@@ -299,8 +299,6 @@ describe('interactive UI', () => {
       mkdirSync(saved, { recursive: true });
       const other = join(saved, 'older.jsonl');
       writeFileSync(other, '{"type":"session"}\n');
-      const hourAgo = Date.now() / 1000 - 3600; // /flush keeps anything used in the last 15 minutes
-      utimesSync(other, hourAgo, hourAgo);
       await ui.type('/flush all');
       ui.key('\r');
       await until(() => ui.screen().includes('cannot be undone'));

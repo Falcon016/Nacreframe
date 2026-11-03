@@ -428,7 +428,7 @@ export const BUILTINS: BuiltinCommand[] = [
         ];
         scope = await pick(
           c,
-          'Delete which saved conversations and swarms? The current one, and anything used in the last 15 minutes, is always kept.',
+          'Delete which saved conversations and swarms? The current conversation is always kept.',
           options.map((o) => ({ ...o, hint: describePlan(runtime.flushPlan(o.value)) })),
         );
       }
