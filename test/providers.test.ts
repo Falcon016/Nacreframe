@@ -168,6 +168,13 @@ describe('openai-compatible provider', () => {
     expect(call.type === 'tool_use' && call.id.length).toBeGreaterThan(5);
   });
 
+  it('leaves max_tokens to the server when no size is given', () => {
+    const req = { model: 'm', system: 's', messages: [], tools: [] };
+    expect(openaiBody(req)).not.toHaveProperty('max_tokens');
+    expect(openaiBody({ ...req, maxTokens: 500 })).toHaveProperty('max_tokens', 500);
+    expect(anthropicBody(req)).toHaveProperty('max_tokens'); // required there
+  });
+
   it('sends tool results as tool-role messages', () => {
     const body = openaiBody({
       model: 'm',

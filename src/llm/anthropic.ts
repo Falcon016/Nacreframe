@@ -117,7 +117,7 @@ export function buildBody(req: StreamRequest): Record<string, unknown> {
 
   const body: Record<string, unknown> = {
     model: req.model,
-    max_tokens: req.maxTokens,
+    max_tokens: req.maxTokens ?? 32_000, // required by the API
     stream: true,
     system: [{ type: 'text', text: req.system, cache_control: { type: 'ephemeral' } }],
     messages,

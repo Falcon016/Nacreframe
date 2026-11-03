@@ -54,7 +54,8 @@ export const configSchema = z.object({
   smallModel: z.string().optional(),
   /** Override the detected context window (tokens) per `<provider>/<model>`. */
   contextWindows: z.record(z.string(), z.number().int().min(1024)).default({}),
-  maxTokens: z.number().int().positive().default(8192),
+  /** Output tokens per model call. 0 (the default) = all the room left in the context window after the prompt. */
+  maxTokens: z.number().int().min(0).default(0),
   thinkingBudget: z.number().int().min(0).default(0),
   providers: z.record(z.string(), providerSchema).default({}),
 

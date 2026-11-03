@@ -12,6 +12,8 @@ export interface ResolvedModel {
   /** Context window in tokens; compaction is measured against it. Updated if the server proves it smaller. */
   contextWindow: number;
   contextSource: 'config' | 'detected' | 'default';
+  /** The most output tokens the provider accepts in one reply, once it has told us (from a rejected request). */
+  maxOutput?: number;
 }
 
 const DEFAULT_CONTEXT = 200_000;
