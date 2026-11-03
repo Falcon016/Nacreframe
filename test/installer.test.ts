@@ -183,6 +183,24 @@ describe.skipIf(!hasSh || !hasGit)('install.sh', () => {
     expect(update.status, update.stdout + update.stderr).toBe(0);
     expect(update.stdout).toMatch(/Downloaded Nacreframe 9\.9\.9/);
     expect(update.stdout).toContain('was 0.1.0');
+
+    // ---- `nacre update` does the same from the installed command, following the installed branch ----
+    expect(readFileSync(join(home, '.nacreframe', '.nacre-ref'), 'utf8').trim()).toBe('main');
+    const nacre = (...args: string[]) =>
+      spawnSync(link, args, { encoding: 'utf8', env: { ...env, NO_COLOR: '1' }, timeout: 280_000 });
+    expect(nacre('update', '--check').stdout).toContain('is up to date');
+    writeFileSync(
+      pkgPath,
+      readFileSync(pkgPath, 'utf8').replace(/"version": "[^"]+"/, '"version": "9.9.10"'),
+    );
+    git(source, 'commit', '-qam', 'Add the frobnicator');
+    const check = nacre('update', '--check');
+    expect(check.stdout).toContain('9.9.10 is available (you have 9.9.9');
+    expect(check.stdout).toContain('Latest change: Add the frobnicator');
+    expect(nacre('--version').stdout).toContain('9.9.9'); // --check changed nothing
+    const upd = nacre('update');
+    expect(upd.status, upd.stdout + upd.stderr).toBe(0);
+    expect(nacre('--version').stdout).toContain('9.9.10');
   }, 290_000);
 
   it('can leave profile files alone, and says how to finish by hand', () => {

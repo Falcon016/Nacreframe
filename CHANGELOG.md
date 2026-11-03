@@ -23,6 +23,13 @@ First release of the ground-up rewrite (replaces the earlier turtlebot harness).
   It installs what is missing: a private, checksum-verified Node.js when none is usable, and git through your package
   manager if you agree. `nacre` is a launcher that picks that Node.js and repairs a damaged install on its own;
   `install.sh --repair` does the same by hand.
+- **`/update`** and `nacre update [--check]`: check the installed branch for a newer version, show what changed, ask,
+  update through the installer, and offer to restart straight into it, continuing the conversation. `--version` now
+  reads `package.json`, so it always shows the installed version.
+- **Thinking**: each agent's reasoning is kept. Hidden, it is one quiet line ("✻ planner thought for 8s"); ctrl+t or
+  `/thinking` shows it in full, set off by a rule in the agent's colour, both in the transcript and live in the swarm
+  panes. The dashboard shows it as a line that opens. Reasoning that local models write inline as `<think>...</think>`
+  is separated from the answer. `showThinking: true` shows it by default.
 - **Teams**: `/swarm quad` (architect, builder, reviewer, security advisor) joins `duo` and `trio`; `/swarm custom`
   builds a team of any size from a list of roles or roles you write, and can save it as `/swarm config`. Agents no
   longer add teammates unless `swarm.allowSpawn` is on, so `trio` stays three. Reviewers and the security advisor

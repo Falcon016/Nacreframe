@@ -5,6 +5,7 @@ import { AuthStore } from './config/auth.js';
 import { loadConfig, trustProject } from './config/load.js';
 import { approvalModeSchema, sandboxModeSchema } from './config/schema.js';
 import { doctor } from './doctor.js';
+import { checkForUpdate, pendingRelaunch, relaunch, runUpdate, short } from './update.js';
 import { runPrint } from './modes/print.js';
 import { runRpc } from './modes/rpc.js';
 import { Runtime } from './runtime.js';
@@ -26,6 +27,7 @@ Usage
   ${BIN} auth set <provider>       Store an API key (hidden prompt, or pipe it on stdin)
   ${BIN} auth list | remove <p>    Manage stored keys
   ${BIN} trust                     Trust this project's .nacreframe config, skills and extensions
+  ${BIN} update [--check]          Update to the latest version (--check only looks)
   ${BIN} doctor [--fix]            Check your environment; --fix repairs what it can (-y: no questions)
 
 Options
@@ -203,6 +205,7 @@ async function main(): Promise<number> {
         version: { type: 'boolean', short: 'v' },
         help: { type: 'boolean', short: 'h' },
         fix: { type: 'boolean' },
+        check: { type: 'boolean' },
         yes: { type: 'boolean', short: 'y' },
       },
     });
@@ -223,6 +226,7 @@ async function main(): Promise<number> {
   const cwd = process.cwd();
   const [first, ...rest] = positionals;
   if (first === 'doctor') return doctor(cwd, { fix: !!values.fix, yes: !!values.yes });
+  if (first === 'update') return updateCommand(!!values.check);
   if (first === 'models') return modelsCommand(cwd);
   if (first === 'serve') return serveCommand(rest);
   if (first === 'auth') return authCommand(rest);
@@ -321,7 +325,34 @@ async function main(): Promise<number> {
   );
   await app.waitUntilExit();
   await runtime.dispose();
+  // /update → "Restart now": hand the terminal to the new version, continuing the latest conversation.
+  const next = pendingRelaunch();
+  if (next) return relaunch(next);
   return 0;
+}
+
+async function updateCommand(checkOnly: boolean): Promise<number> {
+  console.log('Checking for updates…');
+  const r = await checkForUpdate();
+  if (!r.ok) {
+    console.error(r.error);
+    return 1;
+  }
+  const { check } = r;
+  if (check.upToDate) {
+    console.log(
+      `${NAME} ${check.current.version} is up to date (${check.ref} @ ${short(check.current.commit)}).`,
+    );
+    return 0;
+  }
+  console.log(
+    `${NAME} ${check.latest.version} is available (you have ${check.current.version}, ${short(check.current.commit)} → ${short(check.latest.commit)}).\nLatest change: ${check.latest.subject}`,
+  );
+  if (checkOnly) {
+    console.log(`Run \`${BIN} update\` to install it.`);
+    return 0;
+  }
+  return runUpdate(check, { inherit: true });
 }
 
 main().then(

@@ -511,6 +511,28 @@ function renderItem(item) {
     }
     case 'notice':
       return h('div', { class: `notice ${item.level}`, text: item.text });
+    case 'thinking': {
+      // An agent's reasoning: one quiet line until you open it.
+      const secs = item.ms >= 1000 ? `${Math.round(item.ms / 1000)}s` : item.ms ? '<1s' : '';
+      const who = item.agent === 'main' ? '' : `${item.agent} `;
+      const el = h(
+        'details',
+        { class: 'thought' },
+        h(
+          'summary',
+          null,
+          h('span', { class: 'glyph', 'aria-hidden': 'true', text: '✻' }),
+          `${who}thought${secs ? ` for ${secs}` : ''}`,
+        ),
+        h('div', { class: 'body', text: item.text }),
+      );
+      const color =
+        item.agent === 'main'
+          ? null
+          : colorOf(item.agent, S.st?.live.find((a) => a.name === item.agent)?.color);
+      if (color) el.style.setProperty('--agent', color);
+      return el;
+    }
     case 'channel': {
       const el = h('div', { class: `channel ${item.from === 'system' ? 'system' : ''}` });
       const from = h('span', { class: 'from', text: item.from });

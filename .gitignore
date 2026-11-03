@@ -16,3 +16,4 @@ auth.json
 .nacreframe/browser-profile/
 .DS_Store
 Thumbs.db
+.nacre-ref

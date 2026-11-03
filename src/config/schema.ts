@@ -139,6 +139,8 @@ export const configSchema = z.object({
   mcpServers: z.record(z.string(), mcpServerSchema).default({}),
   maxToolIterations: z.number().int().positive().default(60),
   theme: z.enum(['nacre', 'mono']).default('nacre'),
+  /** Show agents' reasoning in full in the terminal UI (toggle with ctrl+t or /thinking). */
+  showThinking: z.boolean().default(false),
 });
 
 export type Config = z.infer<typeof configSchema>;

@@ -126,6 +126,8 @@ not report one, 32,768 tokens is assumed and you are told; set `"contextWindows"
 | `/browser [status\|takeover\|release\|close]` | Live browser control                                       |
 | `/tree` · `/resume` · `/clear`                | Branch from an earlier message · resume · start fresh      |
 | `/flush [all\|<days>] [everywhere]`           | Delete old saved conversations and swarms (asks first)     |
+| `/thinking [on\|off]` (ctrl+t)                | Show or hide each agent's reasoning                        |
+| `/update`                                     | Update Nacreframe (also `nacre update` in a shell)         |
 | `/compact [focus]`                            | Summarise older context now (it also happens by itself)    |
 | `/skills` · `/tools` · `/mcp`                 | Inspect what is loaded                                     |
 | `/export [file]`                              | Save the conversation as Markdown                          |

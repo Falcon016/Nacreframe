@@ -15,6 +15,8 @@ interface Props {
   history: string[];
   onSubmit(text: string): void;
   onCycleMode(): void;
+  /** Ctrl+T: show or hide agents' reasoning. */
+  onToggleThinking?(): void;
   /** Esc / Ctrl+C with an empty buffer. */
   onInterrupt(kind: 'esc' | 'ctrl-c'): void;
   placeholder?: string;
@@ -54,6 +56,7 @@ export function Input({
   history,
   onSubmit,
   onCycleMode,
+  onToggleThinking,
   onInterrupt,
   placeholder,
 }: Props) {
@@ -88,6 +91,7 @@ export function Input({
   useInput(
     (input, key) => {
       if (key.tab && key.shift) return onCycleMode();
+      if (key.ctrl && input === 't') return onToggleThinking?.();
       if (key.ctrl && input === 'c') {
         if (buf.value) return edit(() => ({ value: '', cursor: 0 }));
         return onInterrupt('ctrl-c');

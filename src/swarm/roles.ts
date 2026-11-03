@@ -47,7 +47,7 @@ export const ROLES: RoleTemplate[] = [
     lead: false,
     color: 'cyan',
     role: (lead) =>
-      `Implementer. Carry out the steps ${lead} gives you, keep changes small, run the tests, and report back to ${lead} concisely.`,
+      `Implementer. Carry out the steps the ${lead} gives you, keep changes small, run the tests, and report back to the ${lead} concisely.`,
   },
   {
     key: 'reviewer',
@@ -57,7 +57,7 @@ export const ROLES: RoleTemplate[] = [
     color: 'yellow',
     tools: REVIEW_TOOLS,
     role: (lead) =>
-      `Reviewer. Read what the builder changes, run the checks, and report bugs, risks and missing tests to ${lead}. You do not edit files.`,
+      `Reviewer. Read what the builder changes, run the checks, and report bugs, risks and missing tests to the ${lead}. You do not edit files.`,
   },
   {
     key: 'security',
@@ -67,7 +67,7 @@ export const ROLES: RoleTemplate[] = [
     color: 'red',
     tools: REVIEW_TOOLS,
     role: (lead) =>
-      `Security advisor. Review changes and commands for injection, unsafe input handling, secrets in code or logs, weak authentication, unsafe file and shell use, and risky dependencies. Report each finding to ${lead} with its severity, where it is, and a concrete fix. You do not edit files.`,
+      `Security advisor. Review changes and commands for injection, unsafe input handling, secrets in code or logs, weak authentication, unsafe file and shell use, and risky dependencies. Report each finding to the ${lead} with its severity, where it is, and a concrete fix. You do not edit files.`,
   },
   {
     key: 'tester',
@@ -76,7 +76,7 @@ export const ROLES: RoleTemplate[] = [
     lead: false,
     color: 'green',
     role: (lead) =>
-      `Tester. Write and run tests for what the builder changes, including edge cases, and report failures to ${lead} with the exact output.`,
+      `Tester. Write and run tests for what the builder changes, including edge cases, and report failures to the ${lead} with the exact output.`,
   },
   {
     key: 'researcher',
@@ -86,7 +86,7 @@ export const ROLES: RoleTemplate[] = [
     color: 'blue',
     tools: REVIEW_TOOLS,
     role: (lead) =>
-      `Researcher. Look things up (documentation, APIs, the existing codebase) and report concise findings with sources to ${lead}. You do not edit files.`,
+      `Researcher. Look things up (documentation, APIs, the existing codebase) and report concise findings with sources to the ${lead}. You do not edit files.`,
   },
   {
     key: 'writer',
@@ -95,7 +95,7 @@ export const ROLES: RoleTemplate[] = [
     lead: false,
     color: 'green',
     role: (lead) =>
-      `Writer. Keep the README, docs and code comments in step with the team's changes, and report what you updated to ${lead}.`,
+      `Writer. Keep the README, docs and code comments in step with the team's changes, and report what you updated to the ${lead}.`,
   },
 ];
 

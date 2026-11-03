@@ -47,6 +47,7 @@ project's skills, extensions, prompt templates and `SYSTEM.md` are not loaded.
 | `mcpServers.<name>`                              | `{}`                                                     | `{ command, args?, env?, cwd? }` (stdio) or `{ url, headers? }` (HTTP)                                                             |
 | `maxToolIterations`                              | `60`                                                     | Model↔tool round trips per user message                                                                                            |
 | `theme`                                          | `nacre`                                                  | `nacre` \| `mono` (`NO_COLOR` also forces mono)                                                                                    |
+| `showThinking`                                   | `false`                                                  | Show agents' reasoning in full in the terminal UI. Toggle any time with ctrl+t or `/thinking`                                      |
 
 ## Providers
 
