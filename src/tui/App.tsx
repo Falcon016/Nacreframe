@@ -143,6 +143,17 @@ export function App({ runtime, store, theme, initialPrompt }: Props) {
       overlay: setOverlay,
       exit: quit,
       togglePanes: () => setShowPanes((s) => !s),
+      ask: (question: string) =>
+        new Promise<string | undefined>((resolve) =>
+          setQuestion({
+            agent: 'main',
+            q: { question },
+            resolve: (a) => {
+              setQuestion(null);
+              resolve(a === '(skipped)' || a === '(no answer)' ? undefined : a);
+            },
+          }),
+        ),
       refresh: () => force((n) => n + 1),
     }),
     [runtime, store, prompt, quit],
@@ -253,7 +264,10 @@ export function App({ runtime, store, theme, initialPrompt }: Props) {
               setOverlay(null);
               overlay.onSelect(v as never);
             }}
-            onCancel={() => setOverlay(null)}
+            onCancel={() => {
+              setOverlay(null);
+              overlay.onCancel?.();
+            }}
           />
         ) : null}
         <Input

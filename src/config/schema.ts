@@ -119,9 +119,10 @@ export const configSchema = z.object({
       maxAgents: z.number().int().min(1).max(12).default(6),
       /** Hard cap on bus messages per run, a backstop against runaway agent chatter. */
       maxMessages: z.number().int().min(1).default(60),
-      allowSpawn: z.boolean().default(true),
+      /** Let agents add teammates mid-run. Off by default: the team you start is the team you get. */
+      allowSpawn: z.boolean().default(false),
     })
-    .default({ agents: [], maxAgents: 6, maxMessages: 60, allowSpawn: true }),
+    .default({ agents: [], maxAgents: 6, maxMessages: 60, allowSpawn: false }),
 
   /**
    * Compaction is always on and cannot be disabled. The trigger can be lowered but never raised above

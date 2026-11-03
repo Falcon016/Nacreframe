@@ -23,6 +23,12 @@ First release of the ground-up rewrite (replaces the earlier turtlebot harness).
   It installs what is missing: a private, checksum-verified Node.js when none is usable, and git through your package
   manager if you agree. `nacre` is a launcher that picks that Node.js and repairs a damaged install on its own;
   `install.sh --repair` does the same by hand.
+- **Teams**: `/swarm quad` (architect, builder, reviewer, security advisor) joins `duo` and `trio`; `/swarm custom`
+  builds a team of any size from a list of roles or roles you write, and can save it as `/swarm config`. Agents no
+  longer add teammates unless `swarm.allowSpawn` is on, so `trio` stays three. Reviewers and the security advisor
+  cannot edit files.
+- **`/flush`** deletes old saved conversations and swarms: older than N days or everything, for this folder or every
+  folder. It shows what it would delete and asks first; the current conversation and running swarm are always kept.
 - **Swarm reporting lines**: only the lead talks to you; teammates report to the lead. Teammates lose `ask_user`,
   their messages to you are rerouted to the lead, a turn that ends without a message is delivered as a report (so
   small models no longer stall the team), plain-text `@mentions` from the lead are delivered, and every wake-up
