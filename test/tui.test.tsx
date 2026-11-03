@@ -135,6 +135,9 @@ describe('interactive UI', () => {
       await until(() => ui.screen().includes('Approve this action?'));
       expect(existsSync(join(ui.work, 'note.txt'))).toBe(false);
       expect(ui.screen()).toContain('new file note.txt'); // diff preview
+      // The dialog is drawn a moment before its key handler is listening; a keypress in between is lost.
+      // That gap grows on a busy CI runner, which is what made this test flaky.
+      await sleep(250);
       await ui.type('y');
       await until(() => existsSync(join(ui.work, 'note.txt')));
       await until(() => ui.screen().includes('All done'));
@@ -150,6 +153,7 @@ describe('interactive UI', () => {
       await ui.type('write nope.txt');
       ui.key('\r');
       await until(() => ui.screen().includes('Approve this action?'));
+      await sleep(250); // see above: let the dialog start listening
       await ui.type('n');
       await until(() => ui.screen().includes('All done'));
       expect(existsSync(join(ui.work, 'nope.txt'))).toBe(false);
