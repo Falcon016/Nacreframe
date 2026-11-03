@@ -95,6 +95,6 @@ export class ContainerSandbox extends GuardSandbox {
   }
 
   override describe(): string {
-    return `container · ${this.cfg.runtime} ${this.cfg.image} · network ${this.cfg.network ? 'on' : 'off'}`;
+    return `container: ${this.cfg.runtime} ${this.cfg.image}, network ${this.cfg.network ? 'on' : 'off'}`;
   }
 }

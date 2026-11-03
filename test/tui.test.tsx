@@ -103,7 +103,7 @@ describe('interactive UI', () => {
   it('renders the banner, streams a reply and shows markdown', async () => {
     const ui = await boot();
     try {
-      await until(() => ui.screen().includes('Nacreframe'));
+      await until(() => ui.screen().includes('nacreframe'));
       await ui.type('hello there');
       ui.key('\r');
       await until(() => ui.screen().includes('mock model'));
@@ -121,7 +121,7 @@ describe('interactive UI', () => {
   it('asks before writing a file in ask mode, and writes after approval', async () => {
     const ui = await boot('ask');
     try {
-      await until(() => ui.screen().includes('Nacreframe'));
+      await until(() => ui.screen().includes('nacreframe'));
       await ui.type('write note.txt');
       ui.key('\r');
       await until(() => ui.screen().includes('Approve this action?'));
@@ -138,7 +138,7 @@ describe('interactive UI', () => {
   it('denies a write when the user answers no', async () => {
     const ui = await boot('ask');
     try {
-      await until(() => ui.screen().includes('Nacreframe'));
+      await until(() => ui.screen().includes('nacreframe'));
       await ui.type('write nope.txt');
       ui.key('\r');
       await until(() => ui.screen().includes('Approve this action?'));
@@ -153,7 +153,7 @@ describe('interactive UI', () => {
   it('shift+tab cycles the approval mode and slash commands work', async () => {
     const ui = await boot('ask');
     try {
-      await until(() => ui.screen().includes('Nacreframe'));
+      await until(() => ui.screen().includes('nacreframe'));
       ui.key('\u001b[Z'); // shift+tab
       await until(() => ui.runtime.policy.mode === 'edits');
       await ui.type('/mode plan');
@@ -172,7 +172,7 @@ describe('interactive UI', () => {
   it('runs a collaborating swarm and shows the live channel', async () => {
     const ui = await boot('auto');
     try {
-      await until(() => ui.screen().includes('Nacreframe'));
+      await until(() => ui.screen().includes('nacreframe'));
       await ui.type('/swarm duo');
       ui.key('\r');
       await until(() => ui.screen().includes('Swarm "duo" is up'));

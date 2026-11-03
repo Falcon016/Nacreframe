@@ -19,7 +19,7 @@ export function inline(text: string, t: Theme, base: { color?: string; bold?: bo
     const s = m[0];
     if (m[1])
       out.push(
-        <Text key={k++} color={t.teal}>
+        <Text key={k++} color={t.lavender}>
           {s.slice(1, -1)}
         </Text>,
       );
@@ -191,7 +191,7 @@ export function CodeBlock({ lang, lines }: { lang: string; lines: string[] }) {
     <Box flexDirection="column" marginY={0}>
       {lang ? <Text color={t.faint}>{lang}</Text> : null}
       {lines.map((l, i) => (
-        <Text key={i} color={diff ? diffColor(l, t) : t.teal} wrap="wrap">
+        <Text key={i} color={diff ? diffColor(l, t) : t.text} wrap="wrap">
           <Text color={t.faint}>│ </Text>
           {l || ' '}
         </Text>

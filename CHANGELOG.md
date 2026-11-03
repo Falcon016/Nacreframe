@@ -23,6 +23,11 @@ First release of the ground-up rewrite (replaces the earlier turtlebot harness).
   It installs what is missing: a private, checksum-verified Node.js when none is usable, and git through your package
   manager if you agree. `nacre` is a launcher that picks that Node.js and repairs a damaged install on its own;
   `install.sh --repair` does the same by hand.
+- **New look**: a black and deep-purple palette shared by the dashboard, terminal UI, installer, setup wizard and the
+  bundled terminal schemes; a new logo (a pearl between two brackets, `[●]` in the terminal) replaces the diamond.
+  The dashboard drops glows, gradient washes and floating cards for hairlines and surface steps, groups mode, sandbox
+  and model into one control, shows keycaps on approvals, and opens on a list of your allowed folders. Newsreader is
+  no longer bundled.
 - **`nacre doctor --fix`** repairs broken or invalid settings, a missing API key, key-file permissions, missing folders, a
   missing or off-`PATH` launcher, a too-old Node.js and (after asking) a missing browser; plain `nacre doctor` offers it.
   The Node.js check now compares the minor version (22.18), not just the major.

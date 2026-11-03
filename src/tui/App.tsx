@@ -235,10 +235,10 @@ export function App({ runtime, store, theme, initialPrompt }: Props) {
           onInterrupt={interrupt}
           placeholder={
             runtime.swarm
-              ? `Message the team (lead: ${runtime.swarm.names[0]}) · @name to address one agent`
+              ? `Message the team (lead: ${runtime.swarm.names[0]}), or @name to address one agent`
               : busy
                 ? 'Type to steer the agent…'
-                : 'Ask anything · / for commands'
+                : 'Ask anything, or type / for commands'
           }
         />
         <Footer

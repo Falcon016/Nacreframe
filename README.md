@@ -183,7 +183,7 @@ Choosing **"Yes, and don't ask again"** in a prompt grants that action for the s
 
 ```text
 > /swarm trio
- ◆ Swarm "trio" is up: architect, builder, reviewer.
+ ● Swarm "trio" is up: architect, builder, reviewer.
 > add rate limiting to the API and cover it with tests
 
 architect → builder   Add a token bucket in src/limiter.ts; keep it dependency-free.
@@ -224,10 +224,12 @@ install code you trust.
 
 ## Terminal theme
 
-The UI is built around a dark "nacre" palette: warm pearl text, violet-grey chrome, iridescent accents. The terminal's
-own background is left alone; matching colour schemes for Windows Terminal, Ghostty and Alacritty are in
-[assets/terminal-themes](assets/terminal-themes). The dashboard bundles Newsreader (serif), IBM Plex Sans and JetBrains Mono
-(all SIL OFL). `NO_COLOR=1` switches the terminal UI to monochrome.
+The terminal UI and the dashboard share one palette: black, deep purple, pearl-white text, and a few status colours
+(amber for "asks first", teal for edits, pink for auto, violet for plan). Purple marks what you can act on, what is
+selected, and what is running; nothing glows. The logo is a pearl held between two brackets, `[●]` in the terminal.
+The terminal's own background is left alone; matching black-and-purple schemes for Windows Terminal, Ghostty and
+Alacritty are in [assets/terminal-themes](assets/terminal-themes). The dashboard bundles IBM Plex Sans and JetBrains
+Mono (both SIL OFL). `NO_COLOR=1` switches the terminal UI to monochrome.
 
 ## Development
 

@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="color-scheme" content="dark" />
-    <meta name="theme-color" content="#0e0d14" />
+    <meta name="theme-color" content="#0b0a10" />
     <meta name="referrer" content="no-referrer" />
     <title>Nacreframe</title>
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
@@ -15,10 +15,10 @@
     <div id="login" hidden>
       <form id="login-form" autocomplete="off">
         <h1>
-          <svg width="30" height="30" viewBox="0 0 32 32" aria-hidden="true">
-            <use href="/favicon.svg#gem" />
+          <svg width="26" height="26" viewBox="0 0 32 32" aria-hidden="true">
+            <use href="/favicon.svg#mark" />
           </svg>
-          Nacreframe
+          nacreframe
         </h1>
         <p class="note">Enter the login token printed by <code>nacre serve</code>.</p>
         <label class="field"
@@ -33,46 +33,50 @@
     <div id="app" hidden>
       <aside id="sidebar" aria-label="Sessions">
         <div class="brand">
-          <svg viewBox="0 0 32 32" aria-hidden="true"><use href="/favicon.svg#gem" /></svg>
-          <span>Nacreframe</span>
+          <svg viewBox="0 0 32 32" aria-hidden="true"><use href="/favicon.svg#mark" /></svg>
+          <span>nacreframe</span>
         </div>
         <div class="side-actions">
-          <button class="btn primary block" id="new-session">New session</button>
+          <button class="btn block side-new" id="new-session">
+            <span class="plus" aria-hidden="true">+</span>New session
+          </button>
         </div>
         <div class="side-list" id="side-list"></div>
         <div class="side-foot">
           <span id="version"></span>
-          <button class="btn small" id="logout">Sign out</button>
+          <button class="btn small ghost" id="logout">Sign out</button>
         </div>
       </aside>
 
       <main id="main">
         <header id="topbar">
-          <button class="btn small" id="menu-btn" aria-label="Toggle sessions">☰</button>
+          <button class="btn small ghost" id="menu-btn" aria-label="Toggle sessions">☰</button>
           <div class="title" id="title">Nacreframe</div>
-          <label class="chip"
-            >Mode
-            <select id="mode" aria-label="Approval mode">
-              <option value="ask">ask</option>
-              <option value="edits">edits</option>
-              <option value="auto">auto</option>
-              <option value="plan">plan</option>
-            </select>
-          </label>
-          <label class="chip"
-            >Sandbox
-            <select id="sandbox" aria-label="Sandbox level">
-              <option value="off">off</option>
-              <option value="guard">guard</option>
-              <option value="container">container</option>
-            </select>
-          </label>
-          <label class="chip chip-model"
-            >Model
-            <select id="model" aria-label="Model"></select>
-          </label>
-          <button class="btn small" id="compact" title="Summarise older messages now">Compact</button>
-          <button class="btn small" id="toggle-panel" title="Tasks, swarm and browser">Panel</button>
+          <div class="controls">
+            <label class="chip" data-mode=""
+              >Mode
+              <select id="mode" aria-label="Approval mode">
+                <option value="ask">ask</option>
+                <option value="edits">edits</option>
+                <option value="auto">auto</option>
+                <option value="plan">plan</option>
+              </select>
+            </label>
+            <label class="chip"
+              >Sandbox
+              <select id="sandbox" aria-label="Sandbox level">
+                <option value="off">off</option>
+                <option value="guard">guard</option>
+                <option value="container">container</option>
+              </select>
+            </label>
+            <label class="chip chip-model"
+              >Model
+              <select id="model" aria-label="Model"></select>
+            </label>
+          </div>
+          <button class="btn small ghost" id="compact" title="Summarise older messages now">Compact</button>
+          <button class="btn small ghost" id="toggle-panel" title="Tasks, swarm and browser">Panel</button>
         </header>
 
         <div id="scroll"><div id="transcript" aria-live="polite"></div></div>
@@ -122,10 +126,10 @@
           <label class="field"
             >Approval mode
             <select id="nf-approval">
-              <option value="ask">ask — confirm every change</option>
-              <option value="edits">edits — auto-approve file edits</option>
-              <option value="auto">auto — approve within the sandbox</option>
-              <option value="plan">plan — read-only</option>
+              <option value="ask">ask: confirm every change</option>
+              <option value="edits">edits: approve file edits automatically</option>
+              <option value="auto">auto: approve anything inside the sandbox</option>
+              <option value="plan">plan: read only</option>
             </select>
           </label>
           <label class="field"

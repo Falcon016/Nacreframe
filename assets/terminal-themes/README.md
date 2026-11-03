@@ -1,7 +1,7 @@
 # Nacre terminal colour schemes
 
 Nacreframe's interface uses true-colour accents and leaves the background to your terminal. These schemes match it
-(deep ink `#121118`, warm pearl text `#e9e4da`).
+(near-black `#08070b`, pearl text `#ebe7f2`, violet `#9d84ff`).
 
 | Terminal         | File                          | How                                                                                     |
 | ---------------- | ----------------------------- | --------------------------------------------------------------------------------------- |
@@ -10,4 +10,4 @@ Nacreframe's interface uses true-colour accents and leaves the background to you
 | Alacritty        | `nacre.alacritty.toml`        | Import it from `alacritty.toml`                                                         |
 
 For typography, a monospace with good box-drawing glyphs works best (JetBrains Mono, Cascadia Code, Berkeley Mono,
-SF Mono). The serif wordmark in `assets/banner.svg` uses Newsreader, falling back to Georgia.
+SF Mono). The wordmark in `assets/banner.svg` uses IBM Plex Sans, falling back to the system sans-serif.

@@ -1,9 +1,9 @@
 import type { ApprovalMode } from '../config/schema.js';
 
 /**
- * "Nacre": mother-of-pearl on deep ink. Warm pearl text, a muted violet-grey for chrome, and a
- * small set of iridescent accents. The terminal background stays the user's own; matching terminal
- * colour schemes live in assets/terminal-themes/.
+ * "Nacre": deep purple on black. Pearl-white text, a violet accent for what is yours to act on or is live, and
+ * a small set of status colours shared with the web dashboard. The terminal background stays the user's own;
+ * matching black-and-purple terminal colour schemes live in assets/terminal-themes/.
  */
 export interface Theme {
   name: string;
@@ -23,18 +23,18 @@ export interface Theme {
 
 export const NACRE: Theme = {
   name: 'nacre',
-  text: '#e9e4da',
-  dim: '#9a95a8',
-  faint: '#5f5a70',
-  accent: '#e3b7c4',
-  teal: '#8fd3c8',
-  lavender: '#b4a7e8',
-  gold: '#e6c384',
-  green: '#9fd4a8',
-  red: '#e58a8a',
-  blue: '#8db4f0',
-  rose: '#d79bd6',
-  agents: ['#d79bd6', '#8fd3c8', '#e6c384', '#8db4f0', '#9fd4a8', '#e3b7c4', '#b4a7e8', '#f0a58f'],
+  text: '#ebe7f2',
+  dim: '#a59db5',
+  faint: '#6f6884',
+  accent: '#9d84ff',
+  teal: '#66cfc0',
+  lavender: '#b7a4ff',
+  gold: '#e2b866',
+  green: '#74d19b',
+  red: '#ef7b7b',
+  blue: '#82aaf2',
+  rose: '#e98bd0',
+  agents: ['#e98bd0', '#66cfc0', '#e2b866', '#82aaf2', '#74d19b', '#f0a3c0', '#b7a4ff', '#f0a98e'],
 };
 
 /** Colour-free fallback for NO_COLOR / dumb terminals. */
@@ -69,7 +69,9 @@ export const MODE_STYLE: Record<ApprovalMode, { label: string; color: ColorKey; 
 };
 
 export const GLYPH = {
-  brand: '◆',
+  /** The logo in text form: a pearl held between two brackets. */
+  mark: ['[', '●', ']'],
+  pearl: '●',
   user: '❯',
   tool: '●',
   result: '⎿',

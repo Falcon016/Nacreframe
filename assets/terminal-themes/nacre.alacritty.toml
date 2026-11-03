@@ -1,32 +1,32 @@
 # Alacritty: import with `general.import = ["~/.config/alacritty/nacre.toml"]`
 [colors.primary]
-background = "#121118"
-foreground = "#e9e4da"
+background = "#08070b"
+foreground = "#ebe7f2"
 
 [colors.cursor]
-cursor = "#e3b7c4"
-text = "#121118"
+cursor = "#b7a4ff"
+text = "#08070b"
 
 [colors.selection]
-background = "#2d2a3a"
-text = "#e9e4da"
+background = "#2a2140"
+text = "#ebe7f2"
 
 [colors.normal]
-black = "#1b1a23"
-red = "#e58a8a"
-green = "#9fd4a8"
-yellow = "#e6c384"
-blue = "#8db4f0"
-magenta = "#b4a7e8"
-cyan = "#8fd3c8"
-white = "#e9e4da"
+black = "#16131d"
+red = "#ef7b7b"
+green = "#74d19b"
+yellow = "#e2b866"
+blue = "#82aaf2"
+magenta = "#9d84ff"
+cyan = "#66cfc0"
+white = "#ebe7f2"
 
 [colors.bright]
-black = "#5f5a70"
-red = "#f0a0a0"
-green = "#b4e2bc"
-yellow = "#f0d49c"
-blue = "#a6c6f6"
-magenta = "#d79bd6"
-cyan = "#a8e2d8"
-white = "#fbf7ef"
+black = "#6f6884"
+red = "#f59a9a"
+green = "#98e0b4"
+yellow = "#efcd8a"
+blue = "#a5c2f7"
+magenta = "#e98bd0"
+cyan = "#8fe0d3"
+white = "#faf8fd"

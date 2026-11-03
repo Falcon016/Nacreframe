@@ -19,19 +19,19 @@ function h(tag, props, ...kids) {
   return el;
 }
 
-// Agent colours: kept in step with the --rose/--teal/--gold/... tokens in app.css.
-const PALETTE = ['#d79bd6', '#8fd3c8', '#e6c384', '#8db4f0', '#9fd4a8', '#b4a7e8', '#e3b7c4', '#f0a98e'];
+// Agent colours: kept in step with the status tokens in app.css and the terminal theme.
+const PALETTE = ['#e98bd0', '#66cfc0', '#e2b866', '#82aaf2', '#74d19b', '#b7a4ff', '#f0a3c0', '#f0a98e'];
 const NAMED = {
-  magenta: '#d79bd6',
-  cyan: '#8fd3c8',
-  yellow: '#e6c384',
-  green: '#9fd4a8',
-  blue: '#8db4f0',
-  red: '#e58a8a',
+  magenta: '#e98bd0',
+  cyan: '#66cfc0',
+  yellow: '#e2b866',
+  green: '#74d19b',
+  blue: '#82aaf2',
+  red: '#ef7b7b',
 };
 const colorOf = (name, preferred) => {
-  if (name === 'you') return '#b4a7e8';
-  if (name === 'system') return '#8c879e';
+  if (name === 'you') return '#b7a4ff';
+  if (name === 'system') return '#857d99';
   if (preferred && (NAMED[preferred] || /^#[0-9a-f]{6}$/i.test(preferred)))
     return NAMED[preferred] ?? preferred;
   let n = 0;
@@ -313,7 +313,13 @@ async function refreshSessions() {
               'span',
               { class: 'name' },
               base(s.cwd),
-              h('span', { class: 'sub', text: `${s.model ?? 'no model'} · ${s.swarm ? 'swarm' : s.mode}` }),
+              h(
+                'span',
+                { class: 'sub' },
+                s.model ?? 'no model',
+                '  ',
+                h('span', { class: `m-${s.swarm ? 'swarm' : s.mode}`, text: s.swarm ? 'swarm' : s.mode }),
+              ),
             ),
             h('span', {
               class: 'sub',
@@ -357,35 +363,64 @@ function closeSessionView() {
   $('#app').classList.remove('with-panel');
 }
 
-function gem(size) {
-  const ns = 'http://www.w3.org/2000/svg';
-  const svg = document.createElementNS(ns, 'svg');
-  svg.setAttribute('width', size);
-  svg.setAttribute('height', size);
-  svg.setAttribute('viewBox', '0 0 32 32');
-  svg.setAttribute('aria-hidden', 'true');
-  const use = document.createElementNS(ns, 'use');
-  use.setAttribute('href', '/favicon.svg#gem');
-  svg.append(use);
-  return svg;
-}
-
 function renderEmpty() {
+  const roots = S.info?.roots ?? [];
+  const d = S.info?.defaults;
+  const startIn = (dir) => {
+    $('#nf-cwd').value = dir;
+    openNewDialog();
+  };
   $('#transcript').replaceChildren(
     h(
       'div',
       { class: 'empty' },
-      gem(56),
-      h('h2', { text: 'What shall we build?' }),
-      h('p', { text: 'A session works inside one folder on this machine. When you start one, you choose:' }),
-      h(
-        'ul',
-        { class: 'steps' },
-        h('li', null, h('b', { text: 'A model' }), ' to do the work.'),
-        h('li', null, h('b', { text: 'An approval mode' }), ' for how much it may do without asking.'),
-        h('li', null, h('b', { text: 'A sandbox' }), ' for how isolated its commands are.'),
-      ),
-      h('button', { class: 'btn primary', onclick: () => openNewDialog(), text: 'New session' }),
+      h('h2', { text: 'Start a session' }),
+      h('p', {
+        text: 'A session runs an agent inside one folder on this machine. Choose where it should work.',
+      }),
+      roots.length
+        ? h(
+            'div',
+            { class: 'group' },
+            h('div', {
+              class: 'group-title',
+              text: roots.length > 1 ? 'Folders you allowed' : 'Folder you allowed',
+            }),
+            h(
+              'ul',
+              { class: 'folders' },
+              roots.map((r) =>
+                h(
+                  'li',
+                  null,
+                  h(
+                    'button',
+                    { onclick: () => startIn(r), 'aria-label': `Start a session in ${r}` },
+                    h('span', { class: 'path', text: r }),
+                    h('span', { class: 'go', text: 'Start here' }),
+                  ),
+                ),
+              ),
+            ),
+          )
+        : null,
+      d
+        ? h(
+            'div',
+            { class: 'group' },
+            h('div', { class: 'group-title', text: 'New sessions start with' }),
+            h(
+              'dl',
+              { class: 'defaults' },
+              h('dt', { text: 'Model' }),
+              h('dd', { text: d.model ?? 'none yet; choose one when you start' }),
+              h('dt', { text: 'Approval' }),
+              h('dd', { text: d.approval }),
+              h('dt', { text: 'Sandbox' }),
+              h('dd', { text: d.sandbox }),
+            ),
+          )
+        : null,
     ),
   );
 }
@@ -418,6 +453,12 @@ function openSession(id) {
   refreshSessions();
 }
 
+const kbd = (k) => h('kbd', { text: k });
+
+function showSendHint() {
+  $('#hint').replaceChildren(kbd('Enter'), ' to send, ', kbd('Shift'), ' ', kbd('Enter'), ' for a new line');
+}
+
 function onState(st) {
   const first = !S.st || st.reset;
   S.st = st;
@@ -426,7 +467,7 @@ function onState(st) {
     tr.replaceChildren();
     S.rendered.clear();
   }
-  $('#hint').textContent = 'Enter to send, Shift+Enter for a new line';
+  showSendHint();
   const live = $('#live') ?? tr.appendChild(h('div', { id: 'live' }));
   for (const item of st.items) {
     if (item.kind === 'banner' || S.rendered.has(item.id)) continue;
@@ -526,12 +567,15 @@ function renderTop() {
   const st = S.st;
   const has = !!st;
   $('#title').replaceChildren(
-    has ? base(st.session.cwd) : 'Nacreframe',
+    has ? base(st.session.cwd) : 'Home',
     has ? h('small', { text: st.session.cwd }) : '',
   );
   for (const id of ['mode', 'sandbox', 'model', 'compact', 'toggle-panel']) $(`#${id}`).disabled = !has;
   $('#send').disabled = !has;
+  // Without a session there is nothing to configure or type to: keep the screen to the empty state.
+  for (const sel of ['.controls', '#compact', '#toggle-panel', '#dock']) $(sel).hidden = !has;
   $('#stop').hidden = !(has && st.session.running);
+  $('#dock').classList.toggle('running', !!(has && st.session.running));
   $('#version').textContent = S.info ? `v${S.info.version}` : '';
   if (!has) {
     $('#meter-text').textContent = '–';
@@ -542,6 +586,7 @@ function renderTop() {
   const mode = $('#mode');
   mode.value = st.session.mode;
   mode.className = `mode-${st.session.mode}`;
+  mode.closest('.chip').dataset.mode = st.session.mode;
   $('#sandbox').value = st.session.sandbox;
 
   const sel = $('#model');
@@ -658,24 +703,36 @@ function renderCards() {
         h(
           'div',
           { class: 'row' },
-          h('button', {
-            class: 'btn primary',
-            'data-key': 'y',
-            onclick: () => send({ allow: true }),
-            text: 'Allow once (y)',
-          }),
-          h('button', {
-            class: 'btn',
-            'data-key': 'a',
-            onclick: () => send({ allow: true, always: true }),
-            text: `Always allow ${a.grantLabel} (a)`,
-          }),
-          h('button', {
-            class: 'btn danger',
-            'data-key': 'n',
-            onclick: () => send({ allow: false }),
-            text: 'Deny (n)',
-          }),
+          h(
+            'button',
+            {
+              class: 'btn primary',
+              'data-key': 'y',
+              onclick: () => send({ allow: true }),
+            },
+            'Allow once',
+            kbd('y'),
+          ),
+          h(
+            'button',
+            {
+              class: 'btn',
+              'data-key': 'a',
+              onclick: () => send({ allow: true, always: true }),
+            },
+            `Always allow ${a.grantLabel}`,
+            kbd('a'),
+          ),
+          h(
+            'button',
+            {
+              class: 'btn danger',
+              'data-key': 'n',
+              onclick: () => send({ allow: false }),
+            },
+            'Deny',
+            kbd('n'),
+          ),
         ),
         h(
           'div',
@@ -761,7 +818,7 @@ function renderPanel() {
       { class: 'panel-head' },
       h('span', { text: 'Details' }),
       h('button', {
-        class: 'btn small',
+        class: 'btn small ghost',
         'aria-label': 'Close details panel',
         onclick: () => {
           S.pinned = false;
@@ -974,7 +1031,7 @@ async function slash(text) {
       ));
     default:
       return toast(
-        'Commands: /compact [focus] · /clear · /stop · /mode <m> · /sandbox <s> · /model <provider/model> · /swarm <duo|trio|stop>',
+        'Commands: /compact [focus], /clear, /stop, /mode <m>, /sandbox <s>, /model <provider/model>, /swarm <duo|trio|stop>',
       );
   }
 }
@@ -1017,12 +1074,12 @@ async function loadSaved() {
     const saved = await api(`/api/saved?cwd=${encodeURIComponent($('#nf-cwd').value)}`);
     if (seq !== savedSeq) return; // a newer lookup (typing continued) has superseded this answer
     for (const s of saved.sessions)
-      sel.append(h('option', { value: `session:${s.id}`, text: `Conversation — ${s.preview}` }));
+      sel.append(h('option', { value: `session:${s.id}`, text: `Conversation: ${s.preview}` }));
     for (const s of saved.swarms)
       sel.append(
         h('option', {
           value: `swarm:${s.id}`,
-          text: `Swarm ${s.name} (${s.agents.join(', ')}) — ${s.messages} messages`,
+          text: `Swarm ${s.name} (${s.agents.join(', ')}), ${s.messages} messages`,
         }),
       );
   } catch {
@@ -1143,7 +1200,10 @@ function wire() {
   );
   $('#mode').addEventListener(
     'change',
-    guard((e) => api(`/api/sessions/${S.id}/settings`, { method: 'POST', body: { mode: e.target.value } })),
+    guard(async (e) => {
+      await api(`/api/sessions/${S.id}/settings`, { method: 'POST', body: { mode: e.target.value } });
+      refreshSessions(); // the session list shows the mode too; do not wait for the next poll
+    }),
   );
   $('#sandbox').addEventListener(
     'change',
