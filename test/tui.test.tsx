@@ -88,6 +88,8 @@ async function boot(mode: 'ask' | 'auto' = 'ask') {
   return {
     runtime,
     work,
+    stdout,
+    raw: () => out,
     screen,
     type,
     key: (s: string) => stdin.write(s),
@@ -104,6 +106,11 @@ describe('interactive UI', () => {
     const ui = await boot();
     try {
       await until(() => ui.screen().includes('nacreframe'));
+      // The welcome panel: wordmark set into the top edge of a frame, the mascot, and the keys worth knowing.
+      const welcome = ui.screen();
+      expect(welcome).toMatch(/╭─\[●\] nacreframe ─+ v\d+\.\d+\.\d+ ─╮/);
+      expect(welcome).toContain('▀'); // the mascot is half-block pixel art
+      expect(welcome).toContain('/swarm duo');
       await ui.type('hello there');
       ui.key('\r');
       await until(() => ui.screen().includes('mock model'));
@@ -182,6 +189,30 @@ describe('interactive UI', () => {
       await until(() => ui.screen().includes('mock model')); // the lead replied
       expect(ui.screen()).toContain('planner');
       expect(ui.screen()).toContain('builder');
+    } finally {
+      await ui.stop();
+    }
+  });
+
+  it('starts from a clean screen and reprints everything after the window is resized', async () => {
+    const ui = await boot();
+    try {
+      await until(() => ui.screen().includes('nacreframe'));
+      const before = ui.raw().length;
+      // Going fullscreen: the terminal reflows what is on screen, so redrawing in place would leave ghosts.
+      ui.stdout.columns = 160;
+      ui.stdout.rows = 50;
+      ui.stdout.emit('resize');
+      await until(() => ui.raw().slice(before).includes('\x1b[2J\x1b[3J\x1b[H'));
+      await until(() => ui.raw().slice(ui.raw().lastIndexOf('\x1b[2J')).includes('nacreframe'));
+      // A resize that ends where it started changes nothing.
+      const settled = ui.raw().length;
+      ui.stdout.columns = 120;
+      ui.stdout.emit('resize');
+      ui.stdout.columns = 160;
+      ui.stdout.emit('resize');
+      await sleep(400);
+      expect(ui.raw().slice(settled)).not.toContain('\x1b[2J');
     } finally {
       await ui.stop();
     }

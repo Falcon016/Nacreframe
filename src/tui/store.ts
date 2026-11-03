@@ -23,7 +23,7 @@ export type Item =
       reason?: string;
     }
   | { id: number; kind: 'notice'; level: Level; text: string }
-  | { id: number; kind: 'channel'; from: string; to?: string; text: string }
+  | { id: number; kind: 'channel'; from: string; to?: string; text: string; auto?: boolean }
   | { id: number; kind: 'banner' };
 
 export interface LiveTool {
@@ -208,7 +208,13 @@ export class UiStore {
         this.publish(true);
       }),
       swarm.events.on('message', (m) => {
-        this.push({ kind: 'channel', from: m.from, ...(m.to ? { to: m.to } : {}), text: m.text });
+        this.push({
+          kind: 'channel',
+          from: m.from,
+          ...(m.to ? { to: m.to } : {}),
+          text: m.text,
+          ...(m.auto ? { auto: true } : {}),
+        });
       }),
       swarm.events.on('agent_event', ({ name, event }) => this.onAgentEvent(name, event, true)),
     );
@@ -217,11 +223,18 @@ export class UiStore {
   }
 
   /** Replay a saved channel into the transcript when a swarm is resumed. */
-  restoreChannel(log: { from: string; to?: string | undefined; text: string }[]): void {
+  restoreChannel(log: { from: string; to?: string | undefined; text: string; auto?: boolean }[]): void {
     for (const m of log) {
       this.items = [
         ...this.items,
-        { id: this.nextId++, kind: 'channel', from: m.from, ...(m.to ? { to: m.to } : {}), text: m.text },
+        {
+          id: this.nextId++,
+          kind: 'channel',
+          from: m.from,
+          ...(m.to ? { to: m.to } : {}),
+          text: m.text,
+          ...(m.auto ? { auto: true } : {}),
+        },
       ];
     }
     this.publish(true);

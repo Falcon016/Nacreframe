@@ -517,7 +517,12 @@ function renderItem(item) {
       from.style.color = colorOf(item.from, S.st?.live.find((a) => a.name === item.from)?.color);
       el.append(from);
       if (item.to) el.append(h('span', { class: 'to', text: `→ ${item.to}` }));
-      el.append(h('span', { class: 'text', text: item.text }));
+      // An automatic report repeats what the agent just wrote; only show where it went.
+      el.append(
+        item.auto
+          ? h('span', { class: 'text auto', text: 'report delivered', title: item.text })
+          : h('span', { class: 'text', text: item.text }),
+      );
       return el;
     }
     default:
