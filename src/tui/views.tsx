@@ -550,6 +550,24 @@ export function LiveArea({
   );
 }
 
+/**
+ * How many messages the swarm's agents have sent each other since you last spoke, against the limit. It turns
+ * amber near the limit and red when the team is paused waiting for you.
+ */
+function BudgetCounter({ used, limit }: { used: number; limit: number }) {
+  const t = useTheme();
+  const color = !limit ? t.dim : used >= limit ? t.red : used >= limit * 0.8 ? t.gold : t.dim;
+  return (
+    <Text>
+      messages{' '}
+      <Text color={color}>
+        {used}/{limit || '∞'}
+      </Text>
+      {'   '}
+    </Text>
+  );
+}
+
 export function Footer({
   mode,
   sandbox,
@@ -598,6 +616,9 @@ export function Footer({
         ) : null}
       </Text>
       <Text color={t.faint}>
+        {snap.swarmBudget ? (
+          <BudgetCounter used={snap.swarmBudget.used} limit={snap.swarmBudget.limit} />
+        ) : null}
         context <Text color={pct > 80 ? t.red : pct > 60 ? t.gold : t.dim}>{pct}%</Text>
         {'   '}↑{fmtTokens(snap.tokens.input)} ↓{fmtTokens(snap.tokens.output)}
       </Text>

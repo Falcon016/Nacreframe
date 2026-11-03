@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { PassThrough } from 'node:stream';
 import { render } from 'ink';
@@ -227,13 +227,28 @@ describe('interactive UI', () => {
     const ui = await boot('auto');
     try {
       await until(() => ui.screen().includes('nacreframe'));
+      const press = async (k: string, wait: string) => {
+        const mark = ui.raw().length;
+        ui.key(k);
+        await until(() => plain(ui.raw().slice(mark)).includes(wait));
+        await sleep(60);
+      };
       await ui.type('/swarm custom architect builder security');
-      ui.key('\r');
-      await until(() => ui.screen().includes('Start this team?'));
+      await press('\r', 'How many messages may the agents send each other');
+      ui.key('\u001b[B'); // 60 (current) → 120
+      await sleep(40);
+      ui.key('\u001b[B'); // → 250
+      await sleep(40);
+      await press('\r', 'How many tool calls may one agent make');
+      await press('\r', 'Start this team?'); // keep the current tool-call limit
       expect(ui.screen()).toContain('security: Security advisor.');
-      ui.key('\r'); // Start
-      await until(() => ui.screen().includes('Swarm is up: architect, builder, security'));
+      expect(ui.screen()).toContain('Limits saved to your config: 250 messages');
+      await press('\r', 'Swarm is up: architect, builder, security');
       expect(ui.runtime.swarm?.names).toEqual(['architect', 'builder', 'security']);
+      // The limit is in the config file and on the counter beside the context meter.
+      const cfg = JSON.parse(readFileSync(join(dirname(ui.work), '.home', 'config', 'config.json'), 'utf8'));
+      expect(cfg.swarm.maxMessages).toBe(250);
+      await until(() => /messages 0\/250\s+context/.test(ui.screen()));
     } finally {
       ui.runtime.stopSwarm();
       await ui.stop();
@@ -263,6 +278,8 @@ describe('interactive UI', () => {
       await ui.type('perf');
       await press('\r', 'What should perf do?');
       await ui.type('Profile the hot paths');
+      await press('\r', 'How many messages may the agents send each other');
+      await press('\r', 'How many tool calls may one agent make');
       await press('\r', 'Start this team?');
       expect(ui.screen()).toContain('perf: Profile the hot paths. Report back to planner.');
       await press('\r', 'Swarm is up');

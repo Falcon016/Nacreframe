@@ -62,6 +62,60 @@ function describePlan(p: FlushPlan): string {
   return `${parts.join(' and ')}, ${fmtBytes(p.bytes)}`;
 }
 
+const MESSAGE_LIMITS = [60, 120, 250, 500, 1000, 0];
+const TOOL_LIMITS = [60, 150, 300, 0];
+
+/**
+ * Ask how long agents may work before checking in, and save the answers to the config. Esc keeps the current
+ * value.
+ */
+async function chooseLimits(c: CmdCtx): Promise<void> {
+  const { runtime, store } = c;
+  const msgs = runtime.config.swarm.maxMessages;
+  const tools = runtime.config.maxToolIterations;
+  const withCurrent = (list: number[], cur: number) => (list.includes(cur) ? list : [cur, ...list]);
+  const mList = withCurrent(MESSAGE_LIMITS, msgs);
+  const maxMessages = await pick(
+    c,
+    'How many messages may the agents send each other before checking in with you? Anything you type resets the count.',
+    mList.map((n) => ({
+      label: n ? `${n} messages` : 'No limit',
+      value: n,
+      hint: n
+        ? `about ${Math.floor(n / 2)} hand-offs${n === msgs ? ' (current)' : ''}`
+        : `runs until the work is done or you press esc${msgs === 0 ? ' (current)' : ''}`,
+    })),
+    mList.indexOf(msgs),
+  );
+  const tList = withCurrent(TOOL_LIMITS, tools);
+  const maxToolIterations = await pick(
+    c,
+    'How many tool calls may one agent make in a single turn?',
+    tList.map((n) => ({
+      label: n ? `${n} tool calls` : 'No limit',
+      value: n,
+      ...(n === tools ? { hint: 'current' } : {}),
+    })),
+    tList.indexOf(tools),
+  );
+  const next = {
+    ...(maxMessages !== undefined ? { maxMessages } : {}),
+    ...(maxToolIterations !== undefined ? { maxToolIterations } : {}),
+  };
+  if (!Object.keys(next).length) return;
+  try {
+    runtime.setLimits(next);
+    const m = runtime.config.swarm.maxMessages;
+    const tc = runtime.config.maxToolIterations;
+    store.notice(
+      `Limits saved to your config: ${m ? `${m} messages` : 'no message limit'} between yours, ${tc ? `${tc} tool calls` : 'no tool-call limit'} per turn.`,
+      'success',
+    );
+  } catch (e) {
+    store.notice(`Could not save the limits: ${(e as Error).message}`, 'error');
+  }
+}
+
 /** `/swarm custom`: choose how many agents and what each one does, then start (and optionally save) the team. */
 async function customTeam(words: string[], c: CmdCtx): Promise<void> {
   const { runtime, store } = c;
@@ -115,6 +169,7 @@ async function customTeam(words: string[], c: CmdCtx): Promise<void> {
     }
   }
   const team = assembleTeam(slots);
+  await chooseLimits(c);
   store.notice(
     ['Your team:', ...team.map((a, i) => `  ${a.name}${i === 0 ? ' (lead)' : ''}: ${a.role}`)].join('\n'),
   );
@@ -465,12 +520,24 @@ export const BUILTINS: BuiltinCommand[] = [
   },
   {
     name: 'swarm',
-    usage: 'swarm [duo|trio|quad|custom|config|resume|stop|panes|status]',
+    usage: 'swarm [duo|trio|quad|custom|config|resume|stop|panes|status|limit]',
     description: 'Start collaborating agents in a shared channel',
     async run(args, c) {
       const { runtime, store } = c;
       const a = args.trim() || 'status';
       if (a === 'panes') return c.togglePanes();
+      if (a === 'limit' || a.startsWith('limit ')) {
+        const v = a.split(/\s+/)[1];
+        if (!v) return chooseLimits(c);
+        const n = v === 'off' || v === 'none' ? 0 : Number(v);
+        if (!Number.isInteger(n) || n < 0)
+          return store.notice('Usage: /swarm limit [<messages>|off], for example /swarm limit 250', 'warn');
+        runtime.setLimits({ maxMessages: n });
+        return store.notice(
+          `Message limit saved: ${n ? `${n} messages between yours` : 'no limit'}.${runtime.swarm ? ' A paused team carries on as soon as you speak.' : ''}`,
+          'success',
+        );
+      }
       if (a === 'custom' || a.startsWith('custom ')) {
         if (runtime.swarm) return store.notice('A swarm is already running. Use /swarm stop first.', 'warn');
         return customTeam(a.split(/\s+/).slice(1), c);

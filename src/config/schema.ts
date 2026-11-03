@@ -117,8 +117,11 @@ export const configSchema = z.object({
     .object({
       agents: z.array(swarmAgentSchema).default([]),
       maxAgents: z.number().int().min(1).max(12).default(6),
-      /** Hard cap on bus messages per run, a backstop against runaway agent chatter. */
-      maxMessages: z.number().int().min(1).default(60),
+      /**
+       * Messages agents may send each other between two of yours, a backstop against runaway chatter.
+       * Anything you type resets it. 0 means no limit.
+       */
+      maxMessages: z.number().int().min(0).default(60),
       /** Let agents add teammates mid-run. Off by default: the team you start is the team you get. */
       allowSpawn: z.boolean().default(false),
     })
@@ -137,7 +140,8 @@ export const configSchema = z.object({
     .default({ threshold: 0.8, keepRecent: 6 }),
 
   mcpServers: z.record(z.string(), mcpServerSchema).default({}),
-  maxToolIterations: z.number().int().positive().default(60),
+  /** Tool calls an agent may make in one turn before it stops and waits for you. 0 means no limit. */
+  maxToolIterations: z.number().int().min(0).default(60),
   theme: z.enum(['nacre', 'mono']).default('nacre'),
   /** Show agents' reasoning in full in the terminal UI (toggle with ctrl+t or /thinking). */
   showThinking: z.boolean().default(false),

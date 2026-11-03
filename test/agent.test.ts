@@ -25,6 +25,22 @@ describe('agent loop', () => {
     expect(events.at(-1)).toEqual({ type: 'turn_end', stopReason: 'end_turn' });
   });
 
+  it('stops after maxToolIterations tool calls in one turn, and 0 means no limit', async () => {
+    const calls = (n: number) => Array.from({ length: n }, (_, i) => callTool(`c${i}`, 'ls', { path: '.' }));
+    const capped = makeAgent(ws.dir, new ScriptedProvider([...calls(5), say('done')]), {
+      config: { maxToolIterations: 3 },
+    });
+    await capped.agent.run('go');
+    expect(capped.events.some((e) => e.type === 'turn_end' && e.stopReason === 'max_iterations')).toBe(true);
+
+    const free = makeAgent(ws.dir, new ScriptedProvider([...calls(80), say('done')]), {
+      config: { maxToolIterations: 0 },
+    });
+    await free.agent.run('go');
+    expect(free.events.some((e) => e.type === 'turn_end' && e.stopReason === 'max_iterations')).toBe(false);
+    expect(free.events.filter((e) => e.type === 'tool_end')).toHaveLength(80);
+  });
+
   it('edits a file only after it has been read, and rejects stale edits', async () => {
     const f = join(ws.dir, 'b.txt');
     writeFileSync(f, 'one\ntwo\n');

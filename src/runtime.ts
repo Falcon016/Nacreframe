@@ -405,6 +405,25 @@ export class Runtime {
   }
 
   /**
+   * How long agents may work before checking in with you, saved to your config (0 = no limit):
+   * `maxMessages` agent-to-agent swarm messages between yours, `maxToolIterations` tool calls in one turn.
+   * Takes effect at once, including for a swarm that is running (a paused one carries on if raised).
+   */
+  setLimits(l: { maxMessages?: number; maxToolIterations?: number }): void {
+    const patch: { swarm?: { maxMessages: number }; maxToolIterations?: number } = {};
+    if (l.maxMessages !== undefined) {
+      this.config.swarm.maxMessages = l.maxMessages;
+      patch.swarm = { maxMessages: l.maxMessages };
+      this.swarm?.setLimit(l.maxMessages);
+    }
+    if (l.maxToolIterations !== undefined) {
+      this.config.maxToolIterations = l.maxToolIterations;
+      patch.maxToolIterations = l.maxToolIterations;
+    }
+    patchUserConfig(patch as PartialConfig, this.loaded.paths);
+  }
+
+  /**
    * Saved conversations and swarms that `/flush` would delete. Never the conversation in use or the running
    * swarm. `olderThanDays` keeps anything touched more recently; `allFolders` looks beyond this folder.
    */
