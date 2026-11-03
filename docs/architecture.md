@@ -2,7 +2,7 @@
 
 ```
 src/
-  cli.tsx            entry: flags, auth/doctor/trust subcommands, picks a mode
+  cli.ts             entry: flags, auth/doctor/trust subcommands, picks a mode
   runtime.ts         wires config → providers → tools → policy → sandbox → agent (+ swarm); shared by every mode
   agent/
     agent.ts         the loop: stream → tool calls → approvals → results → repeat; steering, abort, compaction

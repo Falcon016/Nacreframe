@@ -1,4 +1,8 @@
 #!/usr/bin/env node
+// Must stay the first import, and this file must not contain JSX (which adds a React import above it):
+// ./env.js decides which React build loads.
+import { restoreNodeEnv } from './env.js';
+import { createElement } from 'react';
 import { parseArgs } from 'node:util';
 import { render } from 'ink';
 import { AuthStore } from './config/auth.js';
@@ -186,6 +190,8 @@ function friendlyStartupError(e: Error): string {
 }
 
 async function main(): Promise<number> {
+  // Every static import (React included) has loaded by now.
+  restoreNodeEnv();
   // Subcommands with their own flags are dispatched before the interactive flags are parsed.
   if (process.argv[2] === 'serve') return serveCommand(process.argv.slice(3));
   if (process.argv[2] === 'setup') return setupCommand(process.argv.slice(3));
@@ -314,13 +320,14 @@ async function main(): Promise<number> {
   }
   const store = new UiStore({ printAsStreamed: true });
   const theme = pickTheme(runtime.config.theme);
+  // createElement, not JSX: this entry file must not import React before ./env.js has run (see there).
   const app = render(
-    <App
-      runtime={runtime}
-      store={store}
-      theme={theme}
-      {...(positionals.length ? { initialPrompt: positionals.join(' ') } : {})}
-    />,
+    createElement(App, {
+      runtime,
+      store,
+      theme,
+      ...(positionals.length ? { initialPrompt: positionals.join(' ') } : {}),
+    }),
     {
       exitOnCtrlC: false,
       // We only get here on a real terminal (checked above). Without this, Ink treats a stray CI=true in the

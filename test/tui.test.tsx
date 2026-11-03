@@ -6,6 +6,7 @@ import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { projectKey } from '../src/paths.js';
 import { Runtime } from '../src/runtime.js';
 import { App } from '../src/tui/App.js';
+import { BUILTINS } from '../src/tui/commands.js';
 import { UiStore } from '../src/tui/store.js';
 import { NACRE } from '../src/tui/theme.js';
 import { startMockLlm } from './mock-llm.js';
@@ -103,6 +104,26 @@ async function boot(mode: 'ask' | 'auto' = 'ask') {
 }
 
 describe('interactive UI', () => {
+  it('has one command per name, and the menu shows each once without React key warnings', async () => {
+    const names = BUILTINS.map((c) => c.name);
+    expect(names.filter((n, i) => names.indexOf(n) !== i)).toEqual([]);
+    const errors: string[] = [];
+    const spy = vi
+      .spyOn(console, 'error')
+      .mockImplementation((...a: unknown[]) => void errors.push(a.join(' ')));
+    const ui = await boot();
+    try {
+      await until(() => ui.screen().includes('nacreframe'));
+      await ui.type('/skill');
+      await until(() => ui.screen().includes('List the skills'));
+      await sleep(100);
+      expect(errors.filter((e) => /same key/.test(e))).toEqual([]);
+    } finally {
+      spy.mockRestore();
+      await ui.stop();
+    }
+  });
+
   it('renders the banner, streams a reply and shows markdown', async () => {
     const ui = await boot();
     try {

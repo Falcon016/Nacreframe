@@ -7,7 +7,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { tmpWorkspace } from './helpers.js';
 
 const TSX = resolve('node_modules/tsx/dist/cli.mjs');
-const CLI = resolve('src/cli.tsx');
+const CLI = resolve('src/cli.ts');
 
 let ws: ReturnType<typeof tmpWorkspace>;
 let env: NodeJS.ProcessEnv;
@@ -22,6 +22,24 @@ const run = (...args: string[]) =>
   spawnSync(process.execPath, [TSX, CLI, ...args], { env, encoding: 'utf8', timeout: 60_000, cwd: ws.dir });
 
 describe('command line', () => {
+  it("loads React's production build, but does not pass NODE_ENV on to the commands it runs", () => {
+    const script = [
+      "import { restoreNodeEnv } from './src/env.ts';",
+      "import 'react';",
+      'const atLoad = process.env.NODE_ENV;',
+      'restoreNodeEnv();',
+      'console.log(JSON.stringify({ atLoad, after: process.env.NODE_ENV ?? null }));',
+    ].join('\n');
+    const { NODE_ENV: _drop, ...clean } = process.env;
+    const r = spawnSync(process.execPath, [TSX, '--input-type=module', '-e', script], {
+      env: clean,
+      encoding: 'utf8',
+      cwd: resolve('.'),
+      timeout: 60_000,
+    });
+    expect(JSON.parse(r.stdout)).toEqual({ atLoad: 'production', after: null });
+  });
+
   it('prints version and help', () => {
     expect(run('--version').stdout).toMatch(/^Nacreframe \d+\.\d+\.\d+/);
     expect(run('--help').stdout).toContain('nacre serve');
