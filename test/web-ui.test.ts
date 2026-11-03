@@ -68,7 +68,7 @@ describe.skipIf(!channel)('web dashboard in a real browser', () => {
     await page.goto(`${srv.url}/#token=${TOKEN}`);
     await page.locator('#app').waitFor({ state: 'visible' });
     expect(page.url()).not.toContain('token');
-    expect(await page.locator('.empty h2').innerText()).toContain('What shall we build');
+    expect(await page.locator('.empty h2').innerText()).toContain('Start a session');
     await shot('01-empty');
   });
 

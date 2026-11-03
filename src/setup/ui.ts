@@ -31,7 +31,8 @@ const SYMBOLS_UNICODE = {
   warn: '!',
   fail: '✗',
   info: '•',
-  title: '◆',
+  title: '●',
+  pearl: '●',
   pointer: '❯',
   arrow: '→',
   mask: '•',
@@ -44,6 +45,7 @@ const SYMBOLS_ASCII = {
   fail: 'x',
   info: '-',
   title: '*',
+  pearl: 'o',
   pointer: '>',
   arrow: '->',
   mask: '*',
@@ -87,7 +89,7 @@ export class Term {
   bold = (s: string) => this.wrap('1', s);
   dim = (s: string) => this.wrap('2', s);
   /** The Nacre violet. */
-  accent = (s: string) => this.wrap(this.truecolor ? '38;2;180;167;232' : '38;5;183', s);
+  accent = (s: string) => this.wrap(this.truecolor ? '38;2;157;132;255' : '38;5;141', s);
   good = (s: string) => this.wrap('32', s);
   warn = (s: string) => this.wrap('33', s);
   bad = (s: string) => this.wrap('31', s);
@@ -102,14 +104,16 @@ export class Term {
 
   banner(title: string, tagline: string): void {
     this.line();
-    this.line(`  ${this.accent(this.sym.title)} ${this.bold(title)}`);
+    // The logo in text form: a pearl held between two brackets.
+    this.line(`  ${this.accent('[')}${this.sym.pearl}${this.accent(']')} ${this.bold(title)}`);
     this.line(`    ${this.dim(tagline)}`);
     this.line();
   }
 
-  heading(text: string): void {
+  /** A section title, with an optional quiet step counter after it ("1 of 4"). */
+  heading(text: string, step?: string): void {
     this.line();
-    this.line(`  ${this.bold(text)}`);
+    this.line(`  ${this.bold(text)}${step ? `  ${this.dim(step)}` : ''}`);
   }
 
   ok(msg: string, detail?: string): void {

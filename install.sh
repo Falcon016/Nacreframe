@@ -50,8 +50,8 @@ setup_ui() {
     BOLD="${ESC}[1m"; DIM="${ESC}[2m"; RESET="${ESC}[0m"
     RED="${ESC}[31m"; GREEN="${ESC}[32m"; YELLOW="${ESC}[33m"
     case "${COLORTERM:-}" in
-      *truecolor* | *24bit*) ACCENT="${ESC}[38;2;180;167;232m" ;;
-      *) ACCENT="${ESC}[38;5;183m" ;;
+      *truecolor* | *24bit*) ACCENT="${ESC}[38;2;157;132;255m" ;;
+      *) ACCENT="${ESC}[38;5;141m" ;;
     esac
   fi
   UNI=0
@@ -60,9 +60,9 @@ setup_ui() {
   esac
   if [ "${TERM:-}" = "linux" ]; then UNI=0; fi
   if [ "$UNI" = 1 ]; then
-    S_OK="✓"; S_WARN="!"; S_FAIL="✗"; S_TITLE="◆"; S_DOT="•"
+    S_OK="✓"; S_WARN="!"; S_FAIL="✗"; S_TITLE="●"; S_DOT="•"; S_PEARL="●"
   else
-    S_OK="+"; S_WARN="!"; S_FAIL="x"; S_TITLE="*"; S_DOT="-"
+    S_OK="+"; S_WARN="!"; S_FAIL="x"; S_TITLE="*"; S_DOT="-"; S_PEARL="o"
   fi
   # Prompts need a person: a terminal for output and a controlling terminal to read answers from.
   TTY_OK=0
@@ -78,7 +78,8 @@ note() { printf '    %s%s%s\n' "$DIM" "$1" "$RESET"; }
 heading() { printf '\n  %s%s%s\n' "$BOLD" "$1" "$RESET"; }
 banner() {
   blank
-  printf '  %s%s%s %sNacreframe installer%s\n' "$ACCENT" "$S_TITLE" "$RESET" "$BOLD" "$RESET"
+  # The logo in text form: a pearl held between two brackets.
+  printf '  %s[%s%s%s]%s %snacreframe installer%s\n' "$ACCENT" "$RESET" "$S_PEARL" "$ACCENT" "$RESET" "$BOLD" "$RESET"
   note "A terminal AI agent harness - github.com/Falcon016/Nacreframe"
   blank
 }

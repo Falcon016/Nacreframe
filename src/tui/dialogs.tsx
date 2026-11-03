@@ -4,6 +4,7 @@ import type { ApprovalRequest, ApprovalResponse } from '../agent/agent.js';
 import { agentColor, useTheme } from './context.js';
 import { diffColor } from './markdown.js';
 import { GLYPH } from './theme.js';
+import { Keys } from './views.js';
 
 /** One-line text prompt used for feedback and free-form answers. */
 function LineInput({
@@ -81,7 +82,13 @@ export function SelectList<T>({
           </Text>
         );
       })}
-      <Text color={t.faint}>↑↓ move · enter select · esc cancel</Text>
+      <Keys
+        items={[
+          ['↑↓', 'move'],
+          ['enter', 'select'],
+          ['esc', 'cancel'],
+        ]}
+      />
     </Box>
   );
 }
@@ -133,10 +140,10 @@ export function ApprovalDialog({
     <Box flexDirection="column" borderStyle="round" borderColor={t.gold} paddingX={1}>
       <Text>
         <Text bold color={t.gold}>
-          {GLYPH.brand} Approve this action?
+          {GLYPH.pearl} Approve this action?
         </Text>
-        {req.agentId !== 'main' ? <Text color={color}> · {req.agentId}</Text> : null}
-        {pending > 1 ? <Text color={t.faint}> · {pending - 1} more waiting</Text> : null}
+        {req.agentId !== 'main' ? <Text color={color}> {req.agentId}</Text> : null}
+        {pending > 1 ? <Text color={t.faint}> ({pending - 1} more waiting)</Text> : null}
       </Text>
       <Text>
         <Text bold>{req.toolName}</Text> <Text color={t.text}>{req.description}</Text>
@@ -170,7 +177,16 @@ export function ApprovalDialog({
           ))
         )}
       </Box>
-      {feedback ? null : <Text color={t.faint}>y yes · a always · n no · esc deny</Text>}
+      {feedback ? null : (
+        <Keys
+          items={[
+            ['y', 'yes'],
+            ['a', 'always'],
+            ['n', 'no'],
+            ['esc', 'deny'],
+          ]}
+        />
+      )}
     </Box>
   );
 }
@@ -193,9 +209,9 @@ export function QuestionDialog({
     <Box flexDirection="column" borderStyle="round" borderColor={t.teal} paddingX={1}>
       <Text>
         <Text bold color={t.teal}>
-          ◆ Question
+          {GLYPH.pearl} Question
         </Text>
-        {agent !== 'main' ? <Text color={color}> · {agent}</Text> : null}
+        {agent !== 'main' ? <Text color={color}> from {agent}</Text> : null}
       </Text>
       <Text>{question}</Text>
       <Box marginTop={1} flexDirection="column">

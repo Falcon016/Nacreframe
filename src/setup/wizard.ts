@@ -108,8 +108,8 @@ function errorText(e: unknown): string {
 export async function runWizard(ctx: WizardContext): Promise<number> {
   const t = ctx.term;
   t.banner(
-    `${NAME} setup`,
-    `v${VERSION} · about a minute · nothing is saved until the last step · Ctrl+C quits`,
+    `${NAME.toLowerCase()} setup`,
+    `v${VERSION}. About a minute; nothing is saved until the last step. Ctrl+C quits.`,
   );
 
   let loaded: LoadedConfig;
@@ -125,7 +125,7 @@ export async function runWizard(ctx: WizardContext): Promise<number> {
 
   try {
     // ---- 1. system ---------------------------------------------------------------------------
-    t.heading('1 of 4 · Your system');
+    t.heading('Your system', '1 of 4');
     const sp = t.spinner('Looking around…');
     const checks = await ctx.systemChecks();
     sp.stop();
@@ -144,7 +144,7 @@ export async function runWizard(ctx: WizardContext): Promise<number> {
       const plan: SetupPlan = {};
 
       // ---- 2. provider -----------------------------------------------------------------------
-      t.heading('2 of 4 · Where your models come from');
+      t.heading('Where your models come from', '2 of 4');
       const outcome = await chooseProvider(ctx, config, auth);
       if (outcome) {
         plan.provider = outcome.provider;
@@ -153,16 +153,16 @@ export async function runWizard(ctx: WizardContext): Promise<number> {
 
       // ---- 3. model --------------------------------------------------------------------------
       if (outcome) {
-        t.heading('3 of 4 · Your model');
+        t.heading('Your model', '3 of 4');
         const model = await chooseModel(ctx, outcome, config.model);
         if (model) plan.model = model;
       } else {
-        t.heading('3 of 4 · Your model');
+        t.heading('Your model', '3 of 4');
         t.info('Skipped. Pick one in the app, or run `' + BIN + ' auth set <provider>` later.');
       }
 
       // ---- 4. safety -------------------------------------------------------------------------
-      t.heading('4 of 4 · Safety');
+      t.heading('Safety', '4 of 4');
       plan.approval = await ctx.prompt.select({
         message: 'How much should the agent ask before it acts?',
         initial: ['ask', 'edits', 'auto', 'plan'].indexOf(config.approval.mode),

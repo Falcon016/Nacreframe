@@ -106,7 +106,7 @@ export class GuardSandbox implements Sandbox {
   }
 
   describe(): string {
-    return this.enforce ? `guard · confined to ${this.cwd}` : 'off · no isolation';
+    return this.enforce ? `guard: file tools stay inside ${this.cwd}` : 'off: no isolation';
   }
 }
 

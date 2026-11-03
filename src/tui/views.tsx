@@ -31,6 +31,22 @@ export interface BannerInfo {
   warnings: string[];
 }
 
+/** Key hints: the key in a brighter tone, what it does in a quieter one, groups set apart by space. */
+export function Keys({ items }: { items: [key: string, what: string][] }) {
+  const t = useTheme();
+  return (
+    <Text>
+      {items.map(([k, w], i) => (
+        <Text key={k}>
+          {i ? '   ' : ''}
+          <Text color={t.dim}>{k}</Text>
+          <Text color={t.faint}> {w}</Text>
+        </Text>
+      ))}
+    </Text>
+  );
+}
+
 export function Banner({ info }: { info: BannerInfo }) {
   const t = useTheme();
   const home = process.env.HOME ?? process.env.USERPROFILE ?? '';
@@ -39,22 +55,36 @@ export function Banner({ info }: { info: BannerInfo }) {
     <Box flexDirection="column" marginBottom={1} paddingLeft={1}>
       <Text>
         <Text color={t.accent} bold>
-          {GLYPH.brand} {NAME}
+          {GLYPH.mark[0]}
+          <Text color={t.text}>{GLYPH.mark[1]}</Text>
+          {GLYPH.mark[2]}
         </Text>
+        <Text bold> {NAME.toLowerCase()}</Text>
         <Text color={t.faint}> v{VERSION}</Text>
       </Text>
-      <Text color={t.dim}>
-        {' '}
-        {info.model} · {cwd}
-      </Text>
-      <Text color={t.dim}>
-        {' '}
-        <Text color={t[MODE_STYLE[info.mode].color]}>{info.mode}</Text> mode · {info.sandbox}
-      </Text>
-      <Text color={t.faint}>
-        {' '}
-        /help for commands · shift+tab changes mode · esc interrupts · {BIN} --help
-      </Text>
+      {/* Details hang under the wordmark, past the mark. */}
+      <Box flexDirection="column" paddingLeft={4}>
+        <Text>
+          <Text color={t.text}>{info.model}</Text>
+          <Text color={t.faint}> in </Text>
+          <Text color={t.dim}>{cwd}</Text>
+        </Text>
+        <Text>
+          <Text color={t[MODE_STYLE[info.mode].color]}>{info.mode}</Text>
+          <Text color={t.faint}> mode, </Text>
+          <Text color={t.dim}>{info.sandbox}</Text>
+        </Text>
+        <Text>
+          <Keys
+            items={[
+              ['/help', 'commands'],
+              ['shift+tab', 'mode'],
+              ['esc', 'interrupt'],
+              [`${BIN} --help`, 'options'],
+            ]}
+          />
+        </Text>
+      </Box>
       {info.warnings.map((w, i) => (
         <Box key={i} paddingLeft={1}>
           <Box width={2} flexShrink={0}>
@@ -87,7 +117,7 @@ export function ItemView({ item, banner }: { item: Item; banner: BannerInfo }) {
         <Box marginTop={1} paddingLeft={1} flexDirection="column">
           {item.agent !== 'main' ? (
             <Text bold color={c}>
-              {GLYPH.brand} {item.agent}
+              {GLYPH.pearl} {item.agent}
             </Text>
           ) : null}
           <Box>
@@ -334,7 +364,11 @@ export function LiveArea({
         <Box paddingLeft={1} marginTop={1}>
           <Text color={t.accent}>{spin} </Text>
           <Text color={t.dim}>{snap.status ?? (main?.thinking ? 'Thinking' : 'Working')}… </Text>
-          <Text color={t.faint}>({elapsed(Date.now() - started)} · esc to interrupt)</Text>
+          <Text color={t.faint}>
+            {elapsed(Date.now() - started)}
+            {'   '}
+          </Text>
+          <Keys items={[['esc', 'interrupt']]} />
         </Box>
       ) : null}
     </Box>
@@ -365,14 +399,26 @@ export function Footer({
         <Text color={t[m.color]} bold>
           ⏵⏵ {m.label}
         </Text>
-        <Text color={t.faint}> (shift+tab) · {sandbox.split(' · ')[0]}</Text>
-        {swarmCount ? <Text color={t.rose}> · swarm ×{swarmCount}</Text> : null}
-        {snap.browser.open ? <Text color={t.blue}> · browser</Text> : null}
-        {queued ? <Text color={t.gold}> · {queued} queued</Text> : null}
+        <Text color={t.faint}> shift+tab</Text>
+        <Text color={t.dim}>
+          {'   '}sandbox {sandbox.split(':')[0]}
+        </Text>
+        {swarmCount ? (
+          <Text color={t.rose}>
+            {'   '}swarm ×{swarmCount}
+          </Text>
+        ) : null}
+        {snap.browser.open ? <Text color={t.blue}>{'   '}browser</Text> : null}
+        {queued ? (
+          <Text color={t.gold}>
+            {'   '}
+            {queued} queued
+          </Text>
+        ) : null}
       </Text>
       <Text color={t.faint}>
-        ctx <Text color={pct > 80 ? t.red : pct > 60 ? t.gold : t.dim}>{pct}%</Text> · ↑
-        {fmtTokens(snap.tokens.input)} ↓{fmtTokens(snap.tokens.output)}
+        context <Text color={pct > 80 ? t.red : pct > 60 ? t.gold : t.dim}>{pct}%</Text>
+        {'   '}↑{fmtTokens(snap.tokens.input)} ↓{fmtTokens(snap.tokens.output)}
       </Text>
     </Box>
   );
