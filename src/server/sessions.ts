@@ -67,7 +67,8 @@ export interface WebState {
   queued: number;
   /** Swarm messages since the user last spoke, against the limit (0 = none). */
   swarmBudget?: { used: number; limit: number };
-  compacting?: { pct: number };
+  speed?: UiSnapshot['speed'];
+  compacting?: UiSnapshot['compacting'];
   status?: string;
   todos: { content: string; status: string }[];
   approval?: ApprovalRequest & { id: number; pending: number };
@@ -196,6 +197,7 @@ export class WebSession {
       contextTokens: snap.contextTokens,
       queued: snap.queued,
       ...(snap.swarmBudget ? { swarmBudget: snap.swarmBudget } : {}),
+      ...(snap.speed ? { speed: snap.speed } : {}),
       ...(snap.compacting ? { compacting: snap.compacting } : {}),
       ...(snap.status ? { status: snap.status } : {}),
       todos: rt.todos,

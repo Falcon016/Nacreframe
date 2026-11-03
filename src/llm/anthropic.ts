@@ -22,6 +22,7 @@ const VERSION = '2023-06-01';
 
 export class AnthropicProvider implements Provider {
   readonly id: string;
+  readonly keepsThinking = true; // signed thinking blocks are sent back within a tool loop
   private baseUrl: string;
 
   constructor(private opts: AnthropicOptions) {
