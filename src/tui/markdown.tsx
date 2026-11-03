@@ -206,3 +206,31 @@ export function diffColor(line: string, t: Theme): string {
   if (line.startsWith('@@')) return t.lavender;
   return t.dim;
 }
+
+/**
+ * The end of `text` that fits in `rows` terminal rows at `width` columns, for the live area: it must stay
+ * shorter than the window, or the terminal scrolls part of it into history on every redraw. If the cut falls
+ * inside a code block, its opening fence is kept so the rest still renders as code.
+ */
+export function fitTail(text: string, width: number, rows: number): { text: string; hidden: number } {
+  const w = Math.max(10, width);
+  const height = (l: string) => Math.max(1, Math.ceil((l.length + 2) / w));
+  const lines = text.split('\n');
+  let total = 0;
+  for (const l of lines) total += height(l);
+  if (total <= rows) return { text, hidden: 0 };
+  const room = Math.max(1, rows - 1); // one row for the opening fence's label, if the cut is inside a block
+  let used = 0;
+  let i = lines.length;
+  while (i > 0 && used + height(lines[i - 1]!) <= room) used += height(lines[--i]!);
+  let kept = lines.slice(i);
+  if (!kept.length) {
+    // One line longer than the whole space: show its end.
+    const last = lines.at(-1)!;
+    kept = [last.slice(-Math.max(w, room * w - 4))];
+    i = lines.length - 1;
+  }
+  let fence: string | undefined;
+  for (const l of lines.slice(0, i)) if (/^\s*```/.test(l)) fence = fence === undefined ? l : undefined;
+  return { text: [...(fence !== undefined ? [fence] : []), ...kept].join('\n'), hidden: i };
+}

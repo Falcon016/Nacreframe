@@ -10,6 +10,7 @@ import type { AddressInfo } from 'node:net';
  *   "think ..."    → streams reasoning (reasoning_content) before the reply
  *   "ponder ..."   → the same, written inline as <think>...</think> like some local models do
  *   "deliberate"   → long reasoning streamed slowly (one word every 30 ms), to watch it arrive live
+ *   "essay"        → a long reply (numbered paragraphs, then a 40-line code block) streamed a line at a time
  *   anything else  → plain text reply
  * Each tool result is answered with a short wrap-up so the loop terminates.
  */
@@ -70,7 +71,30 @@ export function startMockLlm(port = 0): Promise<{ server: Server; url: string; r
         else if (m?.[1]!.toLowerCase() === 'write')
           call('write', { path: m[2], content: 'hello from the mock\n' });
         else if (m?.[1]!.toLowerCase() === 'run') call('bash', { command: u.replace(/^.*\brun\s+/i, '') });
-        else if (/\bdeliberate\b/i.test(u)) {
+        else if (/\bessay\b/i.test(u)) {
+          const lines = [
+            ...Array.from(
+              { length: 30 },
+              (_, i) => `Paragraph ${String(i + 1).padStart(2, '0')}: a line of the reply.\n`,
+            ),
+            '\n```ts\n',
+            ...Array.from(
+              { length: 40 },
+              (_, i) => `const line${String(i + 1).padStart(2, '0')} = ${i + 1};\n`,
+            ),
+            '```\n\nThat is the whole essay.',
+          ];
+          void (async () => {
+            for (const l of lines) {
+              send({ choices: [{ delta: { content: l } }] });
+              await new Promise((r) => setTimeout(r, 15));
+            }
+            send({ choices: [{ delta: {}, finish_reason: 'stop' }] });
+            send({ choices: [], usage: { prompt_tokens: 120, completion_tokens: 900 } });
+            res.end('data: [DONE]\n\n');
+          })();
+          return;
+        } else if (/\bdeliberate\b/i.test(u)) {
           // Streams slowly, then finishes the response itself.
           const words = (
             'Let me work through this carefully before answering. First I will look at what the request asks for ' +

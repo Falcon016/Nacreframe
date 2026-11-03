@@ -261,7 +261,7 @@ export function App({ runtime, store, theme, initialPrompt }: Props) {
         {(item) => <ItemView key={item.id} item={item} banner={banner} showThinking={snap.showThinking} />}
       </Static>
       {/* Panes give way to a one-line roster while a dialog needs the room. */}
-      <LiveArea snap={snap} todos={todos} showPanes={showPanes && !dialogOpen} />
+      <LiveArea snap={snap} todos={todos} showPanes={showPanes && !dialogOpen} dialogOpen={dialogOpen} />
       <Box flexDirection="column" marginTop={1}>
         {approval ? (
           <ApprovalDialog req={approval.req} pending={runtime.broker.pending} onResolve={approval.resolve} />

@@ -307,7 +307,7 @@ async function main(): Promise<number> {
     await runtime.dispose();
     return 2;
   }
-  const store = new UiStore();
+  const store = new UiStore({ printAsStreamed: true });
   const theme = pickTheme(runtime.config.theme);
   const app = render(
     <App

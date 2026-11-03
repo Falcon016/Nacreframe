@@ -3,7 +3,7 @@ import type { ApprovalMode } from '../config/schema.js';
 import type { TodoItem } from '../tools/types.js';
 import { NAME, VERSION } from '../version.js';
 import { agentColor, useTheme } from './context.js';
-import { diffColor, Markdown } from './markdown.js';
+import { diffColor, fitTail, Markdown } from './markdown.js';
 import type { Item, LiveAgent, UiSnapshot } from './store.js';
 import { Mascot } from './mascot.js';
 import { GLYPH, MODE_STYLE } from './theme.js';
@@ -220,8 +220,8 @@ export function ItemView({
     case 'assistant': {
       const c = item.agent === 'main' ? t.text : agentColor(t, item.agent);
       return (
-        <Box marginTop={1} paddingLeft={1} flexDirection="column">
-          {item.agent !== 'main' ? (
+        <Box marginTop={item.cont && !item.gap ? 0 : 1} paddingLeft={1} flexDirection="column">
+          {item.agent !== 'main' && !item.cont ? (
             <Text bold color={c}>
               {GLYPH.pearl} {item.agent}
             </Text>
@@ -229,7 +229,7 @@ export function ItemView({
           <Box>
             <Box marginRight={1}>
               <Text color={item.agent === 'main' ? t.accent : c}>
-                {item.agent === 'main' ? GLYPH.tool : ' '}
+                {item.agent === 'main' && !item.cont ? GLYPH.tool : ' '}
               </Text>
             </Box>
             <Box flexDirection="column" flexGrow={1}>
@@ -349,12 +349,36 @@ function tail(text: string, n: number): string[] {
   return lines.slice(-n);
 }
 
-export function TodoPanel({ todos }: { todos: TodoItem[] }) {
+/**
+ * The items the todo panel shows within `max` rows: everything if it fits, else a count of the finished ones,
+ * then the open ones from the one in progress, and a count of the rest.
+ */
+export function todoRows(
+  todos: TodoItem[],
+  max: number,
+): { items: TodoItem[]; doneHidden: number; moreHidden: number } {
+  if (todos.length <= max) return { items: todos, doneHidden: 0, moreHidden: 0 };
+  const open = todos.filter((x) => x.status !== 'completed');
+  const doneHidden = todos.length - open.length;
+  const room = Math.max(1, max - (doneHidden ? 1 : 0) - 1);
+  const items = open.slice(0, room);
+  return { items, doneHidden, moreHidden: open.length - items.length };
+}
+
+export function todoPanelHeight(todos: TodoItem[], max: number): number {
+  if (!todos.length || todos.every((x) => x.status === 'completed')) return 0;
+  const r = todoRows(todos, max);
+  return 1 + r.items.length + (r.doneHidden ? 1 : 0) + (r.moreHidden ? 1 : 0);
+}
+
+export function TodoPanel({ todos, max = 8 }: { todos: TodoItem[]; max?: number }) {
   const t = useTheme();
   if (!todos.length || todos.every((x) => x.status === 'completed')) return null;
+  const { items, doneHidden, moreHidden } = todoRows(todos, max);
   return (
     <Box flexDirection="column" paddingLeft={1} marginTop={1}>
-      {todos.map((x, i) => (
+      {doneHidden ? <Text color={t.faint}>☑ {doneHidden} done</Text> : null}
+      {items.map((x, i) => (
         <Text
           key={i}
           color={x.status === 'completed' ? t.faint : x.status === 'in_progress' ? t.accent : t.dim}
@@ -363,6 +387,7 @@ export function TodoPanel({ todos }: { todos: TodoItem[] }) {
           {x.status === 'completed' ? '☑' : x.status === 'in_progress' ? '◐' : '☐'} {x.content}
         </Text>
       ))}
+      {moreHidden ? <Text color={t.faint}>☐ {moreHidden} more</Text> : null}
     </Box>
   );
 }
@@ -467,14 +492,19 @@ export function SwarmPanes({
   );
 }
 
+/** Running tools shown at once; more are counted on one line. */
+const MAX_LIVE_TOOLS = 3;
+
 export function LiveArea({
   snap,
   todos,
   showPanes,
+  dialogOpen = false,
 }: {
   snap: UiSnapshot;
   todos: TodoItem[];
   showPanes: boolean;
+  dialogOpen?: boolean;
 }) {
   const t = useTheme();
   const running = snap.live.some((a) => a.running);
@@ -484,6 +514,24 @@ export function LiveArea({
   const { columns, rows } = useWindowSize();
   // Live reasoning: up to a fifth of the window, so the live area always fits on screen.
   const thoughtLines = Math.max(3, Math.min(8, Math.floor(rows / 5)));
+  // Everything below the transcript must stay shorter than the window: a taller frame scrolls its top into the
+  // terminal's history on every redraw, which shows up as repeated text. The reply gets what the rest leaves.
+  const todoMax = Math.max(3, Math.min(8, Math.floor(rows / 4)));
+  const tools = main?.tools ?? [];
+  const shownTools = tools.slice(-MAX_LIVE_TOOLS);
+  const toolRows =
+    shownTools.reduce(
+      (n, x) => n + 1 + Math.min(3, x.output ? x.output.trimEnd().split('\n').length : 0),
+      0,
+    ) + (tools.length > shownTools.length ? 1 : 0);
+  const chrome =
+    11 + // input box and its margin, footer, the status line and its margin, the reply's margin, slack
+    toolRows +
+    todoPanelHeight(todos, todoMax) +
+    (snap.browser.open ? 2 : 0) +
+    (snap.compacting ? 2 : 0);
+  const textRows = dialogOpen ? 3 : Math.max(3, rows - chrome);
+  const reply = main?.text ? fitTail(main.text, columns - 6, textRows - 1) : { text: '', hidden: 0 };
 
   return (
     <Box flexDirection="column">
@@ -499,7 +547,12 @@ export function LiveArea({
         )
       ) : null}
 
-      {!snap.swarmActive && main?.running && main.thought && !main.text && snap.showThinking ? (
+      {!snap.swarmActive &&
+      main?.running &&
+      main.thought &&
+      !main.thinkingUntil &&
+      !main.text &&
+      snap.showThinking ? (
         <Box marginTop={1} paddingLeft={1} flexDirection="column">
           <Text color={t.lavender}>
             {GLYPH.think} <Text color={t.faint}>thinking</Text>
@@ -529,13 +582,16 @@ export function LiveArea({
             <Text color={t.accent}>{GLYPH.tool}</Text>
           </Box>
           <Box flexDirection="column" flexGrow={1}>
-            <Markdown text={main.text} />
+            {reply.hidden ? (
+              <Text color={t.faint}>… {reply.hidden} lines above, printed when this block is finished</Text>
+            ) : null}
+            <Markdown text={reply.text} />
           </Box>
         </Box>
       ) : null}
 
       {!snap.swarmActive
-        ? main?.tools.map((x) => (
+        ? shownTools.map((x) => (
             <Box key={x.id} flexDirection="column" paddingLeft={1}>
               <Text>
                 <Text color={t.accent}>{spin} </Text>
@@ -554,7 +610,13 @@ export function LiveArea({
           ))
         : null}
 
-      <TodoPanel todos={todos} />
+      {!snap.swarmActive && tools.length > shownTools.length ? (
+        <Text color={t.faint}>
+          {'  '}+{tools.length - shownTools.length} more running
+        </Text>
+      ) : null}
+
+      <TodoPanel todos={todos} max={todoMax} />
 
       {snap.browser.open ? (
         <Box paddingLeft={1} marginTop={1}>
@@ -580,7 +642,9 @@ export function LiveArea({
       {running ? (
         <Box paddingLeft={1} marginTop={1}>
           <Text color={t.accent}>{spin} </Text>
-          <Text color={t.dim}>{snap.status ?? (main?.thinking ? 'Thinking' : 'Working')}… </Text>
+          <Text color={t.dim}>
+            {snap.status ?? (main?.thinking && !main.thinkingUntil ? 'Thinking' : 'Working')}…{' '}
+          </Text>
           <Text color={t.faint}>
             {elapsed(Date.now() - started)}
             {'   '}

@@ -10,6 +10,14 @@ First release of the ground-up rewrite (replaces the earlier turtlebot harness).
   tool calls are repaired; tool results are capped.
 - Providers: Anthropic and any OpenAI-compatible endpoint (llama.cpp, Ollama, LM Studio, Unsloth Studio, vLLM...).
   Context windows are detected from the server. No default model.
+- **No repeated text in the terminal**: a reply taller than the window used to leave copies of itself in the
+  scrollback on every redraw. Each finished line of a reply is now printed as it arrives, and the live area (the
+  unfinished part, the task list, running tools) always fits in the window.
+- **Compaction no longer restarts finished work**: the summary is marked as background rather than a new request,
+  separates what is done from what remains, is written knowing what happened after the part it compresses, and
+  carries the current task list.
+- **Task lists stay current**: the agent is reminded once if it finishes working while its list still shows open
+  items, and the list survives compaction.
 - **Replies can use the whole context**: by default each model call may write as much as fits in the context window
   after the prompt (`maxTokens: 0`), instead of a fixed 8192 tokens; long answers and long reasoning no longer get
   cut off early. Hosted APIs that cap output lower say so when they refuse, and the agent takes their figure and

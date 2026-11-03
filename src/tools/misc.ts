@@ -4,7 +4,10 @@ import { defineTool } from './types.js';
 export const todoTool = defineTool({
   name: 'todo_write',
   description:
-    'Maintain a visible task list for multi-step work. Send the complete list each time. Keep at most one item in_progress.',
+    'Maintain a visible task list for multi-step work. Send the complete list each time. Keep exactly one item ' +
+    'in_progress while working. Mark an item completed as soon as it is done (not in a batch at the end), and ' +
+    'before your final reply make sure the list matches what was actually built: items finished are completed, ' +
+    "items not done stay pending. Change an item's wording if what you built differs from the plan.",
   risk: 'agent',
   schema: z.object({
     todos: z.array(
@@ -18,7 +21,13 @@ export const todoTool = defineTool({
   async execute(input, ctx) {
     ctx.setTodos?.(input.todos);
     const done = input.todos.filter((t) => t.status === 'completed').length;
-    return { content: `Task list updated (${done}/${input.todos.length} done).` };
+    const next =
+      input.todos.find((t) => t.status === 'in_progress') ?? input.todos.find((t) => t.status === 'pending');
+    return {
+      content:
+        `Task list updated (${done}/${input.todos.length} done).` +
+        (next ? ` Next: ${next.content}. Update the list again as soon as that is done.` : ''),
+    };
   },
 });
 

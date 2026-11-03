@@ -1,5 +1,5 @@
 import type { AgentEvent } from '../agent/agent.js';
-import type { Agent } from '../agent/agent.js';
+import { TODO_CHECK, type Agent } from '../agent/agent.js';
 import type { BrowserEvent } from '../browser/service.js';
 import type { Message } from '../llm/types.js';
 import type { Swarm } from '../swarm/swarm.js';
@@ -10,7 +10,8 @@ export type Level = 'info' | 'warn' | 'error' | 'success';
 
 export type Item =
   | { id: number; kind: 'user'; text: string }
-  | { id: number; kind: 'assistant'; text: string; agent: string }
+  /** `cont`: a later part of a reply whose start is already printed (`gap`: a blank line comes before it). */
+  | { id: number; kind: 'assistant'; text: string; agent: string; cont?: boolean; gap?: boolean }
   | {
       id: number;
       kind: 'tool';
@@ -72,6 +73,22 @@ export interface UiSnapshot {
 
 /** How much live reasoning to keep per agent: enough to show its tail, not the whole essay. */
 const THOUGHT_TAIL = 6000;
+
+/**
+ * How much of a reply being streamed is final and can be printed for good: whole lines, but never part of a
+ * code block or a table that is still open (they are printed whole, once they end).
+ */
+export function settledLength(text: string): number {
+  let cut = 0;
+  let inFence = false;
+  for (let pos = 0, nl = text.indexOf('\n'); nl !== -1; pos = nl + 1, nl = text.indexOf('\n', pos)) {
+    const line = text.slice(pos, nl);
+    if (/^\s*```/.test(line)) inFence = !inFence;
+    if (inFence || /^\s*\|/.test(line)) continue;
+    cut = nl + 1;
+  }
+  return cut;
+}
 
 /** A first line of tool output worth showing under the tool call. */
 export function summarize(name: string, r: ToolResult): { summary: string; detail?: string } {
@@ -137,8 +154,15 @@ export class UiStore {
   private compacting: { pct: number } | undefined;
   private showThinking = false;
   private swarmBudget: { used: number; limit: number } | undefined;
+  /** Per agent, for replies printed line by line: whether part is printed, and the full reasoning so far. */
+  private streamed = new Map<string, { printed: boolean; thought: string }>();
 
-  constructor() {
+  /**
+   * `printAsStreamed`: print each finished line of a reply as it arrives, so only the unfinished part stays in
+   * the live area (the terminal UI: a live area taller than the window leaves copies behind in scrollback).
+   * Swarm agents' replies are still printed whole, so the agents' lines do not interleave.
+   */
+  constructor(private opts: { printAsStreamed?: boolean } = {}) {
     this.snapshot = this.build();
   }
 
@@ -308,32 +332,42 @@ export class UiStore {
         a.startedAt = Date.now();
         a.text = '';
         clearThinking(a);
+        this.streamed.delete(name);
         break;
       case 'text':
         if (a.thinkingSince && !a.thinkingUntil) a.thinkingUntil = Date.now();
         a.text += e.delta;
+        if (this.opts.printAsStreamed && !inSwarm) this.printSettled(name, a);
         break;
-      case 'thinking':
+      case 'thinking': {
         a.thinking += e.delta.length;
         a.thinkingSince ??= Date.now();
         a.thought = (a.thought + e.delta).slice(-THOUGHT_TAIL);
+        const s = this.streamed.get(name) ?? { printed: false, thought: '' };
+        s.thought += e.delta;
+        this.streamed.set(name, s);
         break;
+      }
       case 'assistant': {
-        // Commit the reasoning and the streamed text once the message is complete.
-        const thought = e.message.content
-          .map((b) => (b.type === 'thinking' ? b.text : ''))
-          .join('')
-          .trim();
-        if (thought) {
-          const ms = a.thinkingSince ? (a.thinkingUntil ?? Date.now()) - a.thinkingSince : 0;
-          this.push({ kind: 'thinking', agent: name, text: thought, ms });
+        const s = this.streamed.get(name);
+        this.streamed.delete(name);
+        if (s?.printed) {
+          // The start of this reply is printed already: print what is left of it.
+          this.pushPart(name, a.text, true);
+        } else {
+          // Commit the reasoning and the streamed text once the message is complete.
+          const thought = e.message.content
+            .map((b) => (b.type === 'thinking' ? b.text : ''))
+            .join('')
+            .trim();
+          this.pushThought(name, a, thought);
+          const text = e.message.content
+            .filter((b) => b.type === 'text')
+            .map((b) => b.text)
+            .join('')
+            .trim();
+          if (text) this.push({ kind: 'assistant', text, agent: name });
         }
-        const text = e.message.content
-          .filter((b) => b.type === 'text')
-          .map((b) => b.text)
-          .join('')
-          .trim();
-        if (text) this.push({ kind: 'assistant', text, agent: name });
         a.text = '';
         clearThinking(a);
         break;
@@ -430,6 +464,41 @@ export class UiStore {
   }
 
   private perAgent = new Map<string, { input: number; output: number }>();
+
+  private pushThought(name: string, a: LiveAgent, thought: string): void {
+    if (!thought) return;
+    const ms = a.thinkingSince ? (a.thinkingUntil ?? Date.now()) - a.thinkingSince : 0;
+    this.push({ kind: 'thinking', agent: name, text: thought, ms });
+  }
+
+  /** Print the finished lines of a reply being streamed; the rest stays live. */
+  private printSettled(name: string, a: LiveAgent): void {
+    // Trailing blank lines wait, so the spacing is printed with the line that follows them.
+    const part = a.text.slice(0, settledLength(a.text)).replace(/\n(?:[ \t]*\n)+$/, '\n');
+    if (!part.trim()) return;
+    const s = this.streamed.get(name) ?? { printed: false, thought: '' };
+    if (!s.printed) this.pushThought(name, a, s.thought.trim());
+    this.pushPart(name, part, s.printed);
+    s.printed = true;
+    this.streamed.set(name, s);
+    a.text = a.text.slice(part.length);
+  }
+
+  private pushPart(name: string, part: string, cont: boolean): void {
+    const gap = cont && /^[ \t]*\n/.test(part);
+    const text = part
+      .replace(/^(?:[ \t]*\n)+/, '')
+      .replace(/\n$/, '')
+      .trimEnd();
+    if (!text.trim()) return;
+    this.push({
+      kind: 'assistant',
+      text,
+      agent: name,
+      ...(cont ? { cont: true } : {}),
+      ...(gap ? { gap: true } : {}),
+    });
+  }
 }
 
 type DistributiveOmit<T, K extends keyof never> = T extends unknown ? Omit<T, K> : never;
@@ -443,8 +512,9 @@ export function replayInto(store: UiStore, messages: Message[]): void {
       if (b.type === 'thinking' && b.text.trim()) {
         store.push({ kind: 'thinking', agent: 'main', text: b.text.trim(), ms: 0 });
       } else if (b.type === 'text') {
-        if (m.role === 'user') store.user(b.text);
-        else store.push({ kind: 'assistant', text: b.text, agent: 'main' });
+        if (m.role === 'user') {
+          if (!b.text.startsWith(TODO_CHECK)) store.user(b.text);
+        } else store.push({ kind: 'assistant', text: b.text, agent: 'main' });
       } else if (b.type === 'tool_use') {
         calls.set(b.id, { name: b.name, description: JSON.stringify(b.input).slice(0, 80) });
       } else if (b.type === 'tool_result') {
