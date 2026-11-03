@@ -144,7 +144,7 @@ async function customTeam(words: string[], c: CmdCtx): Promise<void> {
       })),
       1,
     );
-    if (!count) return;
+    if (!count) return store.notice('Team not started.');
     const OWN = '__own__';
     const choose = async (title: string, lead: boolean, n: number): Promise<TeamSlot | undefined> => {
       const key = await pick<string>(c, title, [
@@ -160,11 +160,11 @@ async function customTeam(words: string[], c: CmdCtx): Promise<void> {
     };
     slots = [];
     const lead = await choose('Who leads? The lead talks to you and hands out the work.', true, 1);
-    if (!lead) return;
+    if (!lead) return store.notice('Team not started.');
     slots.push(lead);
     for (let i = 2; i <= count; i++) {
       const s = await choose(`Agent ${i} of ${count}: what does it do?`, false, i);
-      if (!s) return;
+      if (!s) return store.notice('Team not started.');
       slots.push(s);
     }
   }
@@ -428,7 +428,7 @@ export const BUILTINS: BuiltinCommand[] = [
         ];
         scope = await pick(
           c,
-          'Delete which saved conversations and swarms? The current conversation is always kept.',
+          'Delete which saved conversations and swarms? The current one, and anything used in the last 15 minutes, is always kept.',
           options.map((o) => ({ ...o, hint: describePlan(runtime.flushPlan(o.value)) })),
         );
       }

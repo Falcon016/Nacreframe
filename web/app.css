@@ -873,6 +873,17 @@ textarea::placeholder {
   max-height: 420px;
   overflow-y: auto;
 }
+.thought.live .body {
+  margin-top: 0;
+  max-height: 7.5em;
+  overflow: hidden;
+  /* Fade the oldest line out at the top as new text arrives at the bottom. */
+  -webkit-mask-image: linear-gradient(to bottom, transparent, #000 1.6em);
+  mask-image: linear-gradient(to bottom, transparent, #000 1.6em);
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+}
 .thinking {
   color: var(--fg-3);
   font-size: 13.5px;

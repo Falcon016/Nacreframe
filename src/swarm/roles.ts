@@ -102,6 +102,8 @@ export const ROLES: RoleTemplate[] = [
 export const roleByKey = (key: string): RoleTemplate | undefined =>
   ROLES.find((r) => r.key === key.toLowerCase());
 
+const RESERVED = new Set(['you', 'system', 'all', 'main', 'user']);
+
 /** A teammate's slot in a team being put together: a role from the list, or one the user wrote. */
 export type TeamSlot = { template: RoleTemplate } | { name: string; role: string };
 
@@ -118,9 +120,11 @@ export function assembleTeam(slots: TeamSlot[]): SwarmAgentConfig[] {
         .replace(/[^a-z0-9_-]+/g, '-')
         .replace(/^[^a-z]+/, '')
         .slice(0, 20) || 'agent';
-    const n = (used.get(clean) ?? 0) + 1;
-    used.set(clean, n);
-    return n === 1 ? clean : `${clean}-${n}`;
+    // Names the channel already uses for people and broadcasts cannot be agents.
+    const safe = RESERVED.has(clean) ? `${clean}-agent` : clean;
+    const n = (used.get(safe) ?? 0) + 1;
+    used.set(safe, n);
+    return n === 1 ? safe : `${safe}-${n}`;
   };
   const names = slots.map((s) => unique('template' in s ? s.template.key : s.name));
   const lead = names[0]!;

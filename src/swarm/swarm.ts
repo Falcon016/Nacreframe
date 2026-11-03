@@ -39,7 +39,13 @@ interface Slot {
   spoke: boolean;
   /** The text of the agent's latest assistant message this turn: its report if it sends none itself. */
   lastText: string;
+  /** Turns in a row that ended in an error (the model server down, a bad response...). */
+  failures: number;
+  lastError?: string;
 }
+
+/** After this many failed turns in a row from one agent, the team pauses instead of retrying forever. */
+const MAX_FAILURES = 3;
 
 /** The text blocks of an assistant message. */
 function textOf(message: Message): string {
@@ -72,6 +78,8 @@ export class Swarm {
   private nextId = 1;
   /** Agent-to-agent messages since the user last spoke. */
   private used = 0;
+  /** Set when an agent keeps failing: agents are held until the user speaks. */
+  private halted = false;
   private limit: number;
   private exhaustedNotified = false;
   private persistTimer: NodeJS.Timeout | undefined;
@@ -124,15 +132,18 @@ export class Swarm {
       pending: [...(this.state?.pending[cfg.name] ?? [])],
       spoke: false,
       lastText: '',
+      failures: 0,
     };
     agent.events.on('event', (event) => {
       this.events.emit('agent_event', { name: cfg.name, event });
       if (event.type === 'turn_start') {
         slot.spoke = false;
         slot.lastText = '';
+        delete slot.lastError;
         this.events.emit('agent_status', { name: cfg.name, running: true });
       }
       if (event.type === 'assistant') slot.lastText = textOf(event.message) || slot.lastText;
+      if (event.type === 'error') slot.lastError = event.message;
       if (event.type === 'turn_end') {
         this.events.emit('agent_status', { name: cfg.name, running: false });
         this.afterTurn(slot, event.stopReason);
@@ -171,7 +182,12 @@ export class Swarm {
         }
         return this.route(name, text, to)
           ? { ok: true, ...(note ? { note } : {}) }
-          : { ok: false, error: 'Message budget exhausted; wait for the user.' };
+          : {
+              ok: false,
+              error: this.halted
+                ? 'The team is paused until the user speaks.'
+                : 'Message budget exhausted; wait for the user.',
+            };
       },
       note: (k, v) => {
         this.notesStore[k] = v;
@@ -195,6 +211,8 @@ export class Swarm {
   say(text: string, to?: string): void {
     this.used = 0;
     this.exhaustedNotified = false;
+    this.halted = false;
+    for (const s of this.slots.values()) s.failures = 0;
     this.emitBudget();
     this.route(USER, text, to);
   }
@@ -232,10 +250,26 @@ export class Swarm {
    * team does not stall waiting for a message that will never come.
    */
   private afterTurn(slot: Slot, stop: string): void {
-    if (stop === 'aborted' || stop === 'paused' || slot.spoke) return;
+    if (stop === 'aborted' || stop === 'paused') return;
     const name = slot.cfg.name;
-    const text = slot.lastText;
     const lead = this.lead;
+    const failed = stop === 'other' && !!slot.lastError;
+    if (failed) {
+      slot.failures++;
+      // With no message limit, a teammate whose model keeps failing would otherwise be re-woken forever.
+      if (slot.failures >= MAX_FAILURES) {
+        this.halted = true;
+        this.system(
+          `${name} failed ${slot.failures} times in a row (${slot.lastError}). The team is paused until you speak.`,
+        );
+        return;
+      }
+    } else slot.failures = 0;
+    if (slot.spoke) return;
+    let text = slot.lastText;
+    if (failed) text = `(${name}'s turn failed: ${slot.lastError})${text ? `\n${text}` : ''}`;
+    else if (stop === 'max_iterations')
+      text = `${text ? `${text}\n` : ''}(${name} stopped at the tool-call limit for one turn; the work may be unfinished)`;
     if (name === lead) {
       // The lead's plain reply is its answer to the user, unless a line of it is addressed to a teammate
       // ("@builder add the tests"). A passing mention ("thanks to @builder") is not a hand-off.
@@ -243,7 +277,7 @@ export class Swarm {
         const m = /^\s*@([a-z][a-z0-9_-]*)/i.exec(l);
         return !!m && m[1]!.toLowerCase() !== name && this.slots.has(m[1]!.toLowerCase());
       });
-      if (handoff) this.route(name, text, undefined, { auto: true });
+      if (handoff && !failed) this.route(name, text, undefined, { auto: true });
       return;
     }
     if (!lead) return;
@@ -269,6 +303,7 @@ export class Swarm {
     opts: { auto?: boolean; wake?: boolean } = {},
   ): boolean {
     if (from !== USER) {
+      if (this.halted) return false;
       if (this.limit && this.used >= this.limit) {
         if (!this.exhaustedNotified) {
           this.exhaustedNotified = true;

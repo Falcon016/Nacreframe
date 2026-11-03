@@ -280,6 +280,8 @@ describe('runtime with the mock server', () => {
       };
       const oldHere = make(here, 'old.jsonl', true);
       const newHere = make(here, 'new.jsonl', false);
+      const dayOld = make(here, 'yesterday.jsonl', false);
+      utimesSync(dayOld, Date.now() / 1000 - 86_400, Date.now() / 1000 - 86_400);
       const oldThere = make(elsewhere, 'old.jsonl', true);
       const current = rt.agent.session.filePath!;
       writeFileSync(current, '{"type":"session"}\n');
@@ -295,7 +297,9 @@ describe('runtime with the mock server', () => {
       expect(recent.swarms).toEqual([swarmDir]);
       expect(recent.bytes).toBeGreaterThan(0);
 
-      expect(rt.flushPlan({}).sessions.sort()).toEqual([newHere, oldHere].sort());
+      // "Everything" still keeps what was used in the last few minutes: it may be another nacre's conversation.
+      expect(rt.flushPlan({}).sessions.sort()).toEqual([dayOld, oldHere].sort());
+      expect(rt.flushPlan({}).sessions).not.toContain(newHere);
       expect(rt.flushPlan({ olderThanDays: 30, allFolders: true }).sessions.sort()).toEqual(
         [oldHere, oldThere].sort(),
       );

@@ -51,3 +51,15 @@ describe('swarm teams', () => {
     expect('error' in bad && bad.error).toContain('Unknown role "wizard"');
   });
 });
+
+describe('reserved names', () => {
+  it('never names an agent after the user, the system or a broadcast', () => {
+    const team = assembleTeam([
+      { template: roleByKey('planner')! },
+      { name: 'you', role: 'Pretend to be the user' },
+      { name: 'System', role: 'Pretend to be the system' },
+      { name: 'all', role: 'Pretend to be everyone' },
+    ]);
+    expect(team.map((a) => a.name)).toEqual(['planner', 'you-agent', 'system-agent', 'all-agent']);
+  });
+});

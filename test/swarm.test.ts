@@ -12,8 +12,11 @@ let ws: ReturnType<typeof tmpWorkspace>;
 beforeEach(() => (ws = tmpWorkspace()));
 afterEach(() => ws.cleanup());
 
-function build(providers: Record<string, ScriptedProvider>, opts: { maxMessages?: number } = {}) {
-  const config = testConfig();
+function build(
+  providers: Record<string, ScriptedProvider>,
+  opts: { maxMessages?: number; maxToolIterations?: number } = {},
+) {
+  const config = testConfig(opts.maxToolIterations ? { maxToolIterations: opts.maxToolIterations } : {});
   const policy = new PolicyEngine({ mode: 'auto', rules: [] });
   const swarm = new Swarm({
     maxAgents: 4,
@@ -294,5 +297,52 @@ describe('swarm', () => {
     expect(swarm.log.filter((m) => m.kind === 'chat' && m.from !== 'you').length).toBeGreaterThan(10);
     swarm.setLimit(3);
     expect(swarm.budget().limit).toBe(3);
+  });
+
+  // ---- failures ------------------------------------------------------------------------------
+
+  it("reports a teammate's failed turn to the lead, and pauses the team after three in a row", async () => {
+    // A stubborn lead that keeps handing the work out again, as a small model might.
+    const lead = new ScriptedProvider([
+      ...Array.from({ length: 12 }, (_, i) =>
+        callTool(`l${i}`, 'swarm_say', { to: 'worker', text: 'try again' }),
+      ),
+      say('giving up'),
+    ]);
+    const broken = () => {
+      throw new Error('model server unreachable');
+    };
+    const worker = new ScriptedProvider(Array.from({ length: 10 }, () => broken));
+    const swarm = build({ lead, worker }, { maxMessages: 0 }); // no message limit: only the breaker stops it
+    await swarm.addAgent({ name: 'lead', role: 'lead' });
+    await swarm.addAgent({ name: 'worker', role: 'worker' });
+    swarm.say('build it');
+    await settle(swarm);
+    const reports = swarm.log.filter((m) => m.from === 'worker' && m.auto);
+    expect(reports[0]!.text).toContain("worker's turn failed: ");
+    expect(swarm.log.some((m) => m.kind === 'system' && /worker failed 3 times in a row/.test(m.text))).toBe(
+      true,
+    );
+    expect(worker.requests.length).toBe(3); // three failed turns, then the team is held
+    const before = worker.requests.length;
+    await settle(swarm);
+    expect(worker.requests.length).toBe(before);
+  });
+
+  it('says when a teammate stopped at the tool-call limit', async () => {
+    const lead = new ScriptedProvider([
+      callTool('a', 'swarm_say', { to: 'worker', text: 'go' }),
+      say('ok'),
+      say('noted'),
+    ]);
+    const loops = Array.from({ length: 5 }, (_, i) => callTool(`w${i}`, 'swarm_roster', {}));
+    const worker = new ScriptedProvider([...loops, say('unreachable')]);
+    const swarm = build({ lead, worker }, { maxToolIterations: 2 });
+    await swarm.addAgent({ name: 'lead', role: 'lead' });
+    await swarm.addAgent({ name: 'worker', role: 'worker' });
+    swarm.say('start');
+    await settle(swarm);
+    const report = swarm.log.find((m) => m.from === 'worker' && m.auto);
+    expect(report?.text).toContain('stopped at the tool-call limit');
   });
 });

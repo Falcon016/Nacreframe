@@ -67,6 +67,9 @@ Agents use these tools: `swarm_say`, `swarm_roster`, `swarm_note` / `swarm_notes
   `/swarm custom` asks for this limit and the per-turn tool-call limit each time and saves your answers;
   `/swarm limit` changes them any time (`/swarm limit 250`, `/swarm limit off` for none). With local models,
   where tokens cost nothing, a high limit or none is reasonable; a confused team then runs until you press esc.
+- **Failures.** If a teammate's turn fails (for example the model server stops answering), the lead is told. After
+  three failures in a row from the same agent the team pauses until you speak, so a broken model is not retried
+  forever, even with no message limit.
 - **Shared workspace.** Agents edit the same files. `write`/`edit` use per-file locks and atomic writes, and refuse to
   modify a file that changed since _that agent_ last read it, so concurrent edits fail loudly instead of clobbering.
 - **One approval queue.** Every agent's approval requests appear in one prompt, labelled with the agent, in arrival order.

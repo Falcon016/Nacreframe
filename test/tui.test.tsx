@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, utimesSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { PassThrough } from 'node:stream';
 import { render } from 'ink';
@@ -299,6 +299,8 @@ describe('interactive UI', () => {
       mkdirSync(saved, { recursive: true });
       const other = join(saved, 'older.jsonl');
       writeFileSync(other, '{"type":"session"}\n');
+      const hourAgo = Date.now() / 1000 - 3600; // /flush keeps anything used in the last 15 minutes
+      utimesSync(other, hourAgo, hourAgo);
       await ui.type('/flush all');
       ui.key('\r');
       await until(() => ui.screen().includes('cannot be undone'));
@@ -365,6 +367,27 @@ describe('interactive UI', () => {
       await ui.type('/update');
       ui.key('\r');
       await until(() => /cannot update itself|POSIX installer/.test(ui.screen()));
+    } finally {
+      await ui.stop();
+    }
+  });
+
+  it('streams reasoning as wrapped lines while the model thinks', async () => {
+    const ui = await boot();
+    try {
+      await until(() => ui.screen().includes('nacreframe'));
+      await ui.type('/thinking on');
+      ui.key('\r');
+      await until(() => ui.screen().includes('Showing thinking'));
+      await ui.type('deliberate please');
+      ui.key('\r');
+      // Mid-stream, the live block holds whole wrapped lines from the start of the reasoning, not a sliding tail.
+      // The first paragraph has no line break, yet it already spans two lines of the live block.
+      await until(() =>
+        /│ Let me work through this carefully before answering\.[^\n]*\n\s*│ \w/.test(ui.screen()),
+      );
+      expect(ui.screen()).not.toContain('Deliberated: the plan is ready.'); // still thinking at that point
+      await until(() => ui.screen().includes('Deliberated: the plan is ready.'));
     } finally {
       await ui.stop();
     }
