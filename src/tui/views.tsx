@@ -139,11 +139,77 @@ export function Banner({ info }: { info: BannerInfo }) {
   );
 }
 
-export function ItemView({ item, banner }: { item: Item; banner: BannerInfo }) {
+const MAX_THOUGHT_LINES = 40;
+
+const fmtSeconds = (ms: number) => (ms >= 1000 ? `${Math.round(ms / 1000)}s` : '<1s');
+
+/**
+ * An agent's reasoning. Hidden (the default) it is one quiet line, so you know it happened and how long it
+ * took. Shown (/thinking or ctrl+t) it is set off by a rule in the agent's colour, in a quieter italic than
+ * the answer, so it reads as working notes rather than as the reply.
+ */
+export function ThinkingView({
+  agent,
+  text,
+  ms,
+  shown,
+}: {
+  agent: string;
+  text: string;
+  ms: number;
+  shown: boolean;
+}) {
+  const t = useTheme();
+  const c = agent === 'main' ? t.lavender : agentColor(t, agent);
+  const header = (
+    <Text>
+      <Text color={c}>{GLYPH.think}</Text>
+      <Text color={t.faint}>
+        {' '}
+        {agent === 'main' ? '' : `${agent} `}thought{ms ? ` for ${fmtSeconds(ms)}` : ''}
+      </Text>
+    </Text>
+  );
+  if (!shown) return <Box paddingLeft={1}>{header}</Box>;
+  const lines = text.split('\n');
+  const extra = lines.length - MAX_THOUGHT_LINES;
+  return (
+    <Box marginTop={1} paddingLeft={1} flexDirection="column">
+      {header}
+      <Box
+        marginLeft={1}
+        paddingLeft={1}
+        borderStyle="single"
+        borderTop={false}
+        borderRight={false}
+        borderBottom={false}
+        borderColor={c}
+        flexDirection="column"
+      >
+        <Text color={t.dim} italic wrap="wrap">
+          {lines.slice(0, MAX_THOUGHT_LINES).join('\n')}
+        </Text>
+        {extra > 0 ? <Text color={t.faint}>… {extra} more lines (/export saves all of it)</Text> : null}
+      </Box>
+    </Box>
+  );
+}
+
+export function ItemView({
+  item,
+  banner,
+  showThinking = false,
+}: {
+  item: Item;
+  banner: BannerInfo;
+  showThinking?: boolean;
+}) {
   const t = useTheme();
   switch (item.kind) {
     case 'banner':
       return <Banner info={banner} />;
+    case 'thinking':
+      return <ThinkingView agent={item.agent} text={item.text} ms={item.ms} shown={showThinking} />;
     case 'user':
       return (
         <Box marginTop={1} paddingLeft={1}>
@@ -271,13 +337,25 @@ function AgentChip({ a, spin }: { a: LiveAgent; spin: string }) {
       <Text color={c}>
         {a.running ? spin : '○'} {a.name}
       </Text>
-      {a.running && a.lastTool ? <Text color={t.faint}> {a.lastTool.slice(0, 28)}</Text> : null}
+      {a.running && a.thought && !a.text ? (
+        <Text color={t.faint}> {GLYPH.think} thinking</Text>
+      ) : a.running && a.lastTool ? (
+        <Text color={t.faint}> {a.lastTool.slice(0, 28)}</Text>
+      ) : null}
     </Text>
   );
 }
 
 /** Split view: one pane per agent, live. */
-export function SwarmPanes({ agents, spin }: { agents: LiveAgent[]; spin: string }) {
+export function SwarmPanes({
+  agents,
+  spin,
+  showThinking,
+}: {
+  agents: LiveAgent[];
+  spin: string;
+  showThinking: boolean;
+}) {
   const t = useTheme();
   const { columns, rows } = useWindowSize();
   // The live area is redrawn in place, which only works while it fits on screen: anything taller scrolls
@@ -297,7 +375,10 @@ export function SwarmPanes({ agents, spin }: { agents: LiveAgent[]; spin: string
     <Box flexDirection="row" paddingX={1} marginTop={1}>
       {agents.map((a) => {
         const c = agentColor(t, a.name, a.color);
-        const body = a.text ? tail(a.text, Math.max(1, height - 4)) : [];
+        const room = Math.max(1, height - 4);
+        const body = a.text ? tail(a.text, room) : [];
+        // While an agent reasons, its pane shows the latest of it (or just that it is thinking).
+        const thinking = a.running && !a.text && !!a.thought;
         return (
           <Box
             key={a.name}
@@ -326,6 +407,18 @@ export function SwarmPanes({ agents, spin }: { agents: LiveAgent[]; spin: string
                 {l}
               </Text>
             ))}
+            {thinking ? (
+              <Text color={c} wrap="truncate-end">
+                {GLYPH.think} <Text color={t.faint}>thinking</Text>
+              </Text>
+            ) : null}
+            {thinking && showThinking
+              ? tail(a.thought, Math.max(1, room - 1)).map((l, i) => (
+                  <Text key={`t${i}`} color={t.dim} italic wrap="truncate-start">
+                    {l}
+                  </Text>
+                ))
+              : null}
             {!a.running && !body.length ? <Text color={t.faint}>idle</Text> : null}
           </Box>
         );
@@ -353,7 +446,7 @@ export function LiveArea({
     <Box flexDirection="column">
       {snap.swarmActive ? (
         showPanes ? (
-          <SwarmPanes agents={snap.live} spin={spin} />
+          <SwarmPanes agents={snap.live} spin={spin} showThinking={snap.showThinking} />
         ) : (
           <Box paddingLeft={1} marginTop={1} gap={2}>
             {snap.live.map((a) => (
@@ -361,6 +454,31 @@ export function LiveArea({
             ))}
           </Box>
         )
+      ) : null}
+
+      {!snap.swarmActive && main?.running && main.thought && !main.text && snap.showThinking ? (
+        <Box marginTop={1} paddingLeft={1} flexDirection="column">
+          <Text color={t.lavender}>
+            {GLYPH.think} <Text color={t.faint}>thinking</Text>
+          </Text>
+          <Box
+            marginLeft={1}
+            paddingLeft={1}
+            borderStyle="single"
+            borderTop={false}
+            borderRight={false}
+            borderBottom={false}
+            borderColor={t.lavender}
+            flexDirection="column"
+          >
+            {/* The newest words matter most: long lines are cut at the start, not the end. */}
+            {tail(main.thought, 4).map((l, i) => (
+              <Text key={i} color={t.dim} italic wrap="truncate-start">
+                {l}
+              </Text>
+            ))}
+          </Box>
+        </Box>
       ) : null}
 
       {!snap.swarmActive && main?.text ? (
@@ -470,6 +588,12 @@ export function Footer({
           <Text color={t.gold}>
             {'   '}
             {queued} queued
+          </Text>
+        ) : null}
+        {snap.showThinking ? (
+          <Text color={t.lavender}>
+            {'   '}
+            {GLYPH.think} thinking shown
           </Text>
         ) : null}
       </Text>

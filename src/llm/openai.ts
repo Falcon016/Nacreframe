@@ -42,6 +42,7 @@ export class OpenAICompatProvider implements Provider {
     // OpenAI streams tool calls by index; map index -> our stable id.
     const calls = new Map<number, { id: string; started: boolean; name: string; pending: string }>();
     let stop: StopReason = 'other';
+    const think = new ThinkTagSplitter();
     for await (const sse of parseSse(res.body, req.signal)) {
       if (sse.data === '[DONE]') break;
       let chunk: Chunk;
@@ -65,7 +66,8 @@ export class OpenAICompatProvider implements Provider {
       const d = choice.delta;
       const reasoning = d?.reasoning_content ?? d?.reasoning;
       if (reasoning) yield { type: 'thinking', delta: reasoning };
-      if (d?.content) yield { type: 'text', delta: d.content };
+      // Some local models write their reasoning inline as <think>...</think> instead of a separate field.
+      if (d?.content) yield* think.push(d.content);
       for (const tc of d?.tool_calls ?? []) {
         const idx = tc.index ?? 0;
         let c = calls.get(idx);
@@ -86,6 +88,7 @@ export class OpenAICompatProvider implements Provider {
       }
       if (choice.finish_reason) stop = mapStop(choice.finish_reason, calls.size > 0);
     }
+    yield* think.flush();
     // Some local servers report finish_reason "stop" even when calling tools.
     if (calls.size > 0 && stop !== 'max_tokens') stop = 'tool_use';
     yield { type: 'done', stopReason: stop };
@@ -251,4 +254,67 @@ interface Chunk {
       tool_calls?: { index?: number; id?: string; function?: { name?: string; arguments?: string } }[];
     };
   }[];
+}
+
+/**
+ * Splits streamed content into reasoning and answer when a model wraps its reasoning in <think> tags (Qwen,
+ * DeepSeek-R1 and others, when the server does not separate it out). Tags can arrive split across chunks, so
+ * anything that might be the start of a tag is held back until the next chunk decides it.
+ */
+export class ThinkTagSplitter {
+  private buf = '';
+  private inThink = false;
+  /** Only reasoning at the very start of a reply counts; a "<think>" later on is just text. */
+  private seenText = false;
+
+  *push(chunk: string): Generator<StreamEvent> {
+    this.buf += chunk;
+    for (;;) {
+      const tag = this.inThink ? '</think>' : '<think>';
+      if (!this.inThink && this.seenText) {
+        if (this.buf) yield { type: 'text', delta: this.buf };
+        this.buf = '';
+        return;
+      }
+      const i = this.buf.indexOf(tag);
+      if (i >= 0) {
+        const before = this.buf.slice(0, i);
+        if (this.inThink) {
+          if (before) yield { type: 'thinking', delta: before };
+        } else if (before.trim()) {
+          // Text came first: this reply has no leading reasoning block.
+          this.seenText = true;
+          continue;
+        }
+        this.buf = this.buf.slice(i + tag.length);
+        if (this.inThink) this.buf = this.buf.replace(/^\s+/, ''); // the answer starts after the block
+        this.inThink = !this.inThink;
+        if (!this.inThink) this.seenText = true;
+        continue;
+      }
+      // Keep a possible partial tag at the end for the next chunk.
+      let keep = 0;
+      for (let k = Math.min(tag.length - 1, this.buf.length); k > 0; k--) {
+        if (tag.startsWith(this.buf.slice(-k))) {
+          keep = k;
+          break;
+        }
+      }
+      const out = this.buf.slice(0, this.buf.length - keep);
+      this.buf = this.buf.slice(this.buf.length - keep);
+      if (out) {
+        if (this.inThink) yield { type: 'thinking', delta: out };
+        else if (out.trim()) {
+          this.seenText = true;
+          yield { type: 'text', delta: out };
+        } else this.buf = out + this.buf; // leading whitespace before a possible <think>
+      }
+      return;
+    }
+  }
+
+  *flush(): Generator<StreamEvent> {
+    if (this.buf) yield { type: this.inThink ? 'thinking' : 'text', delta: this.buf };
+    this.buf = '';
+  }
 }

@@ -115,6 +115,18 @@ describe.skipIf(!channel)('web dashboard in a real browser', () => {
     await shot('03-conversation');
   });
 
+  it('shows reasoning as one quiet line that opens to the full text', async () => {
+    await page.fill('#input', 'think about it');
+    await page.keyboard.press('Enter');
+    await page.waitForSelector('details.thought');
+    const thought = page.locator('details.thought').last();
+    expect(await thought.locator('summary').innerText()).toContain('thought');
+    expect(await thought.locator('.body').isVisible()).toBe(false);
+    await thought.locator('summary').click();
+    expect(await thought.locator('.body').innerText()).toContain('Step one: read the request.');
+    await page.waitForSelector('.msg-assistant:has-text("the answer is 42")');
+  });
+
   it('asks for approval in ask mode and acts on the keyboard shortcut', async () => {
     await page.selectOption('#mode', 'ask');
     await page.waitForFunction(() => document.querySelector('#mode')?.className === 'mode-ask');

@@ -52,8 +52,15 @@ The same settings exist as environment variables: `NACRE_REF`, `NACRE_INSTALL_DI
 
 ### Updating and uninstalling
 
-Run the same command again to update. It fetches the version you asked for (`main` by default), rebuilds only if
-something changed, and does not repeat the `PATH` entry.
+Update from inside Nacreframe with `/update`, or from a shell with `nacre update` (`nacre update --check` only
+looks). It checks the branch you installed from (`main` unless you used `--ref`), shows the new version and the
+latest change, and asks before installing. After `/update` you can restart straight into the new version; it
+continues the conversation you were in (a swarm comes back with `/swarm resume`). Your settings, keys and saved
+conversations are not touched.
+
+Running the install command again does the same thing. It rebuilds only if something changed and does not repeat
+the `PATH` entry. Copies made by hand (`git clone` + `npm link`) update with `git pull && npm ci && npm run build`;
+`/update` says so instead of touching them.
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/Falcon016/Nacreframe/main/install.sh | sh -s -- --uninstall

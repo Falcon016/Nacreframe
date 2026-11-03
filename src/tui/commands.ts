@@ -7,6 +7,7 @@ import { projectKey } from '../paths.js';
 import type { Runtime } from '../runtime.js';
 import { SWARM_PRESETS, type FlushPlan } from '../runtime.js';
 import { assembleTeam, parseTeam, PRESET_SUMMARY, roleByKey, ROLES, type TeamSlot } from '../swarm/roles.js';
+import { checkForUpdate, requestRelaunch, runUpdate, short } from '../update.js';
 import { BIN } from '../version.js';
 import type { Choice } from './dialogs.js';
 import { replayInto, type UiStore } from './store.js';
@@ -28,6 +29,8 @@ export interface CmdCtx {
   overlay(o: Overlay): void;
   exit(): void;
   togglePanes(): void;
+  /** Show (true), hide (false) or flip (undefined) agents' reasoning. */
+  setThinking(on?: boolean): void;
   refresh(): void;
   /** Ask the user for a line of text; undefined if they skip it. */
   ask(question: string): Promise<string | undefined>;
@@ -268,6 +271,75 @@ export const BUILTINS: BuiltinCommand[] = [
         initial: SANDBOXES.indexOf(runtime.sandbox.mode),
         onSelect: set,
       });
+    },
+  },
+  {
+    name: 'update',
+    description: 'Update Nacreframe to the latest version',
+    async run(_a, c) {
+      const { runtime, store } = c;
+      if (runtime.agent.isRunning || runtime.swarm?.names.some((n) => runtime.swarm?.agent(n)?.isRunning))
+        return store.notice('Wait for the agents to finish (or press esc) before updating.', 'warn');
+      store.notice('Checking for updates…');
+      const r = await checkForUpdate();
+      if (!r.ok) return store.notice(r.error, 'warn');
+      const { check } = r;
+      if (check.upToDate)
+        return store.notice(
+          `Nacreframe ${check.current.version} is up to date (${check.ref} @ ${short(check.current.commit)}).`,
+          'success',
+        );
+      const newer =
+        check.latest.version !== check.current.version
+          ? `Nacreframe ${check.latest.version} is available (you have ${check.current.version}).`
+          : `A newer build of Nacreframe ${check.current.version} is available (${short(check.current.commit)} → ${short(check.latest.commit)}).`;
+      const go = await pick(c, `${newer} Latest change: ${check.latest.subject}`, [
+        {
+          label: 'Update now',
+          value: true,
+          hint: 'about a minute; your conversations and settings are kept',
+        },
+        { label: 'Not now', value: false },
+      ]);
+      if (!go) return store.notice(`Not updated. Run /update or ${BIN} update any time.`);
+      store.notice('Updating: downloading, installing dependencies and building…');
+      const out: string[] = [];
+      const code = await runUpdate(check, { onLine: (l) => out.push(l) });
+      if (code !== 0)
+        return store.notice(
+          [
+            'The update failed. Nothing you were working on is lost; the last lines were:',
+            ...out.slice(-8),
+          ].join('\n') + `\n\nTry again later, or run \`${BIN} doctor --fix\`.`,
+          'error',
+        );
+      const again = await pick(
+        c,
+        `Updated to ${check.latest.version} (${short(check.latest.commit)}). Restart to use it?`,
+        [
+          {
+            label: 'Restart now',
+            value: true,
+            hint: runtime.swarm
+              ? 'continues this conversation; /swarm resume brings the team back'
+              : 'continues this conversation',
+          },
+          { label: 'Later', value: false, hint: 'the new version starts next time you run nacre' },
+        ],
+      );
+      if (!again) return store.notice('Updated. The new version starts next time you run nacre.', 'success');
+      requestRelaunch(check);
+      c.exit();
+    },
+  },
+  {
+    name: 'thinking',
+    usage: 'thinking [on|off]',
+    description: "Show or hide agents' reasoning (also ctrl+t)",
+    run(args, c) {
+      const a = args.trim().toLowerCase();
+      if (a && a !== 'on' && a !== 'off') return c.store.notice('Usage: /thinking [on|off]', 'warn');
+      c.setThinking(a === 'on' ? true : a === 'off' ? false : undefined);
     },
   },
   {

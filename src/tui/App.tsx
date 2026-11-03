@@ -44,6 +44,22 @@ export function App({ runtime, store, theme, initialPrompt }: Props) {
   // Bumped after a resize to print the whole transcript again (see below).
   const [staticKey, setStaticKey] = useState(0);
 
+  // Print the whole transcript again from a clean screen (after a resize, or when reasoning is shown or hidden).
+  const reprint = useCallback(() => {
+    if (stdout?.isTTY) stdout.write('\x1b[2J\x1b[3J\x1b[H');
+    setStaticKey((k) => k + 1);
+  }, [stdout]);
+
+  const toggleThinking = useCallback(
+    (on?: boolean) => {
+      const next = on ?? !store.getSnapshot().showThinking;
+      store.setShowThinking(next);
+      reprint(); // transcript lines are printed once; redraw them in the new form
+      store.notice(next ? 'Showing thinking. ctrl+t hides it.' : 'Thinking hidden. ctrl+t shows it.');
+    },
+    [store, reprint],
+  );
+
   // Terminals reflow their contents when the window changes size (windowed to fullscreen, a split pane
   // dragged), so what Ink believes is on screen no longer matches what is there. Redrawing in place then
   // leaves stale copies of the live area behind. Once the resizing settles, start from a clean screen and
@@ -58,8 +74,7 @@ export function App({ runtime, store, theme, initialPrompt }: Props) {
         const now = `${stdout.columns}x${stdout.rows}`;
         if (now === size) return;
         size = now;
-        stdout.write('\x1b[2J\x1b[3J\x1b[H'); // clear screen, scrollback, cursor home
-        setStaticKey((k) => k + 1);
+        reprint();
       }, 150);
     };
     stdout.on('resize', onResize);
@@ -67,7 +82,7 @@ export function App({ runtime, store, theme, initialPrompt }: Props) {
       clearTimeout(timer);
       stdout.off('resize', onResize);
     };
-  }, [stdout]);
+  }, [stdout, reprint]);
 
   const banner = useMemo<BannerInfo>(
     () => ({
@@ -106,6 +121,7 @@ export function App({ runtime, store, theme, initialPrompt }: Props) {
           },
         });
       });
+    if (runtime.config.showThinking) store.setShowThinking(true);
     store.attachAgent(runtime.agent, 'main');
     if (runtime.browser) store.attachBrowser(runtime.browser.events);
     if (runtime.swarm) store.attachSwarm(runtime.swarm);
@@ -143,6 +159,7 @@ export function App({ runtime, store, theme, initialPrompt }: Props) {
       overlay: setOverlay,
       exit: quit,
       togglePanes: () => setShowPanes((s) => !s),
+      setThinking: (on?: boolean) => toggleThinking(on),
       ask: (question: string) =>
         new Promise<string | undefined>((resolve) =>
           setQuestion({
@@ -156,7 +173,7 @@ export function App({ runtime, store, theme, initialPrompt }: Props) {
         ),
       refresh: () => force((n) => n + 1),
     }),
-    [runtime, store, prompt, quit],
+    [runtime, store, prompt, quit, toggleThinking],
   );
 
   const allCommands = useMemo(
@@ -241,7 +258,7 @@ export function App({ runtime, store, theme, initialPrompt }: Props) {
   return (
     <ThemeContext.Provider value={theme}>
       <Static key={staticKey} items={items}>
-        {(item) => <ItemView key={item.id} item={item} banner={banner} />}
+        {(item) => <ItemView key={item.id} item={item} banner={banner} showThinking={snap.showThinking} />}
       </Static>
       {/* Panes give way to a one-line roster while a dialog needs the room. */}
       <LiveArea snap={snap} todos={todos} showPanes={showPanes && !dialogOpen} />
@@ -277,6 +294,7 @@ export function App({ runtime, store, theme, initialPrompt }: Props) {
           history={history}
           onSubmit={submit}
           onCycleMode={cycleMode}
+          onToggleThinking={() => toggleThinking()}
           onInterrupt={interrupt}
           placeholder={
             runtime.swarm

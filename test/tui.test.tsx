@@ -303,4 +303,53 @@ describe('interactive UI', () => {
       await ui.stop();
     }
   });
+
+  it('folds reasoning into one line, and ctrl+t shows it in full', async () => {
+    const ui = await boot();
+    try {
+      await until(() => ui.screen().includes('nacreframe'));
+      await ui.type('think about it');
+      ui.key('\r');
+      await until(() => ui.screen().includes('Thought it through: the answer is 42.'));
+      expect(ui.screen()).toMatch(/✻ thought/);
+      expect(ui.screen()).not.toContain('Step one: read the request.');
+      const mark = ui.raw().length;
+      ui.key('\u0014'); // ctrl+t
+      await until(() => plain(ui.raw().slice(mark)).includes('Step one: read the request.'));
+      expect(plain(ui.raw().slice(mark))).toContain('thinking shown');
+      expect(ui.raw().slice(mark)).toContain('\x1b[2J'); // the transcript was reprinted, not appended to
+    } finally {
+      await ui.stop();
+    }
+  });
+
+  it('separates inline <think> reasoning from the answer', async () => {
+    const ui = await boot();
+    try {
+      await until(() => ui.screen().includes('nacreframe'));
+      await ui.type('/thinking on');
+      ui.key('\r');
+      await until(() => ui.screen().includes('Showing thinking'));
+      await ui.type('ponder this');
+      ui.key('\r');
+      await until(() => ui.screen().includes('Pondered: the answer is 42.'));
+      const s = ui.screen();
+      expect(s).toContain('Pondering inline, the way small local models do.');
+      expect(s).not.toContain('<think>');
+    } finally {
+      await ui.stop();
+    }
+  });
+
+  it('explains how to update a copy that was not installed with the installer', async () => {
+    const ui = await boot();
+    try {
+      await until(() => ui.screen().includes('nacreframe'));
+      await ui.type('/update');
+      ui.key('\r');
+      await until(() => /cannot update itself|POSIX installer/.test(ui.screen()));
+    } finally {
+      await ui.stop();
+    }
+  });
 });

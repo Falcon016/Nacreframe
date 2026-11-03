@@ -834,6 +834,45 @@ textarea::placeholder {
 .channel .text.auto {
   color: var(--fg-3);
 }
+/* An agent's reasoning: collapsed to one quiet line; opened, set off by a rule in the agent's colour. */
+.thought {
+  --agent: var(--violet-text);
+  font-size: 13px;
+  color: var(--fg-3);
+}
+.thought > summary {
+  display: inline-flex;
+  gap: 7px;
+  align-items: baseline;
+  cursor: pointer;
+  list-style: none;
+  border-radius: var(--r-sm);
+  padding: 1px 4px 1px 0;
+}
+.thought > summary::-webkit-details-marker {
+  display: none;
+}
+.thought > summary:hover {
+  color: var(--fg-2);
+}
+.thought .glyph {
+  color: var(--agent);
+}
+.thought[open] > summary {
+  color: var(--fg-2);
+}
+.thought .body {
+  margin: 6px 0 2px 5px;
+  padding: 2px 0 2px 14px;
+  border-left: 2px solid var(--agent);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font-style: italic;
+  line-height: 1.6;
+  color: var(--fg-2);
+  max-height: 420px;
+  overflow-y: auto;
+}
 .thinking {
   color: var(--fg-3);
   font-size: 13.5px;

@@ -24,6 +24,8 @@ export type Item =
     }
   | { id: number; kind: 'notice'; level: Level; text: string }
   | { id: number; kind: 'channel'; from: string; to?: string; text: string; auto?: boolean }
+  /** What an agent reasoned before answering; shown in full only while thinking is switched on. */
+  | { id: number; kind: 'thinking'; agent: string; text: string; ms: number }
   | { id: number; kind: 'banner' };
 
 export interface LiveTool {
@@ -38,6 +40,10 @@ export interface LiveAgent {
   name: string;
   text: string;
   thinking: number;
+  /** The reasoning streamed so far in this message (the last few thousand characters). */
+  thought: string;
+  thinkingSince?: number;
+  thinkingUntil?: number;
   tools: LiveTool[];
   running: boolean;
   startedAt: number;
@@ -58,7 +64,12 @@ export interface UiSnapshot {
   queued: number;
   /** Set while context is being compacted: the chat is paused until it finishes. */
   compacting?: { pct: number };
+  /** Show agents' reasoning in full (otherwise a one-line "thought for 8s"). */
+  showThinking: boolean;
 }
+
+/** How much live reasoning to keep per agent: enough to show its tail, not the whole essay. */
+const THOUGHT_TAIL = 6000;
 
 /** A first line of tool output worth showing under the tool call. */
 export function summarize(name: string, r: ToolResult): { summary: string; detail?: string } {
@@ -95,6 +106,13 @@ export function summarize(name: string, r: ToolResult): { summary: string; detai
 
 type Listener = () => void;
 
+function clearThinking(a: LiveAgent): void {
+  a.thinking = 0;
+  a.thought = '';
+  delete a.thinkingSince;
+  delete a.thinkingUntil;
+}
+
 /**
  * UI state lives outside React so agent events (which can be very chatty while streaming) are
  * folded into a snapshot and published at most ~30 times a second.
@@ -115,6 +133,7 @@ export class UiStore {
   private status: string | undefined;
   private queued = 0;
   private compacting: { pct: number } | undefined;
+  private showThinking = false;
 
   constructor() {
     this.snapshot = this.build();
@@ -135,6 +154,7 @@ export class UiStore {
       contextTokens: this.contextTokens,
       tokens: this.tokens,
       queued: this.queued,
+      showThinking: this.showThinking,
       ...(this.compacting ? { compacting: this.compacting } : {}),
       ...(this.status ? { status: this.status } : {}),
     };
@@ -177,10 +197,15 @@ export class UiStore {
     this.publish(true);
   }
 
+  setShowThinking(on: boolean): void {
+    this.showThinking = on;
+    this.publish(true);
+  }
+
   private agentLive(name: string, meta: Partial<LiveAgent> = {}): LiveAgent {
     let a = this.live.get(name);
     if (!a) {
-      a = { name, text: '', thinking: 0, tools: [], running: false, startedAt: Date.now() };
+      a = { name, text: '', thinking: 0, thought: '', tools: [], running: false, startedAt: Date.now() };
       this.live.set(name, a);
     }
     Object.assign(a, meta);
@@ -273,16 +298,27 @@ export class UiStore {
         a.running = true;
         a.startedAt = Date.now();
         a.text = '';
-        a.thinking = 0;
+        clearThinking(a);
         break;
       case 'text':
+        if (a.thinkingSince && !a.thinkingUntil) a.thinkingUntil = Date.now();
         a.text += e.delta;
         break;
       case 'thinking':
         a.thinking += e.delta.length;
+        a.thinkingSince ??= Date.now();
+        a.thought = (a.thought + e.delta).slice(-THOUGHT_TAIL);
         break;
       case 'assistant': {
-        // Commit the streamed text once the message is complete.
+        // Commit the reasoning and the streamed text once the message is complete.
+        const thought = e.message.content
+          .map((b) => (b.type === 'thinking' ? b.text : ''))
+          .join('')
+          .trim();
+        if (thought) {
+          const ms = a.thinkingSince ? (a.thinkingUntil ?? Date.now()) - a.thinkingSince : 0;
+          this.push({ kind: 'thinking', agent: name, text: thought, ms });
+        }
         const text = e.message.content
           .filter((b) => b.type === 'text')
           .map((b) => b.text)
@@ -290,7 +326,7 @@ export class UiStore {
           .trim();
         if (text) this.push({ kind: 'assistant', text, agent: name });
         a.text = '';
-        a.thinking = 0;
+        clearThinking(a);
         break;
       }
       case 'tool_start':
@@ -395,7 +431,9 @@ export function replayInto(store: UiStore, messages: Message[]): void {
   const calls = new Map<string, { name: string; description: string }>();
   for (const m of messages) {
     for (const b of m.content) {
-      if (b.type === 'text') {
+      if (b.type === 'thinking' && b.text.trim()) {
+        store.push({ kind: 'thinking', agent: 'main', text: b.text.trim(), ms: 0 });
+      } else if (b.type === 'text') {
         if (m.role === 'user') store.user(b.text);
         else store.push({ kind: 'assistant', text: b.text, agent: 'main' });
       } else if (b.type === 'tool_use') {

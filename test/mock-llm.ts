@@ -7,6 +7,8 @@ import type { AddressInfo } from 'node:net';
  *   "read <file>"  → calls the read tool, then summarises
  *   "write <file>" → calls the write tool (exercises approvals), then confirms
  *   "run <cmd>"    → calls bash
+ *   "think ..."    → streams reasoning (reasoning_content) before the reply
+ *   "ponder ..."   → the same, written inline as <think>...</think> like some local models do
  *   anything else  → plain text reply
  * Each tool result is answered with a short wrap-up so the loop terminates.
  */
@@ -32,6 +34,9 @@ export function startMockLlm(port = 0): Promise<{ server: Server; url: string; r
       const last = j.messages.at(-1)!;
       res.writeHead(200, { 'content-type': 'text/event-stream' });
       const send = (o: object) => res.write(`data: ${JSON.stringify(o)}\n\n`);
+      const reason = (t: string) => {
+        for (const w of t.match(/\S+\s*/g) ?? []) send({ choices: [{ delta: { reasoning_content: w } }] });
+      };
       const text = (t: string) => {
         for (const w of t.match(/\S+\s*/g) ?? []) send({ choices: [{ delta: { content: w } }] });
         send({ choices: [{ delta: {}, finish_reason: 'stop' }] });
@@ -64,6 +69,13 @@ export function startMockLlm(port = 0): Promise<{ server: Server; url: string; r
         else if (m?.[1]!.toLowerCase() === 'write')
           call('write', { path: m[2], content: 'hello from the mock\n' });
         else if (m?.[1]!.toLowerCase() === 'run') call('bash', { command: u.replace(/^.*\brun\s+/i, '') });
+        else if (/\bthink\b/i.test(u)) {
+          reason('The user wants me to think first.\nStep one: read the request.\nStep two: answer briefly.');
+          text('Thought it through: the answer is 42.');
+        } else if (/\bponder\b/i.test(u))
+          text(
+            '<think>Pondering inline, the way small local models do.</think>\n\nPondered: the answer is 42.',
+          );
         else
           text(
             `Hello! This is the **mock** model. You said: ${u.slice(0, 60)}\n\n- It streams tokens\n- It supports \`inline code\`\n\n\`\`\`ts\nconst x = 1;\n\`\`\``,

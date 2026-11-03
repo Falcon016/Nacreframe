@@ -210,7 +210,7 @@ Environment
                                                 (default: https://nodejs.org/dist/latest-v22.x)
   NO_COLOR                                      Plain output
 
-Run it again at any time to update to the latest version.
+Update later with `nacre update` (or /update inside nacre), or by running this again.
 EOF
 }
 
@@ -439,6 +439,8 @@ do_fetch() {
   fi
   GIT_TERMINAL_PROMPT=0 git fetch -q --depth 1 origin "$NACRE_REF"
   git -c advice.detachedHead=false checkout -q -f --detach FETCH_HEAD
+  # Remember the branch so `nacre update` follows the same one.
+  printf '%s\n' "$NACRE_REF" >.nacre-ref
 }
 
 do_deps() {
@@ -693,7 +695,7 @@ finish() {
     note "  nacre doctor    check your environment (add --fix to repair problems)"
   fi
   note "Start it inside a project folder:  cd your-project && nacre"
-  note "Update later by running the install command again."
+  note "Update later with:  nacre update   (or /update inside nacre)"
   blank
 }
 
