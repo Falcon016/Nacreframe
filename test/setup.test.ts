@@ -583,7 +583,7 @@ describe('terminal prompts', () => {
 
 describe('nacre setup (command line)', () => {
   const TSX = resolve('node_modules/tsx/dist/cli.mjs');
-  const CLI = resolve('src/cli.tsx');
+  const CLI = resolve('src/cli.ts');
   let cws: ReturnType<typeof tmpWorkspace>;
   beforeAll(() => {
     cws = tmpWorkspace();

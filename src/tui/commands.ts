@@ -654,18 +654,6 @@ export const BUILTINS: BuiltinCommand[] = [
     },
   },
   {
-    name: 'skills',
-    description: 'List available skills',
-    run(_a, { runtime, store }) {
-      const s = runtime.skills.list();
-      store.notice(
-        s.length
-          ? s.map((x) => `${x.name} — ${x.description}`).join('\n')
-          : `No skills found. Add SKILL.md files under ${resolve(runtime.loaded.paths.config, 'skills')}/<name>/`,
-      );
-    },
-  },
-  {
     name: 'tools',
     description: 'List tools the agent can use',
     run(_a, { runtime, store }) {

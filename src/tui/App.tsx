@@ -176,13 +176,13 @@ export function App({ runtime, store, theme, initialPrompt }: Props) {
     [runtime, store, prompt, quit, toggleThinking],
   );
 
-  const allCommands = useMemo(
-    () => [
-      ...BUILTINS.map((c) => ({ name: c.name, description: c.description })),
-      ...runtime.commands.map((c) => ({ name: c.name, description: c.description })),
-    ],
-    [runtime],
-  );
+  // One entry per name: a prompt template named like a built-in command is shadowed by it (the built-in runs).
+  const allCommands = useMemo(() => {
+    const seen = new Set<string>();
+    return [...BUILTINS, ...runtime.commands]
+      .filter((c) => !seen.has(c.name) && !!seen.add(c.name))
+      .map((c) => ({ name: c.name, description: c.description }));
+  }, [runtime]);
 
   const submit = useCallback(
     (text: string) => {
