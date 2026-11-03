@@ -56,6 +56,15 @@ export function loadConfig(opts: LoadOptions): LoadedConfig {
     }
   }
 
+  // Who may command the agent from Telegram is the user's decision alone, even for a trusted project.
+  if (project.telegram !== undefined) {
+    const { telegram: _ignored, ...rest } = project;
+    project = rest;
+    warnings.push(
+      `Project config ${projectConfigPath} sets telegram; that is only read from your user config.`,
+    );
+  }
+
   let merged = merge({ providers: BUILTIN_PROVIDERS }, user);
   merged = merge(merged, project);
   merged = merge(merged, fromEnv(env));

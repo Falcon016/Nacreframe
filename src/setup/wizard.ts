@@ -9,7 +9,9 @@ import type { AppPaths } from '../paths.js';
 import { BIN, NAME, VERSION } from '../version.js';
 import { applyPlan, type SetupPlan } from './plan.js';
 import { Cancelled, type Prompter } from './prompt.js';
+import { chooseTelegram, describeTelegram } from './telegram.js';
 import type { Term } from './ui.js';
+import { TELEGRAM_KEY } from '../telegram/api.js';
 
 export interface WizardContext {
   term: Term;
@@ -125,7 +127,7 @@ export async function runWizard(ctx: WizardContext): Promise<number> {
 
   try {
     // ---- 1. system ---------------------------------------------------------------------------
-    t.heading('Your system', '1 of 4');
+    t.heading('Your system', '1 of 5');
     const sp = t.spinner('Looking around…');
     const checks = await ctx.systemChecks();
     sp.stop();
@@ -144,7 +146,7 @@ export async function runWizard(ctx: WizardContext): Promise<number> {
       const plan: SetupPlan = {};
 
       // ---- 2. provider -----------------------------------------------------------------------
-      t.heading('Where your models come from', '2 of 4');
+      t.heading('Where your models come from', '2 of 5');
       const outcome = await chooseProvider(ctx, config, auth);
       if (outcome) {
         plan.provider = outcome.provider;
@@ -153,16 +155,16 @@ export async function runWizard(ctx: WizardContext): Promise<number> {
 
       // ---- 3. model --------------------------------------------------------------------------
       if (outcome) {
-        t.heading('Your model', '3 of 4');
+        t.heading('Your model', '3 of 5');
         const model = await chooseModel(ctx, outcome, config.model);
         if (model) plan.model = model;
       } else {
-        t.heading('Your model', '3 of 4');
+        t.heading('Your model', '3 of 5');
         t.info('Skipped. Pick one in the app, or run `' + BIN + ' auth set <provider>` later.');
       }
 
       // ---- 4. safety -------------------------------------------------------------------------
-      t.heading('Safety', '4 of 4');
+      t.heading('Safety', '4 of 5');
       plan.approval = await ctx.prompt.select({
         message: 'How much should the agent ask before it acts?',
         initial: ['ask', 'edits', 'auto', 'plan'].indexOf(config.approval.mode),
@@ -182,6 +184,11 @@ export async function runWizard(ctx: WizardContext): Promise<number> {
           : `No Chrome or Edge found. You can turn this on later (see \`${BIN} doctor\`).`,
       });
 
+      // ---- 5. telegram -----------------------------------------------------------------------
+      t.heading('Telegram', '5 of 5');
+      const telegram = await chooseTelegram(ctx, config, auth.get(TELEGRAM_KEY));
+      if (telegram) plan.telegram = telegram;
+
       // ---- review ----------------------------------------------------------------------------
       t.heading('Review');
       t.table([
@@ -190,6 +197,7 @@ export async function runWizard(ctx: WizardContext): Promise<number> {
         ['Approvals', plan.approval],
         ['Sandbox', plan.sandbox],
         ['Browser', plan.browser ? 'on' : 'off'],
+        ['Telegram', describeTelegram(plan.telegram, config)],
         ['Saved to', join(ctx.paths.config, 'config.json')],
       ]);
       t.line();
@@ -626,6 +634,9 @@ function save(ctx: WizardContext, plan: SetupPlan, outcome: ProviderOutcome | nu
   }
   t.ok('Settings saved', result.configPath);
   if (result.keySaved) t.ok('API key stored with owner-only permissions', `${ctx.paths.config}/auth.json`);
+  if (result.telegramTokenSaved)
+    t.ok('Telegram bot token stored with owner-only permissions', `${ctx.paths.config}/auth.json`);
+  if (plan.telegram?.off) t.ok('Telegram bot turned off');
   if (result.backupPath) t.info(`Your previous settings are kept in ${result.backupPath}`);
   if (result.replacedInvalid)
     t.warning(
@@ -648,6 +659,14 @@ function save(ctx: WizardContext, plan: SetupPlan, outcome: ProviderOutcome | nu
   t.table([
     [BIN, 'start the terminal UI (run it inside a project folder)'],
     [`${BIN} serve`, 'open the browser dashboard'],
+    ...(plan.telegram && !plan.telegram.off
+      ? [
+          [`${BIN} telegram`, 'start your Telegram bot (keep it running to use it from your phone)'] as [
+            string,
+            string,
+          ],
+        ]
+      : []),
     [`${BIN} -p "..."`, 'one-shot answers for scripts'],
     [`${BIN} doctor`, 'check your environment'],
     [`${BIN} setup`, 'run this wizard again'],

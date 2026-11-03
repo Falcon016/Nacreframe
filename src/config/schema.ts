@@ -102,6 +102,19 @@ export const configSchema = z.object({
       },
     }),
 
+  /**
+   * `nacre telegram`: talk to the agent from Telegram. Only read from the user config, never from a project's.
+   * The bot token is a secret: it lives in auth.json (`nacre setup`) or $NACRE_TELEGRAM_TOKEN.
+   */
+  telegram: z
+    .object({
+      /** Telegram user ids allowed to use the bot. Nobody else gets an answer. */
+      allowedUsers: z.array(z.number().int().positive()).default([]),
+      /** The folder the bot's agent works in (default: the folder `nacre telegram` is started from). */
+      cwd: z.string().optional(),
+    })
+    .default({ allowedUsers: [] }),
+
   browser: z
     .object({
       enabled: z.boolean().default(true),

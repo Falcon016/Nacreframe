@@ -1,5 +1,5 @@
 import { writeFileSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { join, resolve } from 'node:path';
 import { Session, sessionDir } from '../agent/session.js';
 import type { ApprovalMode, SandboxMode } from '../config/schema.js';
 import { trustProject } from '../config/load.js';
@@ -385,6 +385,31 @@ export const BUILTINS: BuiltinCommand[] = [
       if (!again) return store.notice('Updated. The new version starts next time you run nacre.', 'success');
       requestRelaunch(check);
       c.exit();
+    },
+  },
+  {
+    name: 'skills',
+    usage: 'skills [name]',
+    description: 'List the skills the agent can load, or show one',
+    run(args, c) {
+      const all = c.runtime.skills.list();
+      const name = args.trim();
+      if (name) {
+        const s = all.find((x) => x.name === name);
+        if (!s) return c.store.notice(`No skill named "${name}". /skills lists them.`, 'warn');
+        return c.store.notice(`${s.name} (${s.source}): ${s.description}\n${s.path}`);
+      }
+      if (!all.length) return c.store.notice('No skills installed.');
+      c.store.notice(
+        [
+          'Skills (the agent loads one when a task matches it; ask for one by name to use it directly):',
+          ...all.map(
+            (s) =>
+              `  ${s.name}${s.source === 'built-in' ? '' : ` [${s.source}]`}: ${s.description.split('. ')[0]}.`,
+          ),
+          `Add your own as ${join(c.runtime.loaded.paths.config, 'skills', '<name>', 'SKILL.md')}.`,
+        ].join('\n'),
+      );
     },
   },
   {

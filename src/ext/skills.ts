@@ -1,12 +1,18 @@
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 export interface Skill {
   name: string;
   description: string;
   body: string;
   path: string;
+  /** Where it came from: `built-in`, `user` or `project`. */
+  source: string;
 }
+
+/** Skills shipped with Nacreframe (`skills/` beside `src/` and `dist/`). User and project skills override them. */
+export const BUILTIN_SKILLS_DIR = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..', 'skills');
 
 /** Parse the tiny `---\nkey: value\n---` front-matter subset used by SKILL.md files. */
 export function parseFrontMatter(text: string): { meta: Record<string, string>; body: string } {
@@ -27,11 +33,12 @@ export function parseFrontMatter(text: string): { meta: Record<string, string>; 
 export class SkillStore {
   private skills = new Map<string, Skill>();
 
-  /** Later dirs override earlier ones (user skills first, project skills last). */
-  load(dirs: string[]): string[] {
+  /** Later dirs override earlier ones (built-in first, then user skills, project skills last). */
+  load(dirs: (string | { dir: string; source: string })[]): string[] {
     const warnings: string[] = [];
     this.skills.clear();
-    for (const dir of dirs) {
+    for (const d of dirs) {
+      const { dir, source } = typeof d === 'string' ? { dir: d, source: 'user' } : d;
       if (!existsSync(dir)) continue;
       for (const entry of readdirSync(dir, { withFileTypes: true })) {
         if (!entry.isDirectory()) continue;
@@ -44,7 +51,13 @@ export class SkillStore {
             warnings.push(`Skill ${file} has no description and was skipped`);
             continue;
           }
-          this.skills.set(name, { name, description: meta.description, body: body.trim(), path: file });
+          this.skills.set(name, {
+            name,
+            description: meta.description,
+            body: body.trim(),
+            path: file,
+            source,
+          });
         } catch (e) {
           warnings.push(`Could not load skill ${file}: ${(e as Error).message}`);
         }

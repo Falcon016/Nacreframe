@@ -12,7 +12,7 @@ import { runWizard } from './wizard.js';
 const HELP = `${NAME} ${VERSION} — guided setup
 
 Usage
-  ${BIN} setup                       Interactive wizard (provider, key, model, safety)
+  ${BIN} setup                       Interactive wizard (provider, key, model, safety, Telegram)
   ${BIN} setup --yes [options]       No questions: apply only the options you pass
 
 Options (with --yes)

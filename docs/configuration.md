@@ -44,6 +44,7 @@ project's skills, extensions, prompt templates and `SYSTEM.md` are not loaded.
 | `swarm.agents[]`                                 | `[]`                                                     | `{ name, role, model?, tools?, color? }`                                                                                                                  |
 | `swarm.maxAgents` / `maxMessages` / `allowSpawn` | `6` / `60` / `false`                                     | `maxMessages`: agent-to-agent messages between yours, 0 = no limit (`/swarm limit` sets it)                                                               |
 | `compaction`                                     | `{ threshold: 0.8, keepRecent: 6 }`                      | Always on. `threshold` 0.3–0.8 (cannot exceed 80%); `keepRecent` newest messages kept verbatim. See [compaction.md](compaction.md)                        |
+| `telegram`                                       | `{ allowedUsers: [] }`                                   | Who may use `nacre telegram` (user ids) and `cwd`, the folder it works in. User config only. See [telegram.md](telegram.md)                               |
 | `mcpServers.<name>`                              | `{}`                                                     | `{ command, args?, env?, cwd? }` (stdio) or `{ url, headers? }` (HTTP)                                                                                    |
 | `maxToolIterations`                              | `60`                                                     | Tool calls an agent may make in one turn before it stops and waits for you; 0 = no limit                                                                  |
 | `theme`                                          | `nacre`                                                  | `nacre` \| `mono` (`NO_COLOR` also forces mono)                                                                                                           |
@@ -76,5 +77,8 @@ port is also 11434, so if you run llama.cpp there, override `providers.llamacpp.
 - `AGENTS.md` / `NACREFRAME.md`: read from the config dir and every directory from `/` down to the working directory.
 - `SYSTEM.md` in the config dir (or a trusted project's `.nacreframe/`) replaces the built-in system prompt.
 - `skills/<name>/SKILL.md` with `name` and `description` front-matter: listed to the model, loaded on demand.
+  Three ship built in: `python-env` (find and repair a Python environment), `security-review` (secrets, injection,
+  auth and dependency checks with severities) and `pre-commit-review` (run the project's checks, read the diff, write
+  the commit message). A user or project skill with the same name replaces a built-in one. `/skills` lists them.
 - `prompts/<name>.md` → `/name`; `$ARGUMENTS` and `$1`…`$9` are substituted.
 - `extensions/*.{ts,js}`: see the README and [examples/extensions](../examples/extensions).

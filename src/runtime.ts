@@ -10,7 +10,7 @@ import { AuthStore } from './config/auth.js';
 import { loadConfig, trustProject, type LoadedConfig } from './config/load.js';
 import type { ApprovalMode, Config, PartialConfig, SandboxMode, SwarmAgentConfig } from './config/schema.js';
 import { loadExtensions, loadPromptTemplates, type SlashCommand } from './ext/extensions.js';
-import { SkillStore } from './ext/skills.js';
+import { BUILTIN_SKILLS_DIR, SkillStore } from './ext/skills.js';
 import { connectAll, type McpConnection } from './ext/mcp.js';
 import { NO_MODEL, ProviderRegistry, type ResolvedModel } from './llm/registry.js';
 import { projectKey } from './paths.js';
@@ -187,7 +187,11 @@ export class Runtime {
       ? join(loaded.projectConfigPath, '..')
       : join(opts.cwd, '.nacreframe');
     warnings.push(
-      ...skills.load([join(paths.config, 'skills'), ...(trusted ? [join(projectRoot, 'skills')] : [])]),
+      ...skills.load([
+        { dir: BUILTIN_SKILLS_DIR, source: 'built-in' },
+        { dir: join(paths.config, 'skills'), source: 'user' },
+        ...(trusted ? [{ dir: join(projectRoot, 'skills'), source: 'project' }] : []),
+      ]),
     );
     const ext = await loadExtensions(
       [join(paths.config, 'extensions'), ...(trusted ? [join(projectRoot, 'extensions')] : [])],
