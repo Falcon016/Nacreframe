@@ -230,7 +230,16 @@ export class Session {
     );
     const summary: Message = {
       role: 'user',
-      content: [{ type: 'text', text: `[Summary of the earlier conversation]\n${comp.summary}` }],
+      content: [
+        {
+          type: 'text',
+          // Sent as a user message, so say plainly that it is background: small models otherwise take the goal it
+          // restates for a fresh request and start the finished work over.
+          text:
+            `[Summary of the earlier conversation. Background only, not a new request.]\n${comp.summary}\n` +
+            '[End of summary. Work it lists as done is finished; do not redo it. Continue from the messages below.]',
+        },
+      ],
     };
     return [summary, ...msgs(keptFrom, c), ...msgs(c + 1, path.length)];
   }

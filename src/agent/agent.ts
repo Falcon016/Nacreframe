@@ -139,6 +139,16 @@ export function outputLimitFix(message: string): { maxOutput: number } | { room:
   return undefined;
 }
 
+/** Marks the harness's reminder to update the task list (a user message the user did not type). */
+export const TODO_CHECK = '[Task list check]';
+
+const formatTodos = (todos: TodoItem[]) =>
+  todos
+    .map(
+      (t) => `${t.status === 'completed' ? '[x]' : t.status === 'in_progress' ? '[~]' : '[ ]'} ${t.content}`,
+    )
+    .join('\n');
+
 /** Thrown to end a turn without sending anything further, leaving the conversation intact. */
 export class PauseTurn extends Error {
   constructor(message: string) {
@@ -175,6 +185,10 @@ export class Agent {
   private idleWaiters: (() => void)[] = [];
   /** Exact context size reported by the provider after the last response (when it reports one). */
   private reported: { tokens: number; messages: number } | undefined;
+  /** The task list this agent keeps with todo_write, and whether this run did any work / was reminded of it. */
+  private todos: TodoItem[] = [];
+  private workedThisRun = false;
+  private todoReminded = false;
 
   constructor(private o: AgentOptions) {
     this.id = o.id;
@@ -207,6 +221,7 @@ export class Agent {
     this.o.session = s;
     this.readState.clear();
     this.reported = undefined;
+    this.todos = [];
   }
   setSandbox(sb: Sandbox): void {
     this.o.sandbox = sb;
@@ -267,6 +282,8 @@ export class Agent {
       return;
     }
     this.running = true;
+    this.workedThisRun = false;
+    this.todoReminded = false;
     this.controller = new AbortController();
     const signal = this.controller.signal;
     let stop: StopReason | 'aborted' | 'max_iterations' | 'paused' = 'end_turn';
@@ -361,17 +378,44 @@ export class Agent {
         (b): b is Extract<ContentBlock, { type: 'tool_use' }> => b.type === 'tool_use',
       );
       if (!calls.length) {
+        const reminder = stopReason === 'end_turn' ? this.todoReminder() : undefined;
+        if (reminder) {
+          // The list still shows open items after the work is done: one nudge to bring it up to date.
+          this.todoReminded = true;
+          this.o.session.append({ role: 'user', content: [{ type: 'text', text: reminder }] }, this.id);
+          this.emit({ type: 'status', text: 'Asking the model to bring its task list up to date' });
+          continue;
+        }
         // Compact right after a long answer so the pause happens now, not in the middle of the next request.
         await this.ensureRoom(signal, { quiet: true });
         return stopReason === 'max_tokens' ? 'max_tokens' : stopReason;
       }
 
+      if (calls.some((c) => c.name !== 'todo_write')) this.workedThisRun = true;
       const results = await this.runTools(calls, badToolCalls, signal);
       this.o.session.append({ role: 'user', content: results }, this.id);
       if (signal.aborted) return 'aborted';
     }
     this.emit({ type: 'status', text: `Stopped after ${max} tool iterations. Send a message to continue.` });
     return 'max_iterations';
+  }
+
+  /**
+   * A reminder to update the task list, when a run that did work is about to end with items still open on it.
+   * Once per run, and only when the model can update it.
+   */
+  private todoReminder(): string | undefined {
+    // Swarm members report with their final words, which the reminder's short answer would replace.
+    if (this.todoReminded || !this.workedThisRun || this.o.services?.swarm || !this.o.tools.get('todo_write'))
+      return undefined;
+    const open = this.todos.filter((t) => t.status !== 'completed');
+    if (!open.length) return undefined;
+    return (
+      `${TODO_CHECK} Your task list still shows ${open.length} unfinished item${open.length === 1 ? '' : 's'}:\n` +
+      `${formatTodos(open)}\n` +
+      'Call todo_write with the complete list so it matches what was actually done: mark finished items completed. ' +
+      'If an item was not done, leave it pending and say so in one short line. Do not repeat your previous answer.'
+    );
   }
 
   // ---- context accounting & compaction -------------------------------------------------------------
@@ -508,6 +552,12 @@ export class Agent {
           keepRecent: keep,
           signal,
           ...(instructions ? { instructions } : {}),
+          // The summary replaces the todo_write calls that held the list, so carry the list itself over.
+          ...(this.todos.length
+            ? {
+                appendix: `Task list when this summary was written (keep it current with todo_write):\n${formatTodos(this.todos)}`,
+              }
+            : {}),
         });
       } catch (e) {
         if (signal.aborted) throw e;
@@ -591,7 +641,10 @@ export class Agent {
       readState: this.readState,
       progress: (text) => this.emit({ type: 'tool_progress', id, text }),
       ...(s.ask ? { ask: s.ask } : {}),
-      ...(s.setTodos ? { setTodos: s.setTodos } : {}),
+      setTodos: (todos) => {
+        this.todos = todos;
+        s.setTodos?.(todos);
+      },
       ...(s.browser ? { browser: s.browser } : {}),
       ...(s.swarm ? { swarm: s.swarm } : {}),
       ...(s.skills ? { skills: s.skills } : {}),

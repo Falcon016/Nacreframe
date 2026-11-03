@@ -7,6 +7,7 @@ import { Session } from '../src/agent/session.js';
 import { configSchema } from '../src/config/schema.js';
 import { ProviderError, type Message, type StreamRequest } from '../src/llm/types.js';
 import { readTool } from '../src/tools/fs-tools.js';
+import { todoTool } from '../src/tools/misc.js';
 import { ToolRegistry } from '../src/tools/registry.js';
 import { AutoProvider, callTool, makeAgent, say, tmpWorkspace } from './helpers.js';
 
@@ -48,7 +49,9 @@ describe('automatic compaction at 80% of the context window', () => {
     expect(isSummary(p.requests[0]!)).toBe(true); // the summariser ran first…
     const real = mainCalls(p);
     expect(real).toHaveLength(1); // …and only then the real request
-    expect(text(real[0]!.messages[0]!)).toContain('[Summary of the earlier conversation]');
+    expect(text(real[0]!.messages[0]!)).toContain(
+      '[Summary of the earlier conversation. Background only, not a new request.]',
+    );
     expect(used(real[0]!)).toBeLessThan(0.8 * WINDOW);
 
     const kinds = events.map((e) => (e.type === 'compaction' ? `compaction:${e.phase}` : e.type));
@@ -417,5 +420,39 @@ describe('events', () => {
     expect(end?.ok).toBe(true);
     expect(end?.afterPct).toBeLessThan(80);
     expect(events.filter((e) => e.type === 'queued').length).toBeGreaterThan(0);
+  });
+});
+
+describe('what the summary tells the model', () => {
+  it('marks the summary as background, shows the summariser what came after, and carries the task list', async () => {
+    const session = Session.create(ws.dir);
+    const p = new AutoProvider([
+      callTool('t1', 'todo_write', {
+        todos: [
+          { content: 'write the parser', status: 'completed' },
+          { content: 'add tests', status: 'pending' },
+        ],
+      }),
+      say('Planned.'),
+    ]);
+    const { agent } = makeAgent(ws.dir, p, { session, tools: readOnly().register(todoTool) });
+    await agent.run('plan the parser');
+    fill(session, 6);
+    session.append(asst('FINAL: the parser is written and the tests pass.'));
+    expect(await agent.compactNow()).toBe(true);
+
+    const ask = p.summaries[0]!;
+    expect(ask.system).toMatch(/Done[^]*Remaining/);
+    const prompt = text(ask.messages[0]!);
+    // The summariser sees how the conversation went on, so finished work is not listed as next steps.
+    expect(prompt).toContain('the conversation continues after this part');
+    expect(prompt).toContain('FINAL: the parser is written');
+
+    const first = text(session.messages()[0]!);
+    expect(first).toContain('Background only, not a new request');
+    expect(first).toContain('do not redo it');
+    expect(first).toContain('Task list when this summary was written');
+    expect(first).toContain('[x] write the parser');
+    expect(first).toContain('[ ] add tests');
   });
 });

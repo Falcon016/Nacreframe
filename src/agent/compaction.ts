@@ -14,6 +14,8 @@ export interface CompactionPlan {
   firstKeptId: string;
   /** Exactly what the model currently sees before the cut (earlier summary included). */
   toSummarise: Message[];
+  /** What stays verbatim after the cut: shown to the summariser so it knows what already happened next. */
+  kept: Message[];
   keptCount: number;
   /** Session leaf when the plan was made; the commit is refused if it moved. */
   leaf: string | null;
@@ -50,7 +52,8 @@ export function planCompaction(session: Session, keepRecent: number): Compaction
   const keptCount = n - cut;
   const toSummarise = visible.slice(0, Math.max(0, visible.length - keptCount));
   if (!toSummarise.length) return undefined;
-  return { cutIndex: cut, firstKeptId: entries[cut]!.id, toSummarise, keptCount, leaf: session.leaf };
+  const kept = visible.slice(toSummarise.length);
+  return { cutIndex: cut, firstKeptId: entries[cut]!.id, toSummarise, kept, keptCount, leaf: session.leaf };
 }
 
 function pieces(messages: Message[]): string[] {
@@ -71,7 +74,10 @@ function pieces(messages: Message[]): string[] {
 const SUMMARY_SYSTEM =
   'You compress coding-agent conversations. Write a dense, factual summary another agent can continue from. ' +
   "Include: the user's goals and constraints, decisions made, files created or changed (with paths), commands run and their outcomes, " +
-  'errors still unresolved, and the exact next steps. Do not invent details. Use short bullet points.';
+  'and errors still unresolved. Keep what is DONE apart from what REMAINS: under "Done" list the work that was finished, ' +
+  'under "Remaining" only work that is still open. If the later conversation shows something finished, it is done, ' +
+  'not remaining. If the latest request is complete, say so plainly and leave "Remaining" empty. ' +
+  'Do not invent details. Use short bullet points.';
 
 export interface SummariseOptions {
   provider: Provider;
@@ -79,6 +85,8 @@ export interface SummariseOptions {
   /** Context window of the summarising model, in tokens. */
   window: number;
   instructions?: string | undefined;
+  /** The conversation after the part being summarised, kept verbatim: context only, not to be summarised. */
+  after?: Message[] | undefined;
   signal?: AbortSignal | undefined;
 }
 
@@ -110,6 +118,16 @@ export async function summarise(messages: Message[], o: SummariseOptions): Promi
   const budgetChars = Math.max(2000, Math.floor(window * 0.4 * CHARS_PER_TOKEN));
   const focus = o.instructions ? `Focus: ${o.instructions}\n` : '';
   const limit = `Keep the summary under about ${Math.floor(targetTokens * 0.7)} words.`;
+  // What happens after this part decides what counts as done; the newest messages matter most.
+  const laterText = truncateMiddle(
+    pieces(o.after ?? [])
+      .map((p) => truncateMiddle(p, 400))
+      .join('\n'),
+    Math.floor(budgetChars * 0.25),
+  );
+  const later = laterText
+    ? `For reference only, do not summarise this: the conversation continues after this part with:\n${laterText}\n\n`
+    : '';
 
   const chunks: string[] = [];
   let cur = '';
@@ -126,8 +144,8 @@ export async function summarise(messages: Message[], o: SummariseOptions): Promi
   let summary = '';
   for (const chunk of chunks) {
     const prompt = summary
-      ? `Existing summary so far:\n${summary}\n\nMerge in this later part of the conversation:\n${chunk}\n\n${focus}${limit}\nWrite the updated summary now.`
-      : `${chunk}\n\n${focus}${limit}\nWrite the summary now.`;
+      ? `Existing summary so far:\n${summary}\n\nMerge in this later part of the conversation:\n${chunk}\n\n${later}${focus}${limit}\nWrite the updated summary now.`
+      : `${chunk}\n\n${later}${focus}${limit}\nWrite the summary now.`;
     // Reasoning models can spend the whole budget thinking; retry once with a larger one before giving up.
     let text = await ask(o, prompt, targetTokens * 2);
     if (!text) text = await ask(o, prompt, Math.min(targetTokens * 6, Math.floor(window * 0.4)));
@@ -168,6 +186,8 @@ export async function compact(opts: {
   keepRecent: number;
   signal?: AbortSignal;
   instructions?: string;
+  /** Appended to the stored summary as is (the agent's current task list). */
+  appendix?: string;
 }): Promise<CompactResult | undefined> {
   const plan = planCompaction(opts.session, opts.keepRecent);
   if (!plan) return undefined;
@@ -177,6 +197,7 @@ export async function compact(opts: {
     model: opts.model,
     window: opts.window,
     instructions: opts.instructions,
+    after: plan.kept,
     signal: opts.signal,
   });
   if (summary.length < 20) throw new CompactionError('The summary was too short to be trustworthy.');
@@ -192,6 +213,6 @@ export async function compact(opts: {
       'The conversation changed while it was being summarised; nothing was modified.',
     );
   }
-  opts.session.appendCompaction(summary, plan.firstKeptId);
+  opts.session.appendCompaction(opts.appendix ? `${summary}\n\n${opts.appendix}` : summary, plan.firstKeptId);
   return { summary, droppedMessages: plan.toSummarise.length, tokensBefore: before, tokensAfter: after };
 }
