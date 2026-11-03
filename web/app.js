@@ -608,6 +608,7 @@ function renderTop() {
     $('#meter-text').textContent = '–';
     $('#meter-fill').style.width = '0%';
     $('#queued').textContent = '';
+    $('#budget').hidden = true;
     return;
   }
   const mode = $('#mode');
@@ -636,6 +637,14 @@ function renderTop() {
   $('#meter').title = win
     ? `Context ${used.toLocaleString()} of ${win.toLocaleString()} tokens (${st.session.contextSource}). Automatic compaction starts at ${st.session.target.toLocaleString()} tokens (the tick), and the chat pauses until it finishes.`
     : 'No model selected yet.';
+  const b = st.swarmBudget;
+  const budget = $('#budget');
+  budget.hidden = !b;
+  if (b) {
+    budget.textContent = `Messages ${b.used}/${b.limit || '∞'}`;
+    budget.className =
+      b.limit && b.used >= b.limit ? 'hot' : b.limit && b.used >= b.limit * 0.8 ? 'warn' : '';
+  }
   $('#queued').textContent = st.queued
     ? `${st.queued} message${st.queued > 1 ? 's' : ''} queued`
     : `↑${fmt(st.tokens.input)} ↓${fmt(st.tokens.output)} tokens`;

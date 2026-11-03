@@ -62,7 +62,11 @@ Agents use these tools: `swarm_say`, `swarm_roster`, `swarm_note` / `swarm_notes
 ## Staying safe
 
 - **Message budget.** After `swarm.maxMessages` (default 60) agent-to-agent messages with no human input, delivery
-  pauses and the channel says so. Only a message from you resets it.
+  pauses and the channel says so. Anything you type resets it. The footer shows the count beside the context meter
+  (`messages 12/60`), amber near the limit and red when the team is waiting for you; the dashboard shows it too.
+  `/swarm custom` asks for this limit and the per-turn tool-call limit each time and saves your answers;
+  `/swarm limit` changes them any time (`/swarm limit 250`, `/swarm limit off` for none). With local models,
+  where tokens cost nothing, a high limit or none is reasonable; a confused team then runs until you press esc.
 - **Shared workspace.** Agents edit the same files. `write`/`edit` use per-file locks and atomic writes, and refuse to
   modify a file that changed since _that agent_ last read it, so concurrent edits fail loudly instead of clobbering.
 - **One approval queue.** Every agent's approval requests appear in one prompt, labelled with the agent, in arrival order.

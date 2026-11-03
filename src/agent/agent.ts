@@ -273,7 +273,7 @@ export class Agent {
   }
 
   private async loop(signal: AbortSignal): Promise<StopReason | 'aborted' | 'max_iterations'> {
-    const max = this.o.config.maxToolIterations;
+    const max = this.o.config.maxToolIterations || Infinity; // 0 = no limit
     let recovered = false;
     for (let iter = 0; iter < max; iter++) {
       if (signal.aborted) return 'aborted';

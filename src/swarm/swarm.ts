@@ -24,6 +24,8 @@ export type SwarmEvents = {
   agent_status: { name: string; running: boolean };
   agent_event: { name: string; event: AgentEvent };
   budget_exhausted: { limit: number };
+  /** Messages agents have sent each other since the user last spoke; `limit` 0 means no limit. */
+  budget: { used: number; limit: number };
 };
 
 interface Slot {
@@ -68,13 +70,15 @@ export class Swarm {
   private slots = new Map<string, Slot>();
   private notesStore: Record<string, string> = {};
   private nextId = 1;
-  private budget: number;
+  /** Agent-to-agent messages since the user last spoke. */
+  private used = 0;
+  private limit: number;
   private exhaustedNotified = false;
   private persistTimer: NodeJS.Timeout | undefined;
   private state: SwarmState | undefined;
 
   constructor(private opts: SwarmOptions) {
-    this.budget = opts.maxMessages;
+    this.limit = opts.maxMessages;
     if (opts.restore) {
       this.state = opts.restore.state;
       this.notesStore = { ...opts.restore.state.notes };
@@ -189,9 +193,26 @@ export class Swarm {
 
   /** The human speaks in the channel. Resets the runaway-chatter budget. */
   say(text: string, to?: string): void {
-    this.budget = this.opts.maxMessages;
+    this.used = 0;
     this.exhaustedNotified = false;
+    this.emitBudget();
     this.route(USER, text, to);
+  }
+
+  /** How much of the message budget is used. */
+  budget(): { used: number; limit: number } {
+    return { used: this.used, limit: this.limit };
+  }
+
+  /** Change the message budget while the team works (0 = no limit). Raising it lets a paused team carry on. */
+  setLimit(limit: number): void {
+    this.limit = limit;
+    if (!limit || this.used < limit) this.exhaustedNotified = false;
+    this.emitBudget();
+  }
+
+  private emitBudget(): void {
+    this.events.emit('budget', this.budget());
   }
 
   private system(text: string): void {
@@ -248,17 +269,18 @@ export class Swarm {
     opts: { auto?: boolean; wake?: boolean } = {},
   ): boolean {
     if (from !== USER) {
-      if (this.budget <= 0) {
+      if (this.limit && this.used >= this.limit) {
         if (!this.exhaustedNotified) {
           this.exhaustedNotified = true;
           this.system(
-            `Message budget (${this.opts.maxMessages}) reached — agents are paused until you speak.`,
+            `Message budget (${this.limit}) reached: agents are paused until you speak. Raise it with /swarm limit.`,
           );
-          this.events.emit('budget_exhausted', { limit: this.opts.maxMessages });
+          this.events.emit('budget_exhausted', { limit: this.limit });
         }
         return false;
       }
-      this.budget--;
+      this.used++;
+      this.emitBudget();
     }
     const mentions = this.mentionsIn(text);
     const explicit = to && this.slots.has(to) ? [to] : [];

@@ -1077,6 +1077,16 @@ textarea::placeholder {
   padding: 0 4px;
   font-variant-numeric: tabular-nums;
 }
+#budget {
+  font-family: var(--mono);
+  color: var(--fg-2);
+}
+#budget.warn {
+  color: var(--amber);
+}
+#budget.hot {
+  color: var(--red);
+}
 #queued {
   font-family: var(--mono);
 }

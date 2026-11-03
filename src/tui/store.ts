@@ -66,6 +66,8 @@ export interface UiSnapshot {
   compacting?: { pct: number };
   /** Show agents' reasoning in full (otherwise a one-line "thought for 8s"). */
   showThinking: boolean;
+  /** Messages the swarm's agents have sent each other since you last spoke, against the limit (0 = none). */
+  swarmBudget?: { used: number; limit: number };
 }
 
 /** How much live reasoning to keep per agent: enough to show its tail, not the whole essay. */
@@ -134,6 +136,7 @@ export class UiStore {
   private queued = 0;
   private compacting: { pct: number } | undefined;
   private showThinking = false;
+  private swarmBudget: { used: number; limit: number } | undefined;
 
   constructor() {
     this.snapshot = this.build();
@@ -155,6 +158,7 @@ export class UiStore {
       tokens: this.tokens,
       queued: this.queued,
       showThinking: this.showThinking,
+      ...(this.swarmActive && this.swarmBudget ? { swarmBudget: this.swarmBudget } : {}),
       ...(this.compacting ? { compacting: this.compacting } : {}),
       ...(this.status ? { status: this.status } : {}),
     };
@@ -226,8 +230,13 @@ export class UiStore {
     for (const c of swarm.configs())
       this.agentLive(c.name, { role: c.role, ...(c.color ? { color: c.color } : {}) });
     this.restoreChannel(swarm.log);
+    this.swarmBudget = swarm.budget();
     const off: (() => void)[] = [];
     off.push(
+      swarm.events.on('budget', (b) => {
+        this.swarmBudget = b;
+        this.publish();
+      }),
       swarm.events.on('agent_added', ({ name, role, color }) => {
         this.agentLive(name, { role, ...(color ? { color } : {}) });
         this.publish(true);

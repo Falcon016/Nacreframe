@@ -254,4 +254,45 @@ describe('swarm', () => {
     await settle(swarm);
     expect(JSON.stringify(lead.requests[0]!.messages)).toContain('the tests use vitest');
   });
+
+  // ---- the message budget -------------------------------------------------------------------
+
+  const pingpong = (self: string, other: string, n = 40) =>
+    new ScriptedProvider(
+      Array.from({ length: n }, (_, i) =>
+        i % 2 === 0 ? callTool(`${self}${i}`, 'swarm_say', { to: other, text: `ping ${i}` }) : say('waiting'),
+      ),
+    );
+
+  it('reports how much of the budget is used, and resets it when the user speaks', async () => {
+    const a = pingpong('a', 'b', 8);
+    const b = pingpong('b', 'a', 8);
+    const swarm = build({ a, b }, { maxMessages: 4 });
+    await swarm.addAgent({ name: 'a', role: 'x' });
+    await swarm.addAgent({ name: 'b', role: 'y' });
+    const seen: string[] = [];
+    swarm.events.on('budget', (x) => seen.push(`${x.used}/${x.limit}`));
+    swarm.say('begin');
+    await settle(swarm);
+    expect(seen.slice(0, 5)).toEqual(['0/4', '1/4', '2/4', '3/4', '4/4']);
+    expect(swarm.budget()).toEqual({ used: 4, limit: 4 });
+    swarm.say('keep going');
+    expect(swarm.budget().used).toBe(0);
+  });
+
+  it('runs without a budget when the limit is 0, and a raised limit takes effect at once', async () => {
+    const a = pingpong('a', 'b', 20);
+    const b = pingpong('b', 'a', 20);
+    const swarm = build({ a, b }, { maxMessages: 0 });
+    await swarm.addAgent({ name: 'a', role: 'x' });
+    await swarm.addAgent({ name: 'b', role: 'y' });
+    let exhausted = false;
+    swarm.events.on('budget_exhausted', () => (exhausted = true));
+    swarm.say('begin');
+    await settle(swarm);
+    expect(exhausted).toBe(false);
+    expect(swarm.log.filter((m) => m.kind === 'chat' && m.from !== 'you').length).toBeGreaterThan(10);
+    swarm.setLimit(3);
+    expect(swarm.budget().limit).toBe(3);
+  });
 });

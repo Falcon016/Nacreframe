@@ -23,6 +23,10 @@ First release of the ground-up rewrite (replaces the earlier turtlebot harness).
   It installs what is missing: a private, checksum-verified Node.js when none is usable, and git through your package
   manager if you agree. `nacre` is a launcher that picks that Node.js and repairs a damaged install on its own;
   `install.sh --repair` does the same by hand.
+- **Swarm limits**: `/swarm custom` asks how many messages the agents may send each other before checking in with
+  you, and how many tool calls one agent may make per turn, and saves both to your config (0 / "No limit" allowed).
+  `/swarm limit [n|off]` changes them any time, also for a running team. The footer shows `messages 12/60` beside
+  the context meter, amber near the limit and red when the team is waiting; the dashboard shows the same.
 - **`/update`** and `nacre update [--check]`: check the installed branch for a newer version, show what changed, ask,
   update through the installer, and offer to restart straight into it, continuing the conversation. `--version` now
   reads `package.json`, so it always shows the installed version.
