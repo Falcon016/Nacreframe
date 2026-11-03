@@ -1,7 +1,7 @@
 import { readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import type { AgentEvent } from '../src/agent/agent.js';
+import { outputLimitFix, type AgentEvent } from '../src/agent/agent.js';
 import { estimateMessages, sanitizeMessages } from '../src/agent/context.js';
 import { Session } from '../src/agent/session.js';
 import { configSchema } from '../src/config/schema.js';
@@ -303,6 +303,100 @@ describe('hard limits', () => {
     });
     await agent.run('hi');
     expect(p.requests[0]!.maxTokens).toBeLessThan(WINDOW);
+  });
+});
+
+describe('reply size', () => {
+  it('asks for all the room left in the window by default', async () => {
+    const p = new AutoProvider([say('ok')]);
+    const { agent } = makeAgent(ws.dir, p, { window: 100_000, tools: readOnly() });
+    await agent.run('hi');
+    const r = p.requests[0]!;
+    expect(r.maxTokens).toBeGreaterThan(95_000);
+    expect(r.maxTokens! + used(r)).toBeLessThan(100_000);
+  });
+
+  it('keeps a configured limit', async () => {
+    const p = new AutoProvider([say('ok')]);
+    const { agent } = makeAgent(ws.dir, p, {
+      window: 100_000,
+      tools: readOnly(),
+      config: { maxTokens: 12_000 },
+    });
+    await agent.run('hi');
+    expect(p.requests[0]!.maxTokens).toBe(12_000);
+  });
+
+  it('leaves it to the server when the window is unknown', async () => {
+    const p = new AutoProvider([say('ok')]);
+    const { agent } = makeAgent(ws.dir, p, { window: 0, tools: readOnly() });
+    await agent.run('hi');
+    expect(p.requests[0]!.maxTokens).toBeUndefined();
+  });
+
+  it("learns a hosted model's output ceiling from the rejection and retries without an error", async () => {
+    const p = new AutoProvider([
+      () => {
+        throw new ProviderError(
+          'max_tokens is too large: 190000. This model supports at most 16384 completion tokens, whereas you provided 190000.',
+          400,
+        );
+      },
+      say('first'),
+      say('second'),
+    ]);
+    const { agent, events } = makeAgent(ws.dir, p, { window: 200_000, tools: readOnly() });
+    await agent.run('hi');
+    await agent.run('again');
+    expect(events.some((e) => e.type === 'error')).toBe(false);
+    expect(mainCalls(p).map((r) => r.maxTokens)).toEqual([expect.any(Number), 16_384, 16_384]);
+    expect(agent.model.maxOutput).toBe(16_384);
+    expect(agent.model.contextWindow).toBe(200_000); // not mistaken for a smaller window
+  });
+
+  it('shrinks the reply, not the window, when the server counts the prompt higher than we did', async () => {
+    const p = new AutoProvider([
+      () => {
+        throw new ProviderError(
+          "This model's maximum context length is 32768 tokens. However, you requested 34000 tokens (3000 in the messages, 31000 in the completion).",
+          400,
+        );
+      },
+      say('ok'),
+    ]);
+    const { agent, events } = makeAgent(ws.dir, p, { window: 32_768, tools: readOnly() });
+    await agent.run('hi');
+    expect(events.some((e) => e.type === 'error')).toBe(false);
+    expect(mainCalls(p)[1]!.maxTokens).toBeLessThanOrEqual(32_768 - 3000 - 64);
+    expect(agent.model.contextWindow).toBe(32_768);
+  });
+
+  it('reads the limits out of provider errors', () => {
+    expect(
+      outputLimitFix(
+        'max_tokens: 150000 > 64000, which is the maximum allowed number of output tokens for x',
+      ),
+    ).toEqual({ maxOutput: 64_000 });
+    expect(
+      outputLimitFix(
+        'input length and `max_tokens` exceed context limit: 187254 + 20000 > 200000, decrease input length or `max_tokens` and try again',
+      ),
+    ).toEqual({ room: 12_746 });
+    expect(
+      outputLimitFix(
+        "'max_tokens' or 'max_completion_tokens' is too large: 8000. This model's maximum context length is 32768 tokens and your request has 25000 input tokens (8000 > 32768 - 25000).",
+      ),
+    ).toEqual({ room: 7768 });
+    expect(outputLimitFix('Invalid value for max_tokens')).toEqual({ maxOutput: 8192 });
+    // The prompt alone is too long: that is for compaction, not a smaller reply.
+    expect(
+      outputLimitFix(
+        "This model's maximum context length is 4096 tokens. However, you requested 9000 tokens (8900 in the messages, 100 in the completion).",
+      ),
+    ).toBeUndefined();
+    expect(
+      outputLimitFix('request (9000 tokens) exceeds the available context size (4096 tokens)'),
+    ).toBeUndefined();
   });
 });
 

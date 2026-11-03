@@ -182,7 +182,7 @@ export function buildBody(req: StreamRequest): Record<string, unknown> {
     model: req.model,
     stream: true,
     stream_options: { include_usage: true },
-    max_tokens: req.maxTokens,
+    ...(req.maxTokens ? { max_tokens: req.maxTokens } : {}),
     ...(req.temperature !== undefined ? { temperature: req.temperature } : {}),
     messages: [{ role: 'system', content: req.system }, ...req.messages.flatMap(toWire)],
     ...(tools.length ? { tools } : {}),

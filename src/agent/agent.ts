@@ -108,6 +108,37 @@ export interface AgentOptions {
 const OVERFLOW =
   /prompt is too long|context (length|window|size)|maximum context|too many tokens|exceeds the (model|context|available)|input is too long|n_ctx/i;
 
+/**
+ * What a provider's rejection of the requested output size tells us, if it was one:
+ * - `maxOutput`: the model's own ceiling for one reply (hosted APIs cap it well below the context window);
+ * - `room`: how much the server says is really left in the window after the prompt (our estimate was low).
+ * Undefined when the error is about something else, or the prompt alone is too long (that is compaction's job).
+ */
+export function outputLimitFix(message: string): { maxOutput: number } | { room: number } | undefined {
+  const n = (s: string | undefined) => Number(s);
+  let m = /supports at most (\d+) completion tokens/i.exec(message); // OpenAI
+  if (m) return { maxOutput: n(m[1]) };
+  m = /max_tokens:\s*\d+\s*>\s*(\d+)/i.exec(message); // Anthropic
+  if (m) return { maxOutput: n(m[1]) };
+  let room: number | undefined;
+  if ((m = /(\d+)\s*\+\s*\d+\s*>\s*(\d+)/.exec(message)) && /max_tokens/i.test(message))
+    room = n(m[2]) - n(m[1]); // Anthropic: "input + max_tokens > limit"
+  else if ((m = /maximum context length is (\d+)[^]*?(\d+) in the messages/i.exec(message)))
+    room = n(m[1]) - n(m[2]); // vLLM and others: "(P in the messages, C in the completion)"
+  else if (
+    (m = /maximum context length is (\d+) tokens and your request has (\d+) input tokens/i.exec(message))
+  )
+    room = n(m[1]) - n(m[2]); // newer vLLM
+  if (room !== undefined) return room >= MIN_REPLY_TOKENS ? { room } : undefined;
+  // Some other complaint about the output size without numbers: fall back to a size every provider accepts.
+  if (
+    /\b(max_tokens|max_completion_tokens|max_output_tokens|n_predict|num_predict)\b/i.test(message) &&
+    !OVERFLOW.test(message)
+  )
+    return { maxOutput: 8192 };
+  return undefined;
+}
+
 /** Thrown to end a turn without sending anything further, leaving the conversation intact. */
 export class PauseTurn extends Error {
   constructor(message: string) {
@@ -137,6 +168,9 @@ export class Agent {
   private followUps: string[] = [];
   private controller: AbortController | undefined;
   private running = false;
+  /** Output size of the last request, and the room a provider said is really left (used once, for the retry). */
+  private lastMaxTokens: number | undefined;
+  private roomOverride: number | undefined;
   private compacting = false;
   private idleWaiters: (() => void)[] = [];
   /** Exact context size reported by the provider after the last response (when it reports one). */
@@ -275,6 +309,7 @@ export class Agent {
   private async loop(signal: AbortSignal): Promise<StopReason | 'aborted' | 'max_iterations'> {
     const max = this.o.config.maxToolIterations || Infinity; // 0 = no limit
     let recovered = false;
+    let outputFixes = 0;
     for (let iter = 0; iter < max; iter++) {
       if (signal.aborted) return 'aborted';
       this.drainSteering();
@@ -291,6 +326,17 @@ export class Agent {
         result = await this.callModel(signal);
       } catch (e) {
         if (signal.aborted) return 'aborted';
+        const fix = e instanceof ProviderError && e.status === 400 ? outputLimitFix(e.message) : undefined;
+        if (fix && outputFixes < 3) {
+          // The reply size we asked for was refused: take the provider's real figure and ask again.
+          outputFixes++;
+          if ('maxOutput' in fix && fix.maxOutput < (this.lastMaxTokens ?? Infinity))
+            this.o.model.maxOutput = fix.maxOutput;
+          else if ('room' in fix) this.roomOverride = fix.room;
+          else throw e;
+          iter--;
+          continue;
+        }
         const overflow =
           e instanceof ProviderError && (e.status === 400 || e.status === 413) && OVERFLOW.test(e.message);
         if (!recovered && overflow) {
@@ -358,7 +404,7 @@ export class Agent {
   limits(): { window: number; target: number; hard: number } {
     const w = this.o.model.contextWindow;
     if (w <= 0) return { window: 0, target: Infinity, hard: Infinity };
-    const reserve = Math.min(this.o.config.maxTokens, Math.floor(w * 0.2));
+    const reserve = Math.min(this.o.config.maxTokens || Infinity, Math.floor(w * 0.2));
     const threshold = Math.min(this.o.config.compaction.threshold, COMPACT_THRESHOLD_MAX);
     return {
       window: w,
@@ -493,17 +539,22 @@ export class Agent {
     const m = this.o.model;
     const { window } = this.limits();
     const used = this.promptTokens();
-    // Never ask for more output than the window can hold on top of the prompt.
-    const maxTokens =
-      window > 0
-        ? Math.max(MIN_REPLY_TOKENS, Math.min(this.o.config.maxTokens, window - used - 64))
-        : this.o.config.maxTokens;
+    // As much output as the window holds on top of the prompt (less a margin for estimation error), unless the
+    // config or the provider's own ceiling asks for less. With no known window, the server decides.
+    let room = window > 0 ? window - used - Math.max(256, Math.floor(window * 0.01)) : Infinity;
+    if (this.roomOverride !== undefined) {
+      room = Math.min(room, this.roomOverride - 64);
+      this.roomOverride = undefined;
+    }
+    const want = Math.min(this.o.config.maxTokens || Infinity, m.maxOutput ?? Infinity, room);
+    const maxTokens = Number.isFinite(want) ? Math.max(MIN_REPLY_TOKENS, want) : undefined;
+    this.lastMaxTokens = maxTokens;
     const stream = m.provider.stream({
       model: m.model,
       system: this.o.system(),
       messages: this.view(),
       tools: this.o.tools.specs(),
-      maxTokens,
+      ...(maxTokens ? { maxTokens } : {}),
       ...(this.o.config.thinkingBudget ? { thinkingBudget: this.o.config.thinkingBudget } : {}),
       signal,
     });

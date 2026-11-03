@@ -10,6 +10,10 @@ First release of the ground-up rewrite (replaces the earlier turtlebot harness).
   tool calls are repaired; tool results are capped.
 - Providers: Anthropic and any OpenAI-compatible endpoint (llama.cpp, Ollama, LM Studio, Unsloth Studio, vLLM...).
   Context windows are detected from the server. No default model.
+- **Replies can use the whole context**: by default each model call may write as much as fits in the context window
+  after the prompt (`maxTokens: 0`), instead of a fixed 8192 tokens; long answers and long reasoning no longer get
+  cut off early. Hosted APIs that cap output lower say so when they refuse, and the agent takes their figure and
+  retries. Set `maxTokens` to a number to cap it.
 - Approval modes `ask` / `edits` / `auto` / `plan` with rules; sandbox levels `off` / `guard` / `container`.
 - Live browser control via Playwright with host policy and user take-over.
 - Collaborative swarms in a shared channel with split-pane view; persistent, compacted, resumable like any session.

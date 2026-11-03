@@ -40,7 +40,8 @@ export interface StreamRequest {
   system: string;
   messages: Message[];
   tools: ToolSpec[];
-  maxTokens: number;
+  /** Omitted = the server's own default (usually: until the context is full). */
+  maxTokens?: number;
   temperature?: number;
   /** Extended-thinking token budget (Anthropic). 0 or undefined disables. */
   thinkingBudget?: number;
