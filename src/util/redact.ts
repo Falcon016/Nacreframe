@@ -10,6 +10,7 @@ const PATTERNS: RegExp[] = [
   /AKIA[0-9A-Z]{16}/g,
   /xox[abprs]-[A-Za-z0-9-]{10,}/g,
   /AIza[0-9A-Za-z_-]{35}/g,
+  /\b\d{6,12}:AA[A-Za-z0-9_-]{30,}/g, // Telegram bot tokens
   /-----BEGIN [A-Z ]*PRIVATE KEY-----[\s\S]*?-----END [A-Z ]*PRIVATE KEY-----/g,
   /(?<=\bBearer\s)[A-Za-z0-9._~+/=-]{20,}/g,
 ];

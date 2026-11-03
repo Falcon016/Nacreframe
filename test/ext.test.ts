@@ -3,7 +3,7 @@ import { join, resolve } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { loadExtensions, loadPromptTemplates } from '../src/ext/extensions.js';
 import { connectMcp } from '../src/ext/mcp.js';
-import { SkillStore } from '../src/ext/skills.js';
+import { BUILTIN_SKILLS_DIR, SkillStore } from '../src/ext/skills.js';
 import { PolicyEngine } from '../src/policy/engine.js';
 import { GuardSandbox } from '../src/sandbox/guard.js';
 import { testConfig, tmpWorkspace } from './helpers.js';
@@ -75,6 +75,35 @@ describe('extensions', () => {
     cmd!.run('src/a.ts security', { cwd: ws.dir, prompt: (t) => (sent = t), notify() {} });
     expect(cmd!.description).toBe('Review a file');
     expect(sent).toBe('Review src/a.ts focusing on: src/a.ts security');
+  });
+});
+
+describe('built-in skills', () => {
+  it('ship with the harness, load first, and give way to a user skill of the same name', () => {
+    const store = new SkillStore();
+    const warnings = store.load([{ dir: BUILTIN_SKILLS_DIR, source: 'built-in' }]);
+    expect(warnings).toEqual([]);
+    expect(store.names().sort()).toEqual(
+      expect.arrayContaining(['pre-commit-review', 'python-env', 'security-review']),
+    );
+    for (const s of store.list()) {
+      expect(s.source).toBe('built-in');
+      expect(s.description.length).toBeGreaterThan(40); // the model picks skills by their description
+      expect(s.body).toMatch(/## Report/); // each ends with what to tell the user
+    }
+
+    const mine = join(ws.dir, 'my-skills', 'security-review');
+    mkdirSync(mine, { recursive: true });
+    writeFileSync(
+      join(mine, 'SKILL.md'),
+      '---\nname: security-review\ndescription: My own checklist\n---\nMine.',
+    );
+    store.load([
+      { dir: BUILTIN_SKILLS_DIR, source: 'built-in' },
+      { dir: join(ws.dir, 'my-skills'), source: 'user' },
+    ]);
+    expect(store.get('security-review')).toContain('Mine.');
+    expect(store.list().find((s) => s.name === 'security-review')!.source).toBe('user');
   });
 });
 

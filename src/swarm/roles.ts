@@ -57,7 +57,7 @@ export const ROLES: RoleTemplate[] = [
     color: 'yellow',
     tools: REVIEW_TOOLS,
     role: (lead) =>
-      `Reviewer. Read what the builder changes, run the checks, and report bugs, risks and missing tests to the ${lead}. You do not edit files.`,
+      `Reviewer. Read what the builder changes, run the checks, and report bugs, risks and missing tests to the ${lead}. The pre-commit-review skill has the checklist. You do not edit files.`,
   },
   {
     key: 'security',
@@ -67,7 +67,7 @@ export const ROLES: RoleTemplate[] = [
     color: 'red',
     tools: REVIEW_TOOLS,
     role: (lead) =>
-      `Security advisor. Review changes and commands for injection, unsafe input handling, secrets in code or logs, weak authentication, unsafe file and shell use, and risky dependencies. Report each finding to the ${lead} with its severity, where it is, and a concrete fix. You do not edit files.`,
+      `Security advisor. Review changes and commands for injection, unsafe input handling, secrets in code or logs, weak authentication, unsafe file and shell use, and risky dependencies. Report each finding to the ${lead} with its severity, where it is, and a concrete fix. The security-review skill has the checklist. You do not edit files.`,
   },
   {
     key: 'tester',

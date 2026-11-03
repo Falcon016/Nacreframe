@@ -251,6 +251,7 @@ describe('setup wizard', () => {
       'edits',
       'guard',
       false,
+      'Not now',
       'Save and finish',
     ]);
     expect(await w.run()).toBe(0);
@@ -272,7 +273,7 @@ describe('setup wizard', () => {
   });
 
   it('offers container only when a container runtime is running', async () => {
-    const w = wizard(['Skip for now', 'ask', 'guard', false, 'Save and finish']);
+    const w = wizard(['Skip for now', 'ask', 'guard', false, 'Not now', 'Save and finish']);
     expect(await w.run()).toBe(0);
     const sandbox = w.prompt.menus.find((m) => m.message.includes('fenced'))!;
     expect(sandbox.choices.find((c) => c.label === 'container')?.disabled).toMatch(/Docker or Podman/);
@@ -284,16 +285,19 @@ describe('setup wizard', () => {
   });
 
   it('asks twice before turning the sandbox off', async () => {
-    const w = wizard(['Skip for now', 'ask', 'off', false, 'guard', false, 'Save and finish']);
+    const w = wizard(['Skip for now', 'ask', 'off', false, 'guard', false, 'Not now', 'Save and finish']);
     expect(await w.run()).toBe(0);
     w.prompt.assertDone();
     expect(readJson(configFile()).sandbox).toEqual({ mode: 'guard' });
   });
 
   it('reuses a key from the environment without asking for or storing one', async () => {
-    const w = wizard(['Anthropic', true, 'claude-test-1', 'ask', 'guard', true, 'Save and finish'], {
-      env: { ANTHROPIC_API_KEY: 'env-key-from-shell' },
-    });
+    const w = wizard(
+      ['Anthropic', true, 'claude-test-1', 'ask', 'guard', true, 'Not now', 'Save and finish'],
+      {
+        env: { ANTHROPIC_API_KEY: 'env-key-from-shell' },
+      },
+    );
     expect(await w.run()).toBe(0);
     w.prompt.assertDone();
     expect(w.prompt.asked.some((q) => q.includes('API key') && !q.includes('already have'))).toBe(false);
@@ -305,7 +309,7 @@ describe('setup wizard', () => {
     const mock = await startMockLlm();
     try {
       const w = wizard(
-        ['Something else', '', mock.url, '', 'mock-1', 'ask', 'guard', true, 'Save and finish'],
+        ['Something else', '', mock.url, '', 'mock-1', 'ask', 'guard', true, 'Not now', 'Save and finish'],
         {
           mock,
         },
@@ -331,7 +335,17 @@ describe('setup wizard', () => {
     try {
       // 1) not running -> use a different address that works
       const a = wizard(
-        ['Ollama', 'Use a different address', mock.url, 'mock-2', 'ask', 'guard', false, 'Save and finish'],
+        [
+          'Ollama',
+          'Use a different address',
+          mock.url,
+          'mock-2',
+          'ask',
+          'guard',
+          false,
+          'Not now',
+          'Save and finish',
+        ],
         {
           mock,
         },
@@ -357,6 +371,7 @@ describe('setup wizard', () => {
         'ask',
         'guard',
         false,
+        'Not now',
         'Save and finish',
       ]);
       expect(await b.run()).toBe(0);
@@ -376,6 +391,7 @@ describe('setup wizard', () => {
       'ask',
       'guard',
       false,
+      'Not now',
       'Save and finish',
     ]);
     expect(await w.run()).toBe(0);
@@ -385,7 +401,7 @@ describe('setup wizard', () => {
   it('keeps everything else in an existing config and says where the old one went', async () => {
     mkdirSync(paths.config, { recursive: true });
     writeFileSync(configFile(), JSON.stringify({ theme: 'mono', mcpServers: { demo: { command: 'demo' } } }));
-    const w = wizard(['Skip for now', 'plan', 'guard', false, 'Save and finish']);
+    const w = wizard(['Skip for now', 'plan', 'guard', false, 'Not now', 'Save and finish']);
     expect(await w.run()).toBe(0);
     expect(readJson(configFile())).toMatchObject({
       theme: 'mono',
@@ -402,11 +418,13 @@ describe('setup wizard', () => {
       'auto',
       'guard',
       false,
+      'Not now',
       'Start over',
       'Skip for now',
       'ask',
       'guard',
       false,
+      'Not now',
       'Quit without saving',
     ]);
     expect(await again.run()).toBe(1);
@@ -424,7 +442,7 @@ describe('setup wizard', () => {
   });
 
   it('warns when an environment variable will override what was just saved', async () => {
-    const w = wizard(['Skip for now', 'ask', 'guard', false, 'Save and finish'], {
+    const w = wizard(['Skip for now', 'ask', 'guard', false, 'Not now', 'Save and finish'], {
       env: { NACRE_SANDBOX: 'off' },
     });
     expect(await w.run()).toBe(0);
@@ -632,5 +650,123 @@ describe('nacre setup (command line)', () => {
     const r = run(['--yes']);
     expect(r.status).toBe(0);
     expect(r.stdout).toContain('Nothing to change');
+  });
+});
+
+// ---- telegram ------------------------------------------------------------------------------------
+
+const TG_TOKEN = '123456789:AAtest-token-for-the-wizard-0000000';
+
+/** Telegram for the wizard: the token above is valid, and "falcon" (id 4242) has messaged the bot. */
+function fakeTelegram(opts: { rejectToken?: string } = {}) {
+  const calls: { method: string; body: Record<string, unknown> }[] = [];
+  let delivered = false;
+  const impl: typeof fetch = async (input, init) => {
+    const url = String(input);
+    const m = /^https:\/\/api\.telegram\.org\/bot([^/]+)\/(\w+)$/.exec(url);
+    if (!m) return fakeNetwork()(input, init);
+    const body = JSON.parse(String(init?.body ?? '{}')) as Record<string, unknown>;
+    calls.push({ method: m[2]!, body });
+    if (m[1] === opts.rejectToken || m[1] !== TG_TOKEN)
+      return Response.json({ ok: false, description: 'Unauthorized' }, { status: 401 });
+    switch (m[2]) {
+      case 'getMe':
+        return Response.json({
+          ok: true,
+          result: { id: 1, is_bot: true, first_name: 'Nacre', username: 'nacre_test_bot' },
+        });
+      case 'getUpdates': {
+        const result =
+          !delivered && !body.offset
+            ? [
+                {
+                  update_id: 7,
+                  message: {
+                    message_id: 1,
+                    date: 0,
+                    text: 'hi',
+                    from: { id: 4242, first_name: 'Falcon', username: 'falcon' },
+                    chat: { id: 4242, type: 'private' },
+                  },
+                },
+              ]
+            : [];
+        if (result.length) delivered = true;
+        return Response.json({ ok: true, result });
+      }
+      default:
+        return Response.json({
+          ok: true,
+          result: { message_id: 9, date: 0, chat: { id: 4242, type: 'private' } },
+        });
+    }
+  };
+  return { impl, calls };
+}
+
+describe('setup: telegram', () => {
+  it('checks the token, finds the account by its message, and stores the token outside config.json', async () => {
+    const tg = fakeTelegram();
+    const folder = join(ws.dir, 'proj');
+    const w = wizard(
+      [
+        'Skip for now',
+        'ask',
+        'guard',
+        false,
+        'Set up a Telegram bot',
+        TG_TOKEN,
+        true,
+        folder,
+        'Save and finish',
+      ],
+      { fetchImpl: tg.impl, env: { NACRE_TELEGRAM_WAIT_MS: '2000' } },
+    );
+    expect(await w.run()).toBe(0);
+    w.prompt.assertDone();
+    expect(w.prompt.asked).toContain('Allow @falcon (id 4242) to use the bot?');
+    expect(readJson(configFile()).telegram).toEqual({ allowedUsers: [4242], cwd: folder });
+    expect(readFileSync(configFile(), 'utf8')).not.toContain(TG_TOKEN);
+    expect(readJson(authFile()).telegram).toBe(TG_TOKEN);
+    // The "hi" that identified the account is marked as read, so the bot does not take it for a task.
+    expect(tg.calls.some((c) => c.method === 'getUpdates' && c.body.offset === 8)).toBe(true);
+    expect(tg.calls.some((c) => c.method === 'sendMessage')).toBe(true); // "Connected." to the user
+    expect(w.out.output()).toContain('@nacre_test_bot');
+    expect(w.out.output()).toContain('nacre telegram');
+  });
+
+  it('asks again for a rejected token, and can take a typed user id instead of waiting', async () => {
+    const tg = fakeTelegram();
+    const w = wizard(
+      [
+        'Skip for now',
+        'ask',
+        'guard',
+        false,
+        'Set up a Telegram bot',
+        '999:AAwrong-token-000000000000000000',
+        'Enter the token again',
+        TG_TOKEN,
+        false, // not that account
+        'Type my user id',
+        '5555',
+        join(ws.dir, 'proj'),
+        'Save and finish',
+      ],
+      { fetchImpl: tg.impl, env: { NACRE_TELEGRAM_WAIT_MS: '2000' } },
+    );
+    expect(await w.run()).toBe(0);
+    w.prompt.assertDone();
+    expect(readJson(configFile()).telegram).toMatchObject({ allowedUsers: [5555] });
+  });
+
+  it('turns a configured bot off: no allowed users, token forgotten', async () => {
+    mkdirSync(paths.config, { recursive: true });
+    writeFileSync(configFile(), JSON.stringify({ telegram: { allowedUsers: [4242] } }));
+    writeFileSync(authFile(), JSON.stringify({ telegram: TG_TOKEN }));
+    const w = wizard(['Skip for now', 'ask', 'guard', false, 'Turn it off', 'Save and finish']);
+    expect(await w.run()).toBe(0);
+    expect(readJson(configFile()).telegram).toEqual({ allowedUsers: [] });
+    expect(readJson(authFile()).telegram).toBeUndefined();
   });
 });

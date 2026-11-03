@@ -10,6 +10,12 @@ First release of the ground-up rewrite (replaces the earlier turtlebot harness).
   tool calls are repaired; tool results are capped.
 - Providers: Anthropic and any OpenAI-compatible endpoint (llama.cpp, Ollama, LM Studio, Unsloth Studio, vLLM...).
   Context windows are detected from the server. No default model.
+- **Telegram bot**: `nacre telegram` relays your messages to an agent and its replies, progress, approvals (buttons)
+  and questions back. Only allowed users in private chats; the token lives in auth.json. `nacre setup` connects a
+  bot, checks the token and finds your account by asking you to message it.
+- **Built-in skills**: `python-env`, `security-review` and `pre-commit-review` ship with the harness (user and
+  project skills of the same name replace them); `/skills` lists what is installed. The swarm's reviewer and
+  security advisor are pointed at theirs.
 - **The context stays at or below 80%**: replies may only use the room left under the compaction line, and a reply
   that reaches it is continued after compacting instead of being cut off; tool results that would cross it are made
   room for first. Reasoning that the provider does not send back (OpenAI-compatible servers) no longer counts toward

@@ -23,7 +23,8 @@ Usage
   ${BIN} -p "prompt" [options]     Run once and print the answer (reads piped stdin as context)
   ${BIN} models                    List the models your providers offer (with context windows)
   ${BIN} serve [options]           Start the self-hosted web dashboard (\`${BIN} serve --help\`)
-  ${BIN} setup                     Guided setup: provider, API key, model and safety (\`${BIN} setup --help\`)
+  ${BIN} setup                     Guided setup: provider, API key, model, safety and Telegram (\`${BIN} setup --help\`)
+  ${BIN} telegram                  Run your Telegram bot, to use the agent from your phone
   ${BIN} auth set <provider>       Store an API key (hidden prompt, or pipe it on stdin)
   ${BIN} auth list | remove <p>    Manage stored keys
   ${BIN} trust                     Trust this project's .nacreframe config, skills and extensions
@@ -188,6 +189,10 @@ async function main(): Promise<number> {
   // Subcommands with their own flags are dispatched before the interactive flags are parsed.
   if (process.argv[2] === 'serve') return serveCommand(process.argv.slice(3));
   if (process.argv[2] === 'setup') return setupCommand(process.argv.slice(3));
+  if (process.argv[2] === 'telegram') {
+    const { telegramCommand } = await import('./telegram/run.js');
+    return telegramCommand(process.argv.slice(3));
+  }
   let parsed;
   try {
     parsed = parseArgs({

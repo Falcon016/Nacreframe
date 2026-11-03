@@ -1,6 +1,7 @@
 import { copyFileSync, existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { AuthStore } from '../config/auth.js';
+import { TELEGRAM_KEY } from '../telegram/api.js';
 import { BUILTIN_PROVIDERS } from '../config/load.js';
 import { appPaths, type AppPaths } from '../paths.js';
 import {
@@ -26,6 +27,17 @@ export interface SetupPlan {
   approval?: ApprovalMode;
   sandbox?: SandboxMode;
   browser?: boolean;
+  /** The Telegram bot: who may use it and where it works. The token goes to the credential file. */
+  telegram?: {
+    /** Turn the bot off: forget the token and the allowed users. */
+    off?: boolean;
+    token?: string;
+    allowedUsers: number[];
+    cwd?: string;
+    /** For the review only. */
+    botName?: string;
+    userLabels?: string[];
+  };
 }
 
 export interface ApplyResult {
@@ -35,6 +47,7 @@ export interface ApplyResult {
   /** True when the old config.json could not be parsed and was set aside instead of merged. */
   replacedInvalid: boolean;
   keySaved: boolean;
+  telegramTokenSaved?: boolean;
 }
 
 export const isPlain = (v: unknown): v is PartialConfig => !!v && typeof v === 'object' && !Array.isArray(v);
@@ -63,6 +76,13 @@ export function planToPatch(plan: SetupPlan): PartialConfig {
   if (plan.approval) patch.approval = { mode: plan.approval };
   if (plan.sandbox) patch.sandbox = { mode: plan.sandbox };
   if (plan.browser !== undefined) patch.browser = { enabled: plan.browser };
+  if (plan.telegram)
+    patch.telegram = plan.telegram.off
+      ? { allowedUsers: [] }
+      : {
+          allowedUsers: plan.telegram.allowedUsers,
+          ...(plan.telegram.cwd ? { cwd: plan.telegram.cwd } : {}),
+        };
   return patch;
 }
 
@@ -121,11 +141,24 @@ export function applyPlan(plan: SetupPlan, paths: AppPaths = appPaths()): ApplyR
   }
 
   let keySaved = false;
+  const auth = new AuthStore(paths);
   if (plan.provider && plan.apiKey) {
-    new AuthStore(paths).set(plan.provider.id, plan.apiKey);
+    auth.set(plan.provider.id, plan.apiKey);
     keySaved = true;
   }
-  return { configPath, ...(backupPath ? { backupPath } : {}), replacedInvalid, keySaved };
+  let telegramTokenSaved = false;
+  if (plan.telegram?.off) auth.remove(TELEGRAM_KEY);
+  else if (plan.telegram?.token) {
+    auth.set(TELEGRAM_KEY, plan.telegram.token);
+    telegramTokenSaved = true;
+  }
+  return {
+    configPath,
+    ...(backupPath ? { backupPath } : {}),
+    replacedInvalid,
+    keySaved,
+    ...(telegramTokenSaved ? { telegramTokenSaved } : {}),
+  };
 }
 
 // ---- non-interactive flags -----------------------------------------------------------------------

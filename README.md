@@ -27,6 +27,10 @@ It has **no default model**: you pick one, and the harness reads that model's re
   touched if a valid summary was produced, the full history stays in the append-only session file, and if compaction
   fails or cannot free enough room the chat pauses with everything intact rather than sending an oversized request.
   Messages you type meanwhile are queued, not lost. [Details](docs/compaction.md).
+- **Telegram.** `nacre telegram` runs a private bot so you can hand the agent tasks from your phone, with approvals as
+  buttons. `nacre setup` connects it and finds your account for you. [Details](docs/telegram.md).
+- **Built-in skills** for repairing Python environments, security reviews and pre-commit checks, loaded only when a
+  task needs them (`/skills` lists them).
 - **Web dashboard you can self-host.** `nacre serve` gives you the whole harness in a browser: sessions, streaming
   chat, approvals, a context meter with the compaction line, swarm roster, live browser view. Token login, loopback by
   default, strict CSP, no external requests. [Details](docs/web.md).
