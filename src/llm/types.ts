@@ -68,11 +68,6 @@ export interface ModelInfo {
 
 export interface Provider {
   readonly id: string;
-  /**
-   * Whether earlier reasoning is sent back to the model with the conversation. OpenAI-compatible servers drop it,
-   * so it takes no room in the context there (context accounting must not count it).
-   */
-  readonly keepsThinking?: boolean;
   stream(req: StreamRequest): AsyncIterable<StreamEvent>;
   listModels?(signal?: AbortSignal): Promise<ModelInfo[]>;
 }

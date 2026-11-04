@@ -635,9 +635,7 @@ export function LiveArea({
       {snap.compacting ? (
         <Box paddingLeft={1} marginTop={1}>
           <Text color={t.gold}>
-            {snap.compacting.incoming
-              ? 'Compacting to make room for new tool output: chat paused, your input is queued'
-              : `Compacting context (${snap.compacting.pct}%): chat paused, your input is queued`}
+            Compacting context ({snap.compacting.pct}%): chat paused, your input is queued
           </Text>
         </Box>
       ) : null}

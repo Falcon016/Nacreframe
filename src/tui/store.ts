@@ -1,5 +1,5 @@
 import type { AgentEvent } from '../agent/agent.js';
-import { isHarnessNote, type Agent } from '../agent/agent.js';
+import { TODO_CHECK, type Agent } from '../agent/agent.js';
 import type { BrowserEvent } from '../browser/service.js';
 import type { Message } from '../llm/types.js';
 import type { Swarm } from '../swarm/swarm.js';
@@ -64,7 +64,7 @@ export interface UiSnapshot {
   /** Messages typed while the agent was busy or compacting, not yet delivered. */
   queued: number;
   /** Set while context is being compacted: the chat is paused until it finishes. */
-  compacting?: { pct: number; incoming?: boolean };
+  compacting?: { pct: number };
   /** Show agents' reasoning in full (otherwise a one-line "thought for 8s"). */
   showThinking: boolean;
   /** Messages the swarm's agents have sent each other since you last spoke, against the limit (0 = none). */
@@ -153,7 +153,7 @@ export class UiStore {
   private swarmActive = false;
   private status: string | undefined;
   private queued = 0;
-  private compacting: { pct: number; incoming?: boolean } | undefined;
+  private compacting: { pct: number } | undefined;
   private showThinking = false;
   private swarmBudget: { used: number; limit: number } | undefined;
   /** Per agent, for replies printed line by line: whether part is printed, and the full reasoning so far. */
@@ -432,9 +432,6 @@ export class UiStore {
         if (e.tokensPerSecond) this.lastSpeed = e.tokensPerSecond;
         break;
       }
-      case 'context':
-        this.contextTokens = e.tokens;
-        break;
       case 'speed':
         this.liveSpeed.set(name, e.tokensPerSecond);
         break;
@@ -443,10 +440,8 @@ export class UiStore {
         break;
       case 'compaction':
         if (e.phase === 'start') {
-          this.compacting = { pct: e.pct, ...(e.incoming ? { incoming: true } : {}) };
-          this.status = e.incoming
-            ? `New tool output would take the context to ${e.pct}%: compacting before it goes in. Anything you type is queued.`
-            : `Context at ${e.pct}%: compacting. The chat is paused; anything you type is queued.`;
+          this.compacting = { pct: e.pct };
+          this.status = `Context at ${e.pct}% — compacting. The chat is paused; anything you type is queued.`;
         } else {
           this.compacting = undefined;
           this.status = undefined;
@@ -533,7 +528,7 @@ export function replayInto(store: UiStore, messages: Message[]): void {
         store.push({ kind: 'thinking', agent: 'main', text: b.text.trim(), ms: 0 });
       } else if (b.type === 'text') {
         if (m.role === 'user') {
-          if (!isHarnessNote(b.text)) store.user(b.text);
+          if (!b.text.startsWith(TODO_CHECK)) store.user(b.text);
         } else store.push({ kind: 'assistant', text: b.text, agent: 'main' });
       } else if (b.type === 'tool_use') {
         calls.set(b.id, { name: b.name, description: JSON.stringify(b.input).slice(0, 80) });
