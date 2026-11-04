@@ -5,13 +5,8 @@ part. Because a bad compaction can corrupt or silently truncate a conversation, 
 
 ## The guarantees
 
-1. **Always on, and the line holds.** There is no setting to disable it. `compaction.threshold` can lower the line
-   (minimum 30%) but never raise it above **80%** of the context window, and the context never goes past it:
-   - before a request, compaction runs once less room is left under the line than one useful reply (2% of the
-     window, at most 1024 tokens);
-   - each reply may only use the room left under the line. A reply that reaches it is not cut short: the older
-     conversation is compacted and the model is asked to carry on exactly where it stopped (up to 4 times a turn);
-   - tool results that would take the context past the line are made room for first, then added whole.
+1. **Always on.** There is no setting to disable it. `compaction.threshold` can lower the trigger (minimum 30%) but
+   never raise it above **80%** of the context window.
 2. **The chat is held, not raced.** When the next request would cross the threshold, nothing is sent to the model.
    The turn waits, the older conversation is summarised, and only then does the model call happen. Anything you type
    while it waits is queued (the footer shows the count) and delivered, in order, with that same request.
@@ -31,11 +26,9 @@ part. Because a bad compaction can corrupt or silently truncate a conversation, 
 
 The window comes from the server (llama.cpp's `--ctx-size`, LM Studio, Ollama, `contextWindows` in config). The
 current size is what the provider reported for the last response, plus an estimate for anything added since; with no
-report, a conservative estimate of the whole request (system prompt, tool schemas and messages) is used. Reasoning is
-counted only where the provider sends it back with the conversation (Anthropic); OpenAI-compatible servers drop it, so
-it takes no room there. If a server turns out to have a smaller window than it claimed, the first overflow error
-teaches the harness the real size, and it compacts and retries once. If compaction cannot make room under the line, a
-reply may still use the rest of the window, and a request above 95% of it is never sent.
+report, a conservative estimate of the whole request (system prompt, tool schemas and messages) is used. A reply
+reserve is subtracted so a full prompt can never leave no room to answer. If a server turns out to have a smaller
+window than it claimed, the first overflow error teaches the harness the real size, and it compacts and retries once.
 
 Individual tool results are capped to a slice of the window (and parallel results share a budget), so a single huge
 file or command output cannot jump the context past the limit in one step.
@@ -60,7 +53,6 @@ these rules. Messages sent to a member that is compacting are queued like any ot
 
 ## Watching it
 
-- Terminal: `Compacting context (79%): chat paused, your input is queued`, then `Context compacted: 79% → 31%`. The
-  footer's context figure is kept current after every reply, tool result and compaction.
+- Terminal: `⏸ Compacting context (83%) — chat paused, your input is queued`, then `Context compacted: 83% → 31%`.
 - Dashboard: a banner above the composer, and the context meter shows the 80% tick.
 - `/compact [focus]` runs it on demand, optionally steering what the summary should keep.

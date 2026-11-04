@@ -8,12 +8,12 @@ export const HARD_LIMIT = 0.95;
 /** Minimum head-room (tokens) that must remain for the model's reply. */
 export const MIN_REPLY_TOKENS = 256;
 
-export function estimateMessages(messages: Message[], opts: { thinking?: boolean } = {}): number {
+export function estimateMessages(messages: Message[]): number {
   let chars = 0;
   for (const m of messages) {
     for (const b of m.content) {
       if (b.type === 'text') chars += b.text.length;
-      else if (b.type === 'thinking') chars += opts.thinking === false ? 0 : b.text.length;
+      else if (b.type === 'thinking') chars += b.text.length;
       else if (b.type === 'tool_use') chars += JSON.stringify(b.input).length + b.name.length + 24;
       else if (b.type === 'tool_result') chars += b.content.length + (b.images?.length ?? 0) * 4000 + 24;
       else chars += 4000;
