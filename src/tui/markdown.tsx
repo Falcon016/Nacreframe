@@ -19,7 +19,7 @@ export function inline(text: string, t: Theme, base: { color?: string; bold?: bo
     const s = m[0];
     if (m[1])
       out.push(
-        <Text key={k++} color={t.lavender}>
+        <Text key={k++} color={t.sky}>
           {s.slice(1, -1)}
         </Text>,
       );
@@ -203,7 +203,7 @@ export function CodeBlock({ lang, lines }: { lang: string; lines: string[] }) {
 export function diffColor(line: string, t: Theme): string {
   if (line.startsWith('+') && !line.startsWith('+++')) return t.green;
   if (line.startsWith('-') && !line.startsWith('---')) return t.red;
-  if (line.startsWith('@@')) return t.lavender;
+  if (line.startsWith('@@')) return t.sky;
   return t.dim;
 }
 

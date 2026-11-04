@@ -8,11 +8,11 @@ within a few days.
 
 Issues of particular interest: sandbox or path-guard escapes, approval-policy bypasses, secret leakage into model
 requests or logs, prompt-injection paths that lead to unapproved actions, and trust-model bypasses (project config that
-gains privileges without `nacre trust`).
+gains privileges without `nexus trust`).
 
 ## Scope
 
-Nacreframe runs model-directed actions on your machine. Read [docs/security.md](docs/security.md) for what each sandbox
+NexusHarness runs model-directed actions on your machine. Read [docs/security.md](docs/security.md) for what each sandbox
 level does and does not protect against; "the `guard` sandbox does not contain a shell command" is documented behaviour,
 not a vulnerability.
 

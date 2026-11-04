@@ -14,7 +14,7 @@ let env: NodeJS.ProcessEnv;
 beforeEach(() => {
   ws = tmpWorkspace();
   mkdirSync(join(ws.dir, 'home'), { recursive: true });
-  env = { ...process.env, NACRE_HOME: join(ws.dir, 'home') };
+  env = { ...process.env, NEXUS_HOME: join(ws.dir, 'home') };
 });
 afterEach(() => ws.cleanup());
 
@@ -41,8 +41,8 @@ describe('command line', () => {
   });
 
   it('prints version and help', () => {
-    expect(run('--version').stdout).toMatch(/^Nacreframe \d+\.\d+\.\d+/);
-    expect(run('--help').stdout).toContain('nacre serve');
+    expect(run('--version').stdout).toMatch(/^NexusHarness \d+\.\d+\.\d+/);
+    expect(run('--help').stdout).toContain('nexus serve');
   });
 
   it('refuses scripted use without a model, saying what is available', () => {
@@ -82,7 +82,7 @@ describe('command line', () => {
 
       const page = await fetch(url! + '/');
       expect(page.status).toBe(200);
-      expect(await page.text()).toContain('Nacreframe');
+      expect(await page.text()).toContain('NexusHarness');
       expect((await fetch(url! + '/api/info')).status).toBe(401);
       const info = await fetch(url! + '/api/info', { headers: { authorization: `Bearer ${token}` } });
       expect(info.status).toBe(200);

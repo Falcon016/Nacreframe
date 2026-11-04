@@ -1,6 +1,6 @@
 # Context compaction
 
-A long conversation eventually fills the model's context window. Nacreframe keeps it working by summarising the older
+A long conversation eventually fills the model's context window. NexusHarness keeps it working by summarising the older
 part. Because a bad compaction can corrupt or silently truncate a conversation, the design is deliberately strict.
 
 ## The guarantees

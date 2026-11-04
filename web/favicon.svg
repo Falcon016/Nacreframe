@@ -1,19 +1,26 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
-  <!-- Nacreframe mark: a pearl held in a frame (two terminal brackets). -->
+  <!-- NexusHarness mark: an N whose diagonal is a line between glowing nodes, inside a ring of nodes. -->
   <defs>
     <symbol id="mark" viewBox="0 0 32 32">
+      <circle cx="16" cy="16" r="12.6" fill="none" stroke="#1d5fe0" stroke-width="1.5" />
+      <circle cx="16" cy="3.4" r="1.9" fill="#5cc8ff" />
+      <circle cx="16" cy="28.6" r="1.9" fill="#5cc8ff" />
+      <circle cx="3.4" cy="16" r="1.9" fill="#5cc8ff" />
+      <circle cx="28.6" cy="16" r="1.9" fill="#5cc8ff" />
       <path
-        d="M10.5 5H6v22h4.5M21.5 5H26v22h-4.5"
+        d="M10.4 22V10l11.2 12V10"
         fill="none"
-        stroke="#8a6cf0"
-        stroke-width="2.6"
+        stroke="#2f7bff"
+        stroke-width="3.4"
         stroke-linecap="round"
         stroke-linejoin="round"
       />
-      <circle cx="16" cy="16" r="5.4" fill="#ece8f3" />
-      <path d="M16 10.6a5.4 5.4 0 0 1 0 10.8a3.6 5.4 0 0 0 0-10.8z" fill="#b7a4ff" />
+      <path d="M10.4 22L21.6 10" stroke="#8fe6ff" stroke-width="1.3" stroke-linecap="round" />
+      <circle cx="16" cy="16" r="2.4" fill="#e6f8ff" />
+      <circle cx="10.4" cy="22" r="1.6" fill="#a8f3ff" />
+      <circle cx="21.6" cy="10" r="1.6" fill="#a8f3ff" />
     </symbol>
   </defs>
-  <rect width="32" height="32" rx="7" fill="#0b0a10" />
-  <use href="#mark" x="2" y="2" width="28" height="28" />
+  <rect width="32" height="32" rx="7" fill="#080b12" />
+  <use href="#mark" x="1.5" y="1.5" width="29" height="29" />
 </svg>

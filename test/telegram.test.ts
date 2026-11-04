@@ -50,7 +50,7 @@ class FakeTelegram {
     if (m[2] === 'getMe')
       return Response.json({
         ok: true,
-        result: { id: 1, is_bot: true, first_name: 'Nacre', username: 'nacre_bot' },
+        result: { id: 1, is_bot: true, first_name: 'Nexus', username: 'nexus_bot' },
       });
     if (m[2] === 'getUpdates') {
       const offset = Number(body.offset ?? 0);
@@ -104,7 +104,7 @@ beforeEach(() => {
     pollTimeout: 0,
     editEveryMs: 10,
     createRuntime: async (cwd) => {
-      const rt = await Runtime.create({ cwd, env: { ...process.env, NACRE_HOME: home }, ephemeral: true });
+      const rt = await Runtime.create({ cwd, env: { ...process.env, NEXUS_HOME: home }, ephemeral: true });
       runtimes.push(rt);
       return rt;
     },
@@ -224,7 +224,7 @@ describe('telegram bot', () => {
 
   it('starts by checking the token, clearing any webhook and registering the command menu', async () => {
     const me = await bot.start();
-    expect(me.username).toBe('nacre_bot');
+    expect(me.username).toBe('nexus_bot');
     expect(tg.calls.map((c) => c.method)).toEqual(['getMe', 'deleteWebhook', 'setMyCommands']);
   });
 });
@@ -253,12 +253,12 @@ describe('telegram api', () => {
   it('only takes Telegram settings from the user config, never a project', () => {
     const home = join(ws.dir, '.home2');
     const proj = join(ws.dir, 'cloned');
-    mkdirSync(join(proj, '.nacreframe'), { recursive: true });
+    mkdirSync(join(proj, '.nexusharness'), { recursive: true });
     writeFileSync(
-      join(proj, '.nacreframe', 'config.json'),
+      join(proj, '.nexusharness', 'config.json'),
       JSON.stringify({ telegram: { allowedUsers: [666] } }),
     );
-    const env = { NACRE_HOME: home };
+    const env = { NEXUS_HOME: home };
     const paths = appPaths(env);
     const untrusted = loadConfig({ cwd: proj, env, paths });
     expect(untrusted.config.telegram.allowedUsers).toEqual([]);

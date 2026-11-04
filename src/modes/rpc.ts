@@ -5,7 +5,7 @@ import type { Runtime } from '../runtime.js';
 import { VERSION } from '../version.js';
 
 /**
- * JSON-lines protocol over stdin/stdout for embedding Nacreframe in other programs.
+ * JSON-lines protocol over stdin/stdout for embedding NexusHarness in other programs.
  *
  *   in : {"type":"prompt","text":"..."}  {"type":"steer","text":"..."}  {"type":"abort"}
  *        {"type":"approve","id":N,"allow":true,"always":false,"feedback":"..."}

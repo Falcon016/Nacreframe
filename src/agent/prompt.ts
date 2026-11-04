@@ -24,10 +24,10 @@ const MODE_TEXT: Record<ApprovalMode, string> = {
   plan: 'PLAN MODE: you are read-only. Investigate, then present a clear step-by-step plan. Do not attempt to change anything.',
 };
 
-/** Collect AGENTS.md / NACREFRAME.md from the user config dir and every ancestor of cwd (outermost first). */
+/** Collect AGENTS.md / NEXUSHARNESS.md (or the old NACREFRAME.md) from the user config dir and every ancestor of cwd (outermost first). */
 export function loadProjectInstructions(cwd: string, configDir: string): { path: string; text: string }[] {
   const files: string[] = [];
-  const names = ['AGENTS.md', 'NACREFRAME.md'];
+  const names = ['AGENTS.md', 'NEXUSHARNESS.md', 'NACREFRAME.md'];
   for (const n of names) files.push(join(configDir, n));
   const chain: string[] = [];
   let dir = resolve(cwd);

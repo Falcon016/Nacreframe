@@ -8,7 +8,7 @@ import { Runtime } from '../src/runtime.js';
 import { App } from '../src/tui/App.js';
 import { BUILTINS } from '../src/tui/commands.js';
 import { UiStore } from '../src/tui/store.js';
-import { NACRE } from '../src/tui/theme.js';
+import { NEXUS } from '../src/tui/theme.js';
 import { startMockLlm } from './mock-llm.js';
 import { tmpWorkspace } from './helpers.js';
 
@@ -63,7 +63,7 @@ async function boot(mode: 'ask' | 'auto' = 'ask') {
   mkdirSync(work);
   const runtime = await Runtime.create({
     cwd: work,
-    env: { ...process.env, NACRE_HOME: home },
+    env: { ...process.env, NEXUS_HOME: home },
     ephemeral: true,
   });
   const store = new UiStore();
@@ -71,7 +71,7 @@ async function boot(mode: 'ask' | 'auto' = 'ask') {
   const stdout = new FakeTty();
   let out = '';
   stdout.on('data', (d: Buffer) => (out += d.toString()));
-  const app = render(<App runtime={runtime} store={store} theme={NACRE} />, {
+  const app = render(<App runtime={runtime} store={store} theme={NEXUS} />, {
     stdin: stdin as never,
     stdout: stdout as never,
     stderr: stdout as never,
@@ -113,7 +113,7 @@ describe('interactive UI', () => {
       .mockImplementation((...a: unknown[]) => void errors.push(a.join(' ')));
     const ui = await boot();
     try {
-      await until(() => ui.screen().includes('nacreframe'));
+      await until(() => ui.screen().includes('NexusHarness'));
       await ui.type('/skill');
       await until(() => ui.screen().includes('List the skills'));
       await sleep(100);
@@ -127,7 +127,7 @@ describe('interactive UI', () => {
   it('shows and sets the context window with /context', async () => {
     const ui = await boot();
     try {
-      await until(() => ui.screen().includes('nacreframe'));
+      await until(() => ui.screen().includes('NexusHarness'));
       await ui.type('/context 128k');
       ui.key('\r');
       await until(() => ui.screen().includes('Context window now: 131,072 tokens (set by you)'));
@@ -143,10 +143,10 @@ describe('interactive UI', () => {
   it('renders the banner, streams a reply and shows markdown', async () => {
     const ui = await boot();
     try {
-      await until(() => ui.screen().includes('nacreframe'));
+      await until(() => ui.screen().includes('NexusHarness'));
       // The welcome panel: wordmark set into the top edge of a frame, the mascot, and the keys worth knowing.
       const welcome = ui.screen();
-      expect(welcome).toMatch(/╭─\[●\] nacreframe ─+ v\d+\.\d+\.\d+ ─╮/);
+      expect(welcome).toMatch(/╭─◉ NexusHarness ─+ v\d+\.\d+\.\d+ ─╮/);
       expect(welcome).toContain('▀'); // the mascot is half-block pixel art
       expect(welcome).toContain('/swarm duo');
       await ui.type('hello there');
@@ -166,7 +166,7 @@ describe('interactive UI', () => {
   it('asks before writing a file in ask mode, and writes after approval', async () => {
     const ui = await boot('ask');
     try {
-      await until(() => ui.screen().includes('nacreframe'));
+      await until(() => ui.screen().includes('NexusHarness'));
       await ui.type('write note.txt');
       ui.key('\r');
       await until(() => ui.screen().includes('Approve this action?'));
@@ -186,7 +186,7 @@ describe('interactive UI', () => {
   it('denies a write when the user answers no', async () => {
     const ui = await boot('ask');
     try {
-      await until(() => ui.screen().includes('nacreframe'));
+      await until(() => ui.screen().includes('NexusHarness'));
       await ui.type('write nope.txt');
       ui.key('\r');
       await until(() => ui.screen().includes('Approve this action?'));
@@ -202,7 +202,7 @@ describe('interactive UI', () => {
   it('shift+tab cycles the approval mode and slash commands work', async () => {
     const ui = await boot('ask');
     try {
-      await until(() => ui.screen().includes('nacreframe'));
+      await until(() => ui.screen().includes('NexusHarness'));
       ui.key('\u001b[Z'); // shift+tab
       await until(() => ui.runtime.policy.mode === 'edits');
       await ui.type('/mode plan');
@@ -221,7 +221,7 @@ describe('interactive UI', () => {
   it('runs a collaborating swarm and shows the live channel', async () => {
     const ui = await boot('auto');
     try {
-      await until(() => ui.screen().includes('nacreframe'));
+      await until(() => ui.screen().includes('NexusHarness'));
       await ui.type('/swarm duo');
       ui.key('\r');
       await until(() => ui.screen().includes('Swarm "duo" is up'));
@@ -239,14 +239,14 @@ describe('interactive UI', () => {
   it('starts from a clean screen and reprints everything after the window is resized', async () => {
     const ui = await boot();
     try {
-      await until(() => ui.screen().includes('nacreframe'));
+      await until(() => ui.screen().includes('NexusHarness'));
       const before = ui.raw().length;
       // Going fullscreen: the terminal reflows what is on screen, so redrawing in place would leave ghosts.
       ui.stdout.columns = 160;
       ui.stdout.rows = 50;
       ui.stdout.emit('resize');
       await until(() => ui.raw().slice(before).includes('\x1b[2J\x1b[3J\x1b[H'));
-      await until(() => ui.raw().slice(ui.raw().lastIndexOf('\x1b[2J')).includes('nacreframe'));
+      await until(() => ui.raw().slice(ui.raw().lastIndexOf('\x1b[2J')).includes('NexusHarness'));
       // A resize that ends where it started changes nothing.
       const settled = ui.raw().length;
       ui.stdout.columns = 120;
@@ -263,7 +263,7 @@ describe('interactive UI', () => {
   it('builds a custom swarm from the quick form and starts it', async () => {
     const ui = await boot('auto');
     try {
-      await until(() => ui.screen().includes('nacreframe'));
+      await until(() => ui.screen().includes('NexusHarness'));
       const press = async (k: string, wait: string) => {
         const mark = ui.raw().length;
         ui.key(k);
@@ -301,7 +301,7 @@ describe('interactive UI', () => {
       await sleep(60);
     };
     try {
-      await until(() => ui.screen().includes('nacreframe'));
+      await until(() => ui.screen().includes('NexusHarness'));
       await ui.type('/swarm custom');
       await press('\r', 'How many agents?');
       await press('\r', 'Who leads?'); // 3 agents is highlighted
@@ -330,7 +330,7 @@ describe('interactive UI', () => {
   it('asks before /flush deletes anything, defaults to keeping it, and deletes on yes', async () => {
     const ui = await boot();
     try {
-      await until(() => ui.screen().includes('nacreframe'));
+      await until(() => ui.screen().includes('NexusHarness'));
       // This test runtime keeps its own conversation in memory; put a saved one where /flush looks.
       const saved = join(dirname(ui.work), '.home', 'data', 'sessions', projectKey(ui.runtime.cwd));
       mkdirSync(saved, { recursive: true });
@@ -361,7 +361,7 @@ describe('interactive UI', () => {
   it('folds reasoning into one line, and ctrl+t shows it in full', async () => {
     const ui = await boot();
     try {
-      await until(() => ui.screen().includes('nacreframe'));
+      await until(() => ui.screen().includes('NexusHarness'));
       await ui.type('think about it');
       ui.key('\r');
       await until(() => ui.screen().includes('Thought it through: the answer is 42.'));
@@ -380,7 +380,7 @@ describe('interactive UI', () => {
   it('separates inline <think> reasoning from the answer', async () => {
     const ui = await boot();
     try {
-      await until(() => ui.screen().includes('nacreframe'));
+      await until(() => ui.screen().includes('NexusHarness'));
       await ui.type('/thinking on');
       ui.key('\r');
       await until(() => ui.screen().includes('Showing thinking'));
@@ -398,7 +398,7 @@ describe('interactive UI', () => {
   it('explains how to update a copy that was not installed with the installer', async () => {
     const ui = await boot();
     try {
-      await until(() => ui.screen().includes('nacreframe'));
+      await until(() => ui.screen().includes('NexusHarness'));
       await ui.type('/update');
       ui.key('\r');
       await until(() => /cannot update itself|POSIX installer/.test(ui.screen()));
@@ -410,7 +410,7 @@ describe('interactive UI', () => {
   it('streams reasoning as wrapped lines while the model thinks', async () => {
     const ui = await boot();
     try {
-      await until(() => ui.screen().includes('nacreframe'));
+      await until(() => ui.screen().includes('NexusHarness'));
       await ui.type('/thinking on');
       ui.key('\r');
       await until(() => ui.screen().includes('Showing thinking'));

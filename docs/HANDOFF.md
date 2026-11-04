@@ -5,7 +5,7 @@ another assistant) continues this work, including publishing it to GitHub.
 
 ## What this is
 
-A from-scratch rebuild of the old "turtlebot" harness as **Nacreframe** (CLI: `nacre`, MIT, Node ≥ 22.18, TypeScript,
+A from-scratch rebuild of the old "turtlebot" harness as **NexusHarness** (CLI: `nexus`, MIT, Node ≥ 22.18, TypeScript,
 Ink TUI, plain-JS dashboard). The old project is not being kept; this folder is intended to _replace_ the contents of
 that repository.
 
@@ -20,7 +20,7 @@ that repository.
 5. CI is in `.github/workflows/ci.yml` (Linux, macOS, Windows × Node 22/24, plus a history secret scan). Watch the first
    run: only Windows has been exercised so far.
 6. **No secrets are in the tree** (`npm run scan-secrets` checks, and CI re-checks history). Keep it that way: API keys
-   come from the environment or `nacre auth set`; the dashboard token is generated at runtime.
+   come from the environment or `nexus auth set`; the dashboard token is generated at runtime.
 
 ## Verified
 
@@ -37,7 +37,7 @@ that repository.
 - The Anthropic and OpenAI adapters have only run against mocked streams (no API keys were used). Try them first.
 - Linux and macOS (CI will tell), Podman, the Docker image in `deploy/`, systemd unit.
 - The dashboard behind a real TLS reverse proxy.
-- `install.sh` and `nacre setup`: exercised on Linux only (dash and bash `--posix`, a real pseudo-terminal, shellcheck
+- `install.sh` and `nexus setup`: exercised on Linux only (dash and bash `--posix`, a real pseudo-terminal, shellcheck
   clean). macOS (zsh/Homebrew), fish, and the wizard's arrow-key menus in Windows Terminal / PowerShell are untested.
   There is no PowerShell installer yet, so native Windows installs by hand (see [install.md](install.md)).
 - Quality of summaries differs per model; `live-check` reports whether a model kept an early fact through compaction.
@@ -58,7 +58,7 @@ that repository.
 2. Anthropic/OpenAI live checks with real keys (extend `live-check`).
 3. Dashboard: interactive remote view of the agent's browser (today: refreshed screenshot + pause), per-user accounts,
    file browser / diff review pane.
-4. `nacre serve` Docker image published to a registry; Chromium variant.
+4. `nexus serve` Docker image published to a registry; Chromium variant.
 5. Extension reload without restart; richer swarm topologies (beyond lead and teammates).
 6. Podman and native OS sandboxes (bubblewrap / Seatbelt) behind the existing `Sandbox` interface.
 

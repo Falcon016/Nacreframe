@@ -2,14 +2,16 @@
 // Must stay the first import, and this file must not contain JSX (which adds a React import above it):
 // ./env.js decides which React build loads.
 import { restoreNodeEnv } from './env.js';
+import { addMissingLauncher, adoptLegacyEnv, migrateLegacyDirs } from './legacy.js';
 import { createElement } from 'react';
 import { parseArgs } from 'node:util';
 import { render } from 'ink';
 import { AuthStore } from './config/auth.js';
 import { loadConfig, trustProject } from './config/load.js';
 import { approvalModeSchema, sandboxModeSchema } from './config/schema.js';
-import { doctor } from './doctor.js';
-import { checkForUpdate, pendingRelaunch, relaunch, runUpdate, short } from './update.js';
+import { detectInstall, doctor, LEGACY_MARK } from './doctor.js';
+import { checkForUpdate, installRoot, pendingRelaunch, relaunch, runUpdate, short } from './update.js';
+import { homedir } from 'node:os';
 import { runPrint } from './modes/print.js';
 import { runRpc } from './modes/rpc.js';
 import { Runtime } from './runtime.js';
@@ -31,7 +33,7 @@ Usage
   ${BIN} telegram                  Run your Telegram bot, to use the agent from your phone
   ${BIN} auth set <provider>       Store an API key (hidden prompt, or pipe it on stdin)
   ${BIN} auth list | remove <p>    Manage stored keys
-  ${BIN} trust                     Trust this project's .nacreframe config, skills and extensions
+  ${BIN} trust                     Trust this project's .nexusharness config, skills and extensions
   ${BIN} update [--check]          Update to the latest version (--check only looks)
   ${BIN} doctor [--fix]            Check your environment; --fix repairs what it can (-y: no questions)
 
@@ -50,7 +52,7 @@ Options
 
 Environment
   ANTHROPIC_API_KEY, OPENAI_API_KEY   Provider keys (or use \`${BIN} auth set\`)
-  NACRE_MODEL, NACRE_APPROVAL, NACRE_SANDBOX, NACRE_HOME, NO_COLOR
+  NEXUS_MODEL, NEXUS_APPROVAL, NEXUS_SANDBOX, NEXUS_HOME, NO_COLOR
 `;
 
 /**
@@ -118,8 +120,8 @@ async function noModelMessage(runtime: Runtime): Promise<string> {
         .slice(0, 25)
         .map((m) => `  ${m.spec}${m.contextWindow ? `  (${Math.round(m.contextWindow / 1000)}k ctx)` : ''}`)
         .join('\n')
-    : '  (no provider answered — start a local server or run `nacre auth set <provider>`)';
-  return `No model selected. Choose one with --model <provider>/<model>, NACRE_MODEL, or "model" in your config.\nNew here? \`${BIN} setup\` walks you through it.\n\nAvailable now:\n${list}`;
+    : '  (no provider answered — start a local server or run `nexus auth set <provider>`)';
+  return `No model selected. Choose one with --model <provider>/<model>, NEXUS_MODEL, or "model" in your config.\nNew here? \`${BIN} setup\` walks you through it.\n\nAvailable now:\n${list}`;
 }
 
 async function serveCommand(args: string[]): Promise<number> {
@@ -133,7 +135,7 @@ async function modelsCommand(cwd: string): Promise<number> {
   await runtime.dispose();
   if (!models.length) {
     console.log(
-      'No provider answered. Start a local server (llama.cpp, Ollama, LM Studio) or run `nacre auth set <provider>`.',
+      'No provider answered. Start a local server (llama.cpp, Ollama, LM Studio) or run `nexus auth set <provider>`.',
     );
     return 1;
   }
@@ -192,6 +194,16 @@ function friendlyStartupError(e: Error): string {
 async function main(): Promise<number> {
   // Every static import (React included) has loaded by now.
   restoreNodeEnv();
+  // Renamed from Nacreframe: old NACRE_* variables still work, and old settings move over once.
+  adoptLegacyEnv();
+  for (const [from, to] of migrateLegacyDirs())
+    console.error(`${NAME}: moved your settings and sessions from ${from} to ${to}.`);
+  const install = detectInstall(installRoot(), process.env, homedir());
+  if (install && !install.launcher) {
+    const added = addMissingLauncher(install.binDir, LEGACY_MARK);
+    if (added)
+      console.error(`${NAME}: added the \`${BIN}\` command (${added}); \`nacre\` keeps working too.`);
+  }
   // Subcommands with their own flags are dispatched before the interactive flags are parsed.
   if (process.argv[2] === 'serve') return serveCommand(process.argv.slice(3));
   if (process.argv[2] === 'setup') return setupCommand(process.argv.slice(3));

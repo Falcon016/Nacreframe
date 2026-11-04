@@ -1,11 +1,11 @@
 # Telegram
 
-Talk to the agent from your phone. `nacre telegram` runs a private bot: your messages become tasks for an agent
+Talk to the agent from your phone. `nexus telegram` runs a private bot: your messages become tasks for an agent
 working in a folder you choose, and its replies, approvals and questions come back as Telegram messages and buttons.
 
 ## Set it up
 
-Run `nacre setup` and choose **Set up a Telegram bot** at the last step:
+Run `nexus setup` and choose **Set up a Telegram bot** at the last step:
 
 1. In Telegram, open [@BotFather](https://t.me/BotFather), send `/newbot`, pick a name, and paste the token it gives
    you. The wizard checks it with Telegram.
@@ -20,26 +20,26 @@ allowed and the folder:
 { "telegram": { "allowedUsers": [123456789], "cwd": "/home/you/projects/app" } }
 ```
 
-`NACRE_TELEGRAM_TOKEN` overrides the stored token (handy for containers).
+`NEXUS_TELEGRAM_TOKEN` overrides the stored token (handy for containers).
 
 ## Run it
 
 ```sh
-nacre telegram                  # works in telegram.cwd, or the current folder
-nacre telegram --cwd ~/projects/other
+nexus telegram                  # works in telegram.cwd, or the current folder
+nexus telegram --cwd ~/projects/other
 ```
 
 It long-polls Telegram, so it works from a home network without opening a port or a webhook. Keep it running in a
 terminal, `tmux`, or as a service:
 
 ```ini
-# ~/.config/systemd/user/nacre-telegram.service
+# ~/.config/systemd/user/nexus-telegram.service
 [Unit]
-Description=Nacreframe Telegram bot
+Description=NexusHarness Telegram bot
 After=network-online.target
 
 [Service]
-ExecStart=%h/.local/bin/nacre telegram
+ExecStart=%h/.local/bin/nexus telegram
 Restart=on-failure
 
 [Install]
@@ -47,7 +47,7 @@ WantedBy=default.target
 ```
 
 ```sh
-systemctl --user enable --now nacre-telegram
+systemctl --user enable --now nexus-telegram
 loginctl enable-linger "$USER"   # keep it running when you are logged out
 ```
 
@@ -73,7 +73,7 @@ mid-task.
 | `/compact`  | Summarise the older conversation now                             |
 | `/help`     | List the commands                                                |
 
-Conversations are saved like terminal ones, so `nacre --continue` in the same folder can pick up what you started
+Conversations are saved like terminal ones, so `nexus --continue` in the same folder can pick up what you started
 from your phone, and the other way round with `/continue`.
 
 ## Security
@@ -83,7 +83,7 @@ A bot that can run tools is a remote shell for whoever can talk to it, so:
 - **Only allowed users get an answer, and only in private chats.** Group messages are ignored. A stranger who
   messages the bot is told their user id once (so you can add someone on purpose) and nothing else; no agent is
   started for them.
-- **Only your user config decides who is allowed.** A project's `.nacreframe/config.json` cannot set `telegram`,
+- **Only your user config decides who is allowed.** A project's `.nexusharness/config.json` cannot set `telegram`,
   even when the project is trusted.
 - **The token never appears in logs or errors.** Request URLs contain it, so errors leave them out. Bot tokens are
   also redacted from tool output, like other secrets.

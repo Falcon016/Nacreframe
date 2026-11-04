@@ -53,7 +53,7 @@ const HELP = [
 ].join('\n');
 
 /**
- * `nacre telegram`: a bot that relays one owner's messages to an agent and its replies back. Only users in
+ * `nexus telegram`: a bot that relays one owner's messages to an agent and its replies back. Only users in
  * `allowedUsers`, only private chats. Each chat gets its own runtime, with approvals and questions as buttons.
  */
 export class TelegramBot {
@@ -88,7 +88,7 @@ export class TelegramBot {
       } catch (e) {
         if (this.ctrl.signal.aborted) break;
         if (e instanceof TelegramError && e.status === 401) {
-          this.log('Telegram rejected the bot token. Run `nacre setup` to enter a new one.');
+          this.log('Telegram rejected the bot token. Run `nexus setup` to enter a new one.');
           throw e;
         }
         if (e instanceof TelegramError && e.status === 409) {

@@ -83,7 +83,7 @@ export class Session {
   static load(file: string): Session {
     const lines = readFileSync(file, 'utf8').split('\n').filter(Boolean);
     const header = JSON.parse(lines[0] ?? '{}') as Header;
-    if (header.type !== 'session') throw new Error(`${file} is not a Nacreframe session file`);
+    if (header.type !== 'session') throw new Error(`${file} is not a NexusHarness session file`);
     const s = new Session(header.cwd, file, header.id, header.ts);
     for (const line of lines.slice(1)) {
       try {

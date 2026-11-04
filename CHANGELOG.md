@@ -4,14 +4,21 @@
 
 First release of the ground-up rewrite (replaces the earlier turtlebot harness).
 
+- **Renamed to NexusHarness** (it was Nacreframe), with the `nexus` command; `nacre` still works. Settings, API keys
+  and sessions move to the new folders on first start; `NACRE_*` environment variables, `.nacreframe/` project
+  folders and `NACREFRAME.md` are still read; the installer moves `~/.nacreframe` to `~/.nexusharness`, and an install
+  updated with `/update` gets the `nexus` command added beside `nacre`. New black-and-blue look from the new logo
+  across the terminal UI, dashboard, installer, setup wizard and terminal schemes; `◉` is the mark in text, and the
+  welcome panel's mascot is Nex, a small agent robot.
+
 - Agent loop with streaming, parallel read-only tools, steering, abort, session trees.
 - **Compaction that cannot corrupt a conversation**: always on, at most 80% of the real context window, the chat is
   held while it runs, transactional and chunked, falls back to shorter tails, pauses instead of overflowing; dangling
   tool calls are repaired; tool results are capped.
 - Providers: Anthropic and any OpenAI-compatible endpoint (llama.cpp, Ollama, LM Studio, Unsloth Studio, vLLM...).
   Context windows are detected from the server. No default model.
-- **Telegram bot**: `nacre telegram` relays your messages to an agent and its replies, progress, approvals (buttons)
-  and questions back. Only allowed users in private chats; the token lives in auth.json. `nacre setup` connects a
+- **Telegram bot**: `nexus telegram` relays your messages to an agent and its replies, progress, approvals (buttons)
+  and questions back. Only allowed users in private chats; the token lives in auth.json. `nexus setup` connects a
   bot, checks the token and finds your account by asking you to message it.
 - **Built-in skills**: `python-env`, `security-review` and `pre-commit-review` ship with the harness (user and
   project skills of the same name replace them); `/skills` lists what is installed. The swarm's reviewer and
@@ -36,15 +43,15 @@ First release of the ground-up rewrite (replaces the earlier turtlebot harness).
 - Approval modes `ask` / `edits` / `auto` / `plan` with rules; sandbox levels `off` / `guard` / `container`.
 - Live browser control via Playwright with host policy and user take-over.
 - Collaborative swarms in a shared channel with split-pane view; persistent, compacted, resumable like any session.
-- Ink TUI with the Nacre theme; print / JSON / RPC modes.
-- Self-hosted web dashboard (`nacre serve`): token auth, strict CSP, SSE streaming, approvals, context meter, swarm,
+- Ink TUI with the Nexus theme; print / JSON / RPC modes.
+- Self-hosted web dashboard (`nexus serve`): token auth, strict CSP, SSE streaming, approvals, context meter, swarm,
   live browser view; Docker and systemd deployment files.
 - Extensions, skills, prompt templates, MCP client, `AGENTS.md`.
-- `nacre models`, `nacre doctor`, `npm run live-check`.
+- `nexus models`, `nexus doctor`, `npm run live-check`.
 - **One-command install** for Linux, macOS and WSL: `curl -fsSL .../install.sh | sh` checks Node/git/npm, builds into
-  `~/.nacreframe`, links `nacre`, asks before touching your shell profile, updates by re-running, and `--uninstall`.
+  `~/.nexusharness`, links `nexus`, asks before touching your shell profile, updates by re-running, and `--uninstall`.
   It installs what is missing: a private, checksum-verified Node.js when none is usable, and git through your package
-  manager if you agree. `nacre` is a launcher that picks that Node.js and repairs a damaged install on its own;
+  manager if you agree. `nexus` is a launcher that picks that Node.js and repairs a damaged install on its own;
   `install.sh --repair` does the same by hand.
 - **Fixes from a bug pass**: live reasoning is word-wrapped and grows line by line instead of sliding sideways in a
   single cut-off line (it looked like it was buffering); the dashboard streams it too, and the server sends only
@@ -55,7 +62,7 @@ First release of the ground-up rewrite (replaces the earlier turtlebot harness).
   you, and how many tool calls one agent may make per turn, and saves both to your config (0 / "No limit" allowed).
   `/swarm limit [n|off]` changes them any time, also for a running team. The footer shows `messages 12/60` beside
   the context meter, amber near the limit and red when the team is waiting; the dashboard shows the same.
-- **`/update`** and `nacre update [--check]`: check the installed branch for a newer version, show what changed, ask,
+- **`/update`** and `nexus update [--check]`: check the installed branch for a newer version, show what changed, ask,
   update through the installer, and offer to restart straight into it, continuing the conversation. `--version` now
   reads `package.json`, so it always shows the installed version.
 - **Thinking**: each agent's reasoning is kept. Hidden, it is one quiet line ("✻ planner thought for 8s"); ctrl+t or
@@ -80,9 +87,9 @@ First release of the ground-up rewrite (replaces the earlier turtlebot harness).
   The dashboard drops glows, gradient washes and floating cards for hairlines and surface steps, groups mode, sandbox
   and model into one control, shows keycaps on approvals, and opens on a list of your allowed folders. Newsreader is
   no longer bundled.
-- **`nacre doctor --fix`** repairs broken or invalid settings, a missing API key, key-file permissions, missing folders, a
-  missing or off-`PATH` launcher, a too-old Node.js and (after asking) a missing browser; plain `nacre doctor` offers it.
+- **`nexus doctor --fix`** repairs broken or invalid settings, a missing API key, key-file permissions, missing folders, a
+  missing or off-`PATH` launcher, a too-old Node.js and (after asking) a missing browser; plain `nexus doctor` offers it.
   The Node.js check now compares the minor version (22.18), not just the major.
-- **`nacre setup`**: guided wizard (arrow-key menus; provider, API key checked before saving, local-server detection,
+- **`nexus setup`**: guided wizard (arrow-key menus; provider, API key checked before saving, local-server detection,
   model, approval mode, sandbox, browser) that saves nothing until confirmed and keeps unrelated settings. `--yes`
-  mode with flags for scripts and CI. `nacre doctor` and `setup` share their system checks.
+  mode with flags for scripts and CI. `nexus doctor` and `setup` share their system checks.

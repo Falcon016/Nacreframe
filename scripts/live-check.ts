@@ -16,17 +16,17 @@ const spec = process.argv[2];
 const window = Number(process.argv[3] ?? 8192);
 if (!spec || !spec.includes('/')) {
   console.error(
-    'Usage: npm run live-check -- <provider>/<model> [contextWindowTokens]\nSee `nacre models` for what is available.',
+    'Usage: npm run live-check -- <provider>/<model> [contextWindowTokens]\nSee `nexus models` for what is available.',
   );
   process.exit(2);
 }
 
-const dir = mkdtempSync(join(tmpdir(), 'nacre-live-'));
+const dir = mkdtempSync(join(tmpdir(), 'nexus-live-'));
 const work = join(dir, 'work');
 mkdirSync(work);
 // Keep the user's config (providers, keys) but isolate sessions/state from their real ones.
-const env = { ...process.env, NACRE_HOME: join(dir, 'home') };
-const userCfg = join(process.env.NACRE_HOME ?? '', 'config', 'config.json');
+const env = { ...process.env, NEXUS_HOME: join(dir, 'home') };
+const userCfg = join(process.env.NEXUS_HOME ?? '', 'config', 'config.json');
 mkdirSync(join(dir, 'home', 'config'), { recursive: true });
 try {
   writeFileSync(join(dir, 'home', 'config', 'config.json'), readFileSync(userCfg));

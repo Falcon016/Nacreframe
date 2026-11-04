@@ -128,7 +128,7 @@ async function findUser(
   me: TgUser,
 ): Promise<{ id: number; label: string } | undefined> {
   const t = ctx.term;
-  const waitMs = Number(ctx.env.NACRE_TELEGRAM_WAIT_MS) || 120_000;
+  const waitMs = Number(ctx.env.NEXUS_TELEGRAM_WAIT_MS) || 120_000;
   await api.deleteWebhook().catch(() => undefined);
   for (;;) {
     t.note(

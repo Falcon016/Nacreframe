@@ -12,7 +12,7 @@ import {
   type SandboxMode,
 } from '../config/schema.js';
 
-/** Everything `nacre setup` can change. Fields left out are left alone. */
+/** Everything `nexus setup` can change. Fields left out are left alone. */
 export interface SetupPlan {
   provider?: {
     id: string;
@@ -86,7 +86,7 @@ export function planToPatch(plan: SetupPlan): PartialConfig {
   return patch;
 }
 
-/** Merge `patch` into the user's config file (keeping a `.bak` of the old one). Used by `nacre doctor --fix`. */
+/** Merge `patch` into the user's config file (keeping a `.bak` of the old one). Used by `nexus doctor --fix`. */
 export function patchUserConfig(patch: PartialConfig, paths: AppPaths = appPaths()): void {
   editUserConfig((current) => mergeConfig(current, patch), paths);
 }

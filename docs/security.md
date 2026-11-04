@@ -1,6 +1,6 @@
 # Security model
 
-Nacreframe lets a language model read files, run commands and drive a browser on your machine. This page states
+NexusHarness lets a language model read files, run commands and drive a browser on your machine. This page states
 what it defends against, how, and — just as important — what it does **not** defend against.
 
 ## Threats
@@ -10,7 +10,7 @@ what it defends against, how, and — just as important — what it does **not**
 | The model makes a mistake (deletes files, force-pushes)                   | Approval modes; hard blocklist; escalations always ask; read-before-edit; diffs shown before writes                                                                                     |
 | **Prompt injection** from web pages, fetched URLs, MCP output, repo files | Untrusted-content envelope + system prompt rule; browser/fetch/MCP results are always wrapped; risky tools still need approval                                                          |
 | Someone else messages your Telegram bot                                   | Only `telegram.allowedUsers`, only private chats; strangers get their id once and nothing else; the list is read from the user config only, never a project's                           |
-| A cloned repo ships config that auto-approves or runs code                | Project config is _restricted_ until `nacre trust`: only deny/ask rules, extra deny-paths, host blocks are honoured; project skills, extensions, prompts and `SYSTEM.md` are not loaded |
+| A cloned repo ships config that auto-approves or runs code                | Project config is _restricted_ until `nexus trust`: only deny/ask rules, extra deny-paths, host blocks are honoured; project skills, extensions, prompts and `SYSTEM.md` are not loaded |
 | Secrets leak to the model provider or the session log                     | Output redaction (token shapes + secret-named env values); child processes get a scrubbed environment; `.env`, `*.pem`, SSH keys are deny-listed by default                             |
 | Agent reads/writes outside the project                                    | `guard`: realpath-resolved path confinement (symlinks/junctions can't escape), Windows device/ADS paths rejected                                                                        |
 | SSRF via `web_fetch` (cloud metadata, localhost services)                 | Private, loopback, link-local and metadata addresses are refused, re-checked on every redirect                                                                                          |
@@ -34,9 +34,9 @@ and session files are append-only, so no operation can silently truncate or corr
 
 ## Web dashboard
 
-`nacre serve` adds an HTTP surface. It listens on loopback by default, refuses a network address without a login token,
+`nexus serve` adds an HTTP surface. It listens on loopback by default, refuses a network address without a login token,
 compares tokens in constant time, rate-limits failed logins, uses `HttpOnly` + `SameSite=Strict` cookies, requires an
-`X-Nacre` header and a matching `Origin` on every state-changing call (CSRF), checks the `Host` header (DNS rebinding),
+`X-Nexus` header and a matching `Origin` on every state-changing call (CSRF), checks the `Host` header (DNS rebinding),
 sends a strict CSP, only opens folders inside configured `--root`s, validates every id from the client so no file path
 reaches the file system, and renders model output with DOM text nodes only. Details and deployment advice (TLS reverse
 proxy or VPN) are in [web.md](web.md). A signed-in user can make the agent run commands as the server's user: treat the
@@ -64,7 +64,7 @@ minimal environment plus the variables you list. Neither is loaded from an untru
 
 ## Credentials
 
-Keys come from environment variables or `nacre auth set` (stored in `auth.json`, mode `0600` on POSIX; on Windows it
+Keys come from environment variables or `nexus auth set` (stored in `auth.json`, mode `0600` on POSIX; on Windows it
 inherits the permissions of your profile directory). Nothing in this repository holds credentials; `npm run scan-secrets`
 and CI scan the tree and git history for credential shapes.
 

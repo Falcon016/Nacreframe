@@ -22,8 +22,9 @@ import { patchUserConfig } from './setup/plan.js';
 import { Cancelled, TtyPrompter, type Prompter } from './setup/prompt.js';
 import { Term } from './setup/ui.js';
 import { BIN, NAME, VERSION } from './version.js';
+import { LEGACY, PROJECT_DIR } from './legacy.js';
 
-/** Something `nacre doctor --fix` can do about a problem. */
+/** Something `nexus doctor --fix` can do about a problem. */
 export interface Fix {
   /** Same id = same fix; it runs once even if several checks point at it. */
   id: string;
@@ -31,7 +32,7 @@ export interface Fix {
   label: string;
   /** Needs a person at the keyboard (typing a key, answering the wizard). */
   interactive?: boolean;
-  /** Does something big or outside Nacreframe's own folders: ask first unless --yes was given. */
+  /** Does something big or outside NexusHarness's own folders: ask first unless --yes was given. */
   confirm?: string;
   run(): Promise<string | undefined>;
 }
@@ -103,7 +104,7 @@ function findChrome(): string | undefined {
   return candidates.find((c) => c && existsSync(c));
 }
 
-/** Checks about the machine itself (no configuration needed). Shared by `nacre doctor` and `nacre setup`. */
+/** Checks about the machine itself (no configuration needed). Shared by `nexus doctor` and `nexus setup`. */
 export async function systemChecks(): Promise<Check[]> {
   const checks: Check[] = [];
   checks.push({
@@ -147,34 +148,45 @@ export async function systemChecks(): Promise<Check[]> {
   return checks;
 }
 
-// ---- how this copy of Nacreframe was installed ---------------------------------------------------------
+// ---- how this copy of NexusHarness was installed ---------------------------------------------------------
 
 export interface InstallInfo {
   /** The folder holding dist/ and node_modules/. */
   root: string;
-  /** Where the `nacre` launcher script is, if it exists. */
+  /** Where the `nexus` launcher script is, if it exists. */
   launcher?: string;
   binDir: string;
 }
 
-const MARK = '# nacre launcher written by the Nacreframe installer';
+const MARK = '# nexus launcher written by the NexusHarness installer';
+/** Launchers written before the rename say this instead, and set NACRE_DIR. */
+export const LEGACY_MARK = '# nacre launcher written by the Nacreframe installer';
 
-/** Finds the launcher made by install.sh for this copy, or says this is not an installer-made copy. */
+const launcherFor = (f: string, root: string): boolean => {
+  try {
+    const text = readFileSync(f, 'utf8');
+    return (
+      (text.includes(MARK) && text.includes(`NEXUS_DIR='${root}'`)) ||
+      (text.includes(LEGACY_MARK) && text.includes(`NACRE_DIR='${root}'`))
+    );
+  } catch {
+    return false;
+  }
+};
+
+/**
+ * Finds the `nexus` launcher made by install.sh for this copy, or says this is not an installer-made copy. An
+ * install from before the rename has only a `nacre` launcher: it is recognised, but `launcher` stays unset so
+ * doctor offers to repair it (which adds `nexus`).
+ */
 export function detectInstall(root: string, env: NodeJS.ProcessEnv, home: string): InstallInfo | undefined {
   if (process.platform === 'win32' || !existsSync(join(root, 'install.sh'))) return undefined;
   const dirs = [...(env.PATH ?? '').split(delimiter), join(home, '.local', 'bin')].filter(Boolean);
-  for (const d of dirs) {
-    const f = join(d, BIN);
-    try {
-      const text = readFileSync(f, 'utf8');
-      if (text.includes(MARK) && text.includes(`NACRE_DIR='${root}'`))
-        return { root, launcher: f, binDir: d };
-    } catch {
-      /* not there */
-    }
-  }
+  for (const d of dirs)
+    if (launcherFor(join(d, BIN), root)) return { root, launcher: join(d, BIN), binDir: d };
+  for (const d of dirs) if (launcherFor(join(d, LEGACY.bin), root)) return { root, binDir: d };
   // No launcher found, but this is where the installer puts things by default: it can be put back.
-  if (resolve(root) === resolve(join(home, '.nacreframe'))) {
+  if ([PROJECT_DIR, LEGACY.projectDir].some((dir) => resolve(root) === resolve(join(home, dir)))) {
     return { root, binDir: join(home, '.local', 'bin') };
   }
   return undefined;
@@ -186,11 +198,13 @@ function profileHasPathEntry(home: string, env: NodeJS.ProcessEnv): boolean {
     join(home, '.bashrc'),
     join(home, '.bash_profile'),
     join(home, '.profile'),
-    join(env.XDG_CONFIG_HOME ?? join(home, '.config'), 'fish', 'conf.d', 'nacreframe.fish'),
+    join(env.XDG_CONFIG_HOME ?? join(home, '.config'), 'fish', 'conf.d', 'nexusharness.fish'),
+    join(env.XDG_CONFIG_HOME ?? join(home, '.config'), 'fish', 'conf.d', `${LEGACY.slug}.fish`),
   ];
   return files.some((f) => {
     try {
-      return readFileSync(f, 'utf8').includes('nacreframe');
+      const text = readFileSync(f, 'utf8');
+      return text.includes('nexusharness') || text.includes(LEGACY.slug);
     } catch {
       return false;
     }
@@ -255,7 +269,7 @@ export async function doctor(cwd: string, opts: DoctorOptions = {}): Promise<num
         install.binDir,
       ]);
       if (code !== 0) throw new Error(`the installer exited with status ${code}`);
-      return 'Repaired. Open a new terminal if `nacre` is not found.';
+      return 'Repaired. Open a new terminal if `nexus` is not found.';
     },
   };
 
@@ -337,11 +351,11 @@ export async function doctor(cwd: string, opts: DoctorOptions = {}): Promise<num
       const inst = install;
       checks.push(
         inst.launcher
-          ? { id: 'install', ok: true, label: 'nacre command', detail: inst.launcher }
+          ? { id: 'install', ok: true, label: 'nexus command', detail: inst.launcher }
           : {
               id: 'install',
               ok: 'warn',
-              label: 'nacre command',
+              label: 'nexus command',
               detail: `missing from ${inst.binDir}`,
               fix: repairInstall,
             },
@@ -477,7 +491,7 @@ export async function doctor(cwd: string, opts: DoctorOptions = {}): Promise<num
         });
     }
 
-    // Folders Nacreframe writes to.
+    // Folders NexusHarness writes to.
     for (const [label, dir] of [
       ['Settings directory', paths.config],
       ['Data directory', paths.data],

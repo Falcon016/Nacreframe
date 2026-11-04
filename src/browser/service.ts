@@ -114,7 +114,7 @@ export class BrowserService {
       pw = await this.load();
     } catch {
       throw new BrowserError(
-        'playwright-core is not installed. Run `npm install playwright-core` in the Nacreframe install directory.',
+        'playwright-core is not installed. Run `npm install playwright-core` in the NexusHarness install directory.',
       );
     }
     mkdirSync(this.profileDir, { recursive: true });
@@ -147,7 +147,7 @@ export class BrowserService {
           return route.fulfill({
             status: 403,
             contentType: 'text/html; charset=utf-8',
-            body: `<!doctype html><title>Blocked</title><h1>Blocked by Nacreframe policy</h1><p>${reason.replace(/[<>&]/g, '')}</p>`,
+            body: `<!doctype html><title>Blocked</title><h1>Blocked by NexusHarness policy</h1><p>${reason.replace(/[<>&]/g, '')}</p>`,
           });
         }
       }

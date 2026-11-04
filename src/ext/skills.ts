@@ -11,7 +11,7 @@ export interface Skill {
   source: string;
 }
 
-/** Skills shipped with Nacreframe (`skills/` beside `src/` and `dist/`). User and project skills override them. */
+/** Skills shipped with NexusHarness (`skills/` beside `src/` and `dist/`). User and project skills override them. */
 export const BUILTIN_SKILLS_DIR = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..', 'skills');
 
 /** Parse the tiny `---\nkey: value\n---` front-matter subset used by SKILL.md files. */

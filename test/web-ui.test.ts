@@ -9,7 +9,7 @@ import { startMockLlm } from './mock-llm.js';
 
 const channel = findBrowser();
 const TOKEN = 'ui-test-token-0123456789abcdef';
-const SHOTS = process.env.NACRE_SHOT_DIR; // set to keep screenshots for design review
+const SHOTS = process.env.NEXUS_SHOT_DIR; // set to keep screenshots for design review
 
 describe.skipIf(!channel)('web dashboard in a real browser', () => {
   let mock: Awaited<ReturnType<typeof startMockLlm>>;
@@ -47,7 +47,7 @@ describe.skipIf(!channel)('web dashboard in a real browser', () => {
       roots: [work],
       token: TOKEN,
       staticDir: resolve('web'),
-      env: { ...process.env, NACRE_HOME: home },
+      env: { ...process.env, NEXUS_HOME: home },
     });
     browser = await chromium.launch({ channel: channel!, headless: true });
     page = await (await browser.newContext({ viewport: { width: 1360, height: 860 } })).newPage();

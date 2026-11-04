@@ -7,7 +7,7 @@ import { render } from 'ink';
 import { Runtime } from '../src/runtime.js';
 import { App } from '../src/tui/App.js';
 import { UiStore } from '../src/tui/store.js';
-import { NACRE } from '../src/tui/theme.js';
+import { NEXUS } from '../src/tui/theme.js';
 import { startMockLlm } from '../test/mock-llm.js';
 
 class Tty extends PassThrough {
@@ -28,7 +28,7 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 const keepColor = process.argv.includes('--color');
 
 const mock = await startMockLlm();
-const dir = mkdtempSync(join(tmpdir(), 'nacre-prev-'));
+const dir = mkdtempSync(join(tmpdir(), 'nexus-prev-'));
 const home = join(dir, 'home');
 mkdirSync(join(home, 'config'), { recursive: true });
 writeFileSync(
@@ -44,7 +44,7 @@ mkdirSync(work);
 writeFileSync(join(work, 'package.json'), '{"name":"demo"}');
 const runtime = await Runtime.create({
   cwd: work,
-  env: { ...process.env, NACRE_HOME: home },
+  env: { ...process.env, NEXUS_HOME: home },
   ephemeral: true,
 });
 const store = new UiStore();
@@ -52,7 +52,7 @@ const stdin = new Tty();
 const stdout = new Tty();
 let out = '';
 stdout.on('data', (d: Buffer) => (out += d.toString()));
-const app = render(<App runtime={runtime} store={store} theme={NACRE} />, {
+const app = render(<App runtime={runtime} store={store} theme={NEXUS} />, {
   stdin: stdin as never,
   stdout: stdout as never,
   stderr: stdout as never,

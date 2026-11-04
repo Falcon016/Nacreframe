@@ -5,11 +5,12 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { detectInstall } from './doctor.js';
 import { BIN } from './version.js';
+import { LEGACY } from './legacy.js';
 
 /**
  * Updating an installer-made copy: check the branch it was installed from for a newer commit, then run the
  * installer that is already on disk in update mode (it downloads, reinstalls dependencies, rebuilds and
- * relinks). If the download fails nothing on disk changes; `nacre doctor --fix` repairs a half-finished one.
+ * relinks). If the download fails nothing on disk changes; `nexus doctor --fix` repairs a half-finished one.
  */
 
 export interface UpdateCheck {
@@ -49,7 +50,7 @@ export const installRoot = (): string => resolve(dirname(fileURLToPath(import.me
 export function manualUpdateHint(root: string): string {
   return existsSync(join(root, '.git'))
     ? `This copy was not installed with install.sh, so it cannot update itself. In ${root}, run:\n  git pull && npm ci && npm run build`
-    : `This copy was not installed with install.sh, so it cannot update itself. Reinstall with:\n  curl -fsSL https://raw.githubusercontent.com/Falcon016/Nacreframe/main/install.sh | sh`;
+    : `This copy was not installed with install.sh, so it cannot update itself. Reinstall with:\n  curl -fsSL https://raw.githubusercontent.com/Falcon016/NexusHarness/main/install.sh | sh`;
 }
 
 export async function checkForUpdate(
@@ -61,13 +62,14 @@ export async function checkForUpdate(
     return {
       ok: false,
       error:
-        'Updating from inside Nacreframe needs the POSIX installer (Linux, macOS or WSL). On Windows: git pull && npm ci && npm run build',
+        'Updating from inside NexusHarness needs the POSIX installer (Linux, macOS or WSL). On Windows: git pull && npm ci && npm run build',
     };
   const install = detectInstall(root, env, home);
   if (!install || !existsSync(join(root, '.git'))) return { ok: false, error: manualUpdateHint(root) };
   let ref = 'main';
   try {
-    ref = readFileSync(join(root, '.nacre-ref'), 'utf8').trim() || 'main';
+    const file = [join(root, '.nexus-ref'), join(root, LEGACY.refFile)].find((f) => existsSync(f));
+    ref = (file ? readFileSync(file, 'utf8').trim() : '') || 'main';
   } catch {
     /* installed before the installer recorded its branch: it defaulted to main */
   }
@@ -115,8 +117,8 @@ export function runUpdate(
         stdio: opts.inherit ? 'inherit' : ['ignore', 'pipe', 'pipe'],
         env: {
           ...process.env,
-          NACRE_REF: check.ref,
-          NACRE_REPO: check.repo,
+          NEXUS_REF: check.ref,
+          NEXUS_REPO: check.repo,
           ...(opts.inherit ? {} : { NO_COLOR: '1' }),
         },
       },
@@ -138,16 +140,20 @@ export function runUpdate(
 }
 
 let pending: UpdateCheck | undefined;
-/** Ask the CLI to start the updated `nacre` once the terminal UI has closed. */
+/** Ask the CLI to start the updated `nexus` once the terminal UI has closed. */
 export const requestRelaunch = (check: UpdateCheck): void => {
   pending = check;
 };
 export const pendingRelaunch = (): UpdateCheck | undefined => pending;
 
-/** Start the freshly updated `nacre` in place of this process, continuing the latest conversation. */
+/** Start the freshly updated `nexus` in place of this process, continuing the latest conversation. */
 export function relaunch(check: UpdateCheck): Promise<number> {
   return new Promise((res) => {
-    const child = spawn(join(check.binDir, BIN), ['--continue'], { stdio: 'inherit' });
+    // An install made before the rename has only the old `nacre` launcher until its installer runs again.
+    const bin =
+      [BIN, LEGACY.bin].map((b) => join(check.binDir, b)).find((p) => existsSync(p)) ??
+      join(check.binDir, BIN);
+    const child = spawn(bin, ['--continue'], { stdio: 'inherit' });
     child.on('error', () => res(1));
     child.on('exit', (code) => res(code ?? 0));
   });

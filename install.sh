@@ -1,14 +1,14 @@
 #!/bin/sh
-# Nacreframe installer
+# NexusHarness installer
 #
-#   curl -fsSL https://raw.githubusercontent.com/Falcon016/Nacreframe/main/install.sh | sh
+#   curl -fsSL https://raw.githubusercontent.com/Falcon016/NexusHarness/main/install.sh | sh
 #
 # Pass options after `-s --`:
 #   curl -fsSL .../install.sh | sh -s -- --help
 #
 # What it does: makes sure Node.js (22.18+) and git are there (installing a private copy of Node.js for you if
-# it is missing or too old), downloads Nacreframe to ~/.nacreframe, installs its dependencies, builds it, puts a
-# `nacre` command in ~/.local/bin, and offers to run the setup wizard. It never uses sudo unless you say yes to
+# it is missing or too old), downloads NexusHarness to ~/.nexusharness, installs its dependencies, builds it, puts a
+# `nexus` command in ~/.local/bin, and offers to run the setup wizard. It never uses sudo unless you say yes to
 # installing git, and it only edits your shell profile if you say yes. Run it again at any time to update;
 # `--repair` fixes a damaged install; `--uninstall` removes it.
 #
@@ -17,13 +17,17 @@
 
 set -eu
 
-NACRE_REPO="${NACRE_REPO:-https://github.com/Falcon016/Nacreframe.git}"
-NACRE_REF="${NACRE_REF:-main}"
-NACRE_INSTALL_DIR="${NACRE_INSTALL_DIR:-}"
-NACRE_BIN_DIR="${NACRE_BIN_DIR:-}"
+# Settings from before the rename (NACRE_*) are still honoured.
+NEXUS_REPO="${NEXUS_REPO:-${NACRE_REPO:-https://github.com/Falcon016/NexusHarness.git}}"
+NEXUS_REF="${NEXUS_REF:-${NACRE_REF:-main}}"
+NEXUS_INSTALL_DIR="${NEXUS_INSTALL_DIR:-${NACRE_INSTALL_DIR:-}}"
+NEXUS_BIN_DIR="${NEXUS_BIN_DIR:-${NACRE_BIN_DIR:-}}"
 
-MARK_BEGIN="# >>> nacreframe >>>"
-MARK_END="# <<< nacreframe <<<"
+MARK_BEGIN="# >>> nexusharness >>>"
+MARK_END="# <<< nexusharness <<<"
+# The PATH block written before the rename.
+LEGACY_MARK_BEGIN="# >>> nacreframe >>>"
+LEGACY_MARK_END="# <<< nacreframe <<<"
 MIN_NODE_MAJOR=22
 MIN_NODE_MINOR=18
 
@@ -32,6 +36,7 @@ RUN_SETUP=auto
 MODIFY_PATH=auto
 UNINSTALL=0
 REPAIR=0
+LEGACY_MOVE=
 NODE_BIN=
 NODE_SEEN=
 SPIN_PID=
@@ -50,8 +55,8 @@ setup_ui() {
     BOLD="${ESC}[1m"; DIM="${ESC}[2m"; RESET="${ESC}[0m"
     RED="${ESC}[31m"; GREEN="${ESC}[32m"; YELLOW="${ESC}[33m"
     case "${COLORTERM:-}" in
-      *truecolor* | *24bit*) ACCENT="${ESC}[38;2;157;132;255m" ;;
-      *) ACCENT="${ESC}[38;5;141m" ;;
+      *truecolor* | *24bit*) ACCENT="${ESC}[38;2;92;200;255m" ;;
+      *) ACCENT="${ESC}[38;5;81m" ;;
     esac
   fi
   UNI=0
@@ -60,9 +65,9 @@ setup_ui() {
   esac
   if [ "${TERM:-}" = "linux" ]; then UNI=0; fi
   if [ "$UNI" = 1 ]; then
-    S_OK="✓"; S_WARN="!"; S_FAIL="✗"; S_TITLE="●"; S_DOT="•"; S_PEARL="●"
+    S_OK="✓"; S_WARN="!"; S_FAIL="✗"; S_TITLE="●"; S_DOT="•"; S_NODE="◉"
   else
-    S_OK="+"; S_WARN="!"; S_FAIL="x"; S_TITLE="*"; S_DOT="-"; S_PEARL="o"
+    S_OK="+"; S_WARN="!"; S_FAIL="x"; S_TITLE="*"; S_DOT="-"; S_NODE="o"
   fi
   # Prompts need a person: a terminal for output and a controlling terminal to read answers from.
   TTY_OK=0
@@ -78,9 +83,9 @@ note() { printf '    %s%s%s\n' "$DIM" "$1" "$RESET"; }
 heading() { printf '\n  %s%s%s\n' "$BOLD" "$1" "$RESET"; }
 banner() {
   blank
-  # The logo in text form: a pearl held between two brackets.
-  printf '  %s[%s%s%s]%s %snacreframe installer%s\n' "$ACCENT" "$RESET" "$S_PEARL" "$ACCENT" "$RESET" "$BOLD" "$RESET"
-  note "A terminal AI agent harness - github.com/Falcon016/Nacreframe"
+  # The logo in text form: a glowing node in its ring.
+  printf '  %s%s%s %sNexusHarness installer%s\n' "$ACCENT" "$S_NODE" "$RESET" "$BOLD" "$RESET"
+  note "A terminal AI agent harness - github.com/Falcon016/NexusHarness"
   blank
 }
 
@@ -186,31 +191,31 @@ ask_yes_no() {
 
 usage() {
   cat <<'EOF'
-Nacreframe installer
+NexusHarness installer
 
 Usage
-  curl -fsSL https://raw.githubusercontent.com/Falcon016/Nacreframe/main/install.sh | sh
-  curl -fsSL https://raw.githubusercontent.com/Falcon016/Nacreframe/main/install.sh | sh -s -- [options]
+  curl -fsSL https://raw.githubusercontent.com/Falcon016/NexusHarness/main/install.sh | sh
+  curl -fsSL https://raw.githubusercontent.com/Falcon016/NexusHarness/main/install.sh | sh -s -- [options]
 
 Options
-  -y, --yes             Do not ask anything; accept the defaults (adds nacre to your PATH, skips the wizard)
+  -y, --yes             Do not ask anything; accept the defaults (adds nexus to your PATH, skips the wizard)
       --no-setup        Do not offer the setup wizard at the end
       --no-modify-path  Never edit shell profile files
       --ref <ref>       Install a branch, tag or commit            (default: main)
-      --dir <path>      Where to install                           (default: ~/.nacreframe)
-      --bin-dir <path>  Where to put the `nacre` command           (default: ~/.local/bin)
+      --dir <path>      Where to install                           (default: ~/.nexusharness)
+      --bin-dir <path>  Where to put the `nexus` command           (default: ~/.local/bin)
       --repair          Reinstall dependencies, rebuild and relink; use it if something stopped working
-      --uninstall       Remove Nacreframe (your settings and sessions are kept)
+      --uninstall       Remove NexusHarness (your settings and sessions are kept)
   -h, --help            Show this help
 
 Environment
-  NACRE_REF, NACRE_INSTALL_DIR, NACRE_BIN_DIR   Same as the options above
-  NACRE_REPO                                    Git URL to install from
-  NACRE_NODE_DIST                               Where to download Node.js from if it is missing
+  NEXUS_REF, NEXUS_INSTALL_DIR, NEXUS_BIN_DIR   Same as the options above
+  NEXUS_REPO                                    Git URL to install from
+  NEXUS_NODE_DIST                               Where to download Node.js from if it is missing
                                                 (default: https://nodejs.org/dist/latest-v22.x)
   NO_COLOR                                      Plain output
 
-Update later with `nacre update` (or /update inside nacre), or by running this again.
+Update later with `nexus update` (or /update inside nexus), or by running this again.
 EOF
 }
 
@@ -226,9 +231,9 @@ detect_os() {
     MINGW* | MSYS* | CYGWIN*)
       fail "This installer is for Linux, macOS and WSL."
       note "On Windows, open a WSL terminal and run the same command there, or install by hand:"
-      note "  git clone https://github.com/Falcon016/Nacreframe.git && cd Nacreframe"
+      note "  git clone https://github.com/Falcon016/NexusHarness.git && cd NexusHarness"
       note "  npm ci && npm run build && npm link"
-      note "Details: https://github.com/Falcon016/Nacreframe/blob/main/docs/install.md"
+      note "Details: https://github.com/Falcon016/NexusHarness/blob/main/docs/install.md"
       exit 1
       ;;
     *) OS=other ;;
@@ -281,7 +286,7 @@ sha256_of() {
 
 # Download, verify (SHA-256 from nodejs.org's SHASUMS256.txt) and unpack Node.js into the install folder.
 do_node_download() {
-  _base="${NACRE_NODE_DIST:-https://nodejs.org/dist/latest-v22.x}"
+  _base="${NEXUS_NODE_DIST:-${NACRE_NODE_DIST:-https://nodejs.org/dist/latest-v22.x}}"
   _tmp="$INSTALL_DIR/runtime/.download"
   rm -rf "$_tmp"
   mkdir -p "$_tmp"
@@ -320,9 +325,9 @@ node_cleanup() {
   rmdir "$INSTALL_DIR/runtime" "$INSTALL_DIR" 2>/dev/null || true
 }
 
-# Find a usable Node.js, or install a private copy next to Nacreframe (no sudo, nothing system-wide).
+# Find a usable Node.js, or install a private copy next to NexusHarness (no sudo, nothing system-wide).
 ensure_node() {
-  # A private copy from an earlier install comes first: it is the one the `nacre` command will use.
+  # A private copy from an earlier install comes first: it is the one the `nexus` command will use.
   if [ -x "$INSTALL_DIR/runtime/node/bin/node" ] && node_version_ok "$INSTALL_DIR/runtime/node/bin/node"; then
     NODE_BIN="$INSTALL_DIR/runtime/node/bin/node"
     ok "Node.js" "v$NODE_SEEN (private copy)"
@@ -344,7 +349,7 @@ ensure_node() {
       fail "curl and tar are needed to download Node.js"
       node_manual_help "$_have"
     fi
-    if ! ask_yes_no "Install a private copy of Node.js for Nacreframe? (about 40 MB, kept in $(tilde "$INSTALL_DIR/runtime"))" y y; then
+    if ! ask_yes_no "Install a private copy of Node.js for NexusHarness? (about 40 MB, kept in $(tilde "$INSTALL_DIR/runtime"))" y y; then
       node_manual_help "$_have"
     fi
     mkdir -p "$INSTALL_DIR/runtime"
@@ -385,7 +390,7 @@ ensure_git() {
     ok "git" "$(git --version | sed 's/^git version //')"
     return 0
   fi
-  warn "git was not found" "it is used to download Nacreframe"
+  warn "git was not found" "it is used to download NexusHarness"
   if [ "$OS" = macOS ] && ! have brew; then
     note "Install it with:  xcode-select --install   (a window opens; come back when it finishes)" >&2
     note "Then run this installer again." >&2
@@ -424,8 +429,13 @@ pkg_version() {
   sed -n 's/.*"version": *"\([^"]*\)".*/\1/p' "$1/package.json" 2>/dev/null | head -n 1
 }
 
+# A checkout of this project, under its current or its old name (Nacreframe).
+is_ours() {
+  [ -f "$1/package.json" ] && grep -qE '"name": *"(nexusharness|nacreframe)"' "$1/package.json" 2>/dev/null
+}
+
 is_our_checkout() {
-  [ -f "$INSTALL_DIR/package.json" ] && grep -q '"name": *"nacreframe"' "$INSTALL_DIR/package.json" 2>/dev/null
+  is_ours "$INSTALL_DIR"
 }
 
 do_fetch() {
@@ -433,14 +443,15 @@ do_fetch() {
   cd "$INSTALL_DIR"
   if [ ! -d .git ]; then git init -q; fi
   if git remote get-url origin >/dev/null 2>&1; then
-    git remote set-url origin "$NACRE_REPO"
+    git remote set-url origin "$NEXUS_REPO"
   else
-    git remote add origin "$NACRE_REPO"
+    git remote add origin "$NEXUS_REPO"
   fi
-  GIT_TERMINAL_PROMPT=0 git fetch -q --depth 1 origin "$NACRE_REF"
+  GIT_TERMINAL_PROMPT=0 git fetch -q --depth 1 origin "$NEXUS_REF"
   git -c advice.detachedHead=false checkout -q -f --detach FETCH_HEAD
-  # Remember the branch so `nacre update` follows the same one.
-  printf '%s\n' "$NACRE_REF" >.nacre-ref
+  # Remember the branch so `nexus update` follows the same one.
+  printf '%s\n' "$NEXUS_REF" >.nexus-ref
+  rm -f .nacre-ref
 }
 
 do_deps() {
@@ -451,7 +462,7 @@ do_deps() {
 do_build() {
   cd "$INSTALL_DIR"
   npm run build --silent
-  # The build tools are not needed to run Nacreframe; drop them to save space.
+  # The build tools are not needed to run NexusHarness; drop them to save space.
   npm prune --omit=dev --no-audit --no-fund --loglevel=error
 }
 
@@ -472,7 +483,7 @@ download_and_build() {
   OLD_VER=
   if dir_has_files "$INSTALL_DIR"; then
     if ! is_our_checkout; then
-      die "$(tilde "$INSTALL_DIR") already exists and is not a Nacreframe install" \
+      die "$(tilde "$INSTALL_DIR") already exists and is not a NexusHarness install" \
         "Choose another place with --dir, or move that folder away."
     fi
     UPDATING=1
@@ -480,13 +491,13 @@ download_and_build() {
     OLD_HEAD=$(git -C "$INSTALL_DIR" rev-parse HEAD 2>/dev/null || true)
   fi
 
-  if ! run_step "Downloading Nacreframe ($NACRE_REF)" do_fetch; then
+  if ! run_step "Downloading NexusHarness ($NEXUS_REF)" do_fetch; then
     if [ "$REPAIR" = 1 ] && is_our_checkout; then
       warn "Could not reach the download server" "repairing from the files already here"
     else
-      step_failed "Could not download Nacreframe" \
+      step_failed "Could not download NexusHarness" \
         "Check your internet connection. If the repository is private, make sure git is signed in" \
-        "(for example with \`gh auth login\`), or set NACRE_REPO to an SSH URL."
+        "(for example with \`gh auth login\`), or set NEXUS_REPO to an SSH URL."
     fi
   fi
   NEW_HEAD=$(git -C "$INSTALL_DIR" rev-parse HEAD 2>/dev/null || true)
@@ -495,13 +506,13 @@ download_and_build() {
 
   if [ "$REPAIR" != 1 ] && [ "$UPDATING" = 1 ] && [ -n "$OLD_HEAD" ] && [ "$OLD_HEAD" = "$NEW_HEAD" ] \
     && [ -f "$INSTALL_DIR/dist/cli.js" ] && [ -d "$INSTALL_DIR/node_modules" ]; then
-    ok "Nacreframe ${NEW_VER:-?} is already up to date" "($NACRE_REF @ $NEW_SHORT)"
+    ok "NexusHarness ${NEW_VER:-?} is already up to date" "($NEXUS_REF @ $NEW_SHORT)"
     return 0
   fi
   if [ "$UPDATING" = 1 ] && [ -n "$OLD_VER" ] && [ "$OLD_VER" != "$NEW_VER" ]; then
-    ok "Downloaded Nacreframe ${NEW_VER:-?}" "(was $OLD_VER, $NACRE_REF @ $NEW_SHORT)"
+    ok "Downloaded NexusHarness ${NEW_VER:-?}" "(was $OLD_VER, $NEXUS_REF @ $NEW_SHORT)"
   else
-    ok "Downloaded Nacreframe ${NEW_VER:-?}" "($NACRE_REF @ $NEW_SHORT)"
+    ok "Downloaded NexusHarness ${NEW_VER:-?}" "($NEXUS_REF @ $NEW_SHORT)"
   fi
 
   if ! run_step "Installing dependencies (about a minute)" do_deps; then
@@ -523,42 +534,51 @@ sq() {
   printf "'%s'" "$(printf '%s' "$1" | sed "s/'/'\\\\''/g")"
 }
 
-LAUNCHER_MARK="# nacre launcher written by the Nacreframe installer"
+LAUNCHER_MARK="# nexus launcher written by the NexusHarness installer"
 
-# The `nacre` command is a small launcher, not a bare symlink: it uses the private Node.js when there is one,
-# and if Nacreframe's files have gone missing it repairs them before starting.
+# The `nexus` command is a small launcher, not a bare symlink: it uses the private Node.js when there is one,
+# and if NexusHarness's files have gone missing it repairs them before starting.
 write_launcher() {
   _q_dir=$(sq "$INSTALL_DIR")
   _q_bin=$(sq "$BIN_DIR")
   cat >"$1" <<EOF
 #!/bin/sh
 $LAUNCHER_MARK
-NACRE_DIR=$_q_dir
-NACRE_BIN_DIR=$_q_bin
-if [ ! -f "\$NACRE_DIR/dist/cli.js" ] || [ ! -d "\$NACRE_DIR/node_modules" ]; then
-  if [ -f "\$NACRE_DIR/install.sh" ]; then
-    echo "Nacreframe's files are missing or damaged. Repairing (this needs an internet connection)..." >&2
-    sh "\$NACRE_DIR/install.sh" --repair --dir "\$NACRE_DIR" --bin-dir "\$NACRE_BIN_DIR" >&2 || exit 1
+NEXUS_DIR=$_q_dir
+NEXUS_BIN_DIR=$_q_bin
+if [ ! -f "\$NEXUS_DIR/dist/cli.js" ] || [ ! -d "\$NEXUS_DIR/node_modules" ]; then
+  if [ -f "\$NEXUS_DIR/install.sh" ]; then
+    echo "NexusHarness's files are missing or damaged. Repairing (this needs an internet connection)..." >&2
+    sh "\$NEXUS_DIR/install.sh" --repair --dir "\$NEXUS_DIR" --bin-dir "\$NEXUS_BIN_DIR" >&2 || exit 1
   else
-    echo "Nacreframe's files are missing. Reinstall with:" >&2
-    echo "  curl -fsSL https://raw.githubusercontent.com/Falcon016/Nacreframe/main/install.sh | sh" >&2
+    echo "NexusHarness's files are missing. Reinstall with:" >&2
+    echo "  curl -fsSL https://raw.githubusercontent.com/Falcon016/NexusHarness/main/install.sh | sh" >&2
     exit 1
   fi
 fi
-NODE="\$NACRE_DIR/runtime/node/bin/node"
+NODE="\$NEXUS_DIR/runtime/node/bin/node"
 [ -x "\$NODE" ] || NODE=node
-exec "\$NODE" "\$NACRE_DIR/dist/cli.js" "\$@"
+exec "\$NODE" "\$NEXUS_DIR/dist/cli.js" "\$@"
 EOF
   chmod +x "$1"
 }
 
+# Launchers from before the rename say this instead.
+LEGACY_LAUNCHER_MARK="# nacre launcher written by the Nacreframe installer"
+
 is_our_launcher() {
-  [ -f "$1" ] && [ ! -L "$1" ] && grep -qF "$LAUNCHER_MARK" "$1" 2>/dev/null
+  [ -f "$1" ] && [ ! -L "$1" ] && { grep -qF "$LAUNCHER_MARK" "$1" 2>/dev/null || grep -qF "$LEGACY_LAUNCHER_MARK" "$1" 2>/dev/null; }
 }
 
+# `nexus`, plus `nacre` (the command's name before the rename) for old habits and scripts.
 link_binary() {
+  link_one nexus required
+  link_one nacre optional
+}
+
+link_one() {
   _target="$INSTALL_DIR/dist/cli.js"
-  _link="$BIN_DIR/nacre"
+  _link="$BIN_DIR/$1"
   chmod +x "$_target"
   mkdir -p "$BIN_DIR"
   if [ -L "$_link" ]; then
@@ -572,13 +592,16 @@ link_binary() {
   elif [ -e "$_link" ]; then
     if is_our_launcher "$_link"; then
       rm -f "$_link"
+    elif [ "$2" = optional ]; then
+      info "Left $(tilde "$_link") alone (not made by this installer), so there is no \`$1\` alias"
+      return 0
     else
       die "$(tilde "$_link") already exists and was not made by this installer" \
         "Move or delete it, or pick another place with --bin-dir, then run this installer again."
     fi
   fi
   write_launcher "$_link"
-  ok "Added the nacre command" "$(tilde "$_link")"
+  if [ "$2" = required ]; then ok "Added the $1 command" "$(tilde "$_link")"; fi
 }
 
 on_path() {
@@ -601,7 +624,7 @@ find_profile() {
       if [ "$OS" = macOS ]; then RC="$HOME/.bash_profile"; else RC="$HOME/.bashrc"; fi
       ;;
     fish)
-      RC="${XDG_CONFIG_HOME:-$HOME/.config}/fish/conf.d/nacreframe.fish"
+      RC="${XDG_CONFIG_HOME:-$HOME/.config}/fish/conf.d/nexusharness.fish"
       RC_KIND=fish
       ;;
     *) RC="$HOME/.profile" ;;
@@ -615,7 +638,7 @@ find_profile() {
 
 setup_path() {
   if on_path; then
-    ok "nacre is already on your PATH"
+    ok "nexus is already on your PATH"
     PATH_READY=1
     return 0
   fi
@@ -626,7 +649,7 @@ setup_path() {
     note "Add this line to $(tilde "$RC") yourself:  $PATH_LINE"
     return 0
   fi
-  if [ -f "$RC" ] && grep -qF "$MARK_BEGIN" "$RC" 2>/dev/null; then
+  if [ -f "$RC" ] && { grep -qF "$MARK_BEGIN" "$RC" 2>/dev/null || grep -qF "$LEGACY_MARK_BEGIN" "$RC" 2>/dev/null; }; then
     ok "Your PATH is already set up in $(tilde "$RC")" "(open a new terminal to pick it up)"
     PATH_READY=1
     return 0
@@ -643,16 +666,16 @@ setup_path() {
     NEED_NEW_SHELL=1
   else
     warn "$(tilde "$BIN_DIR") is not on your PATH"
-    note "To use \`nacre\` by name, add this line to $(tilde "$RC"):  $PATH_LINE"
+    note "To use \`nexus\` by name, add this line to $(tilde "$RC"):  $PATH_LINE"
   fi
 }
 
 verify_install() {
-  _out=$("$BIN_DIR/nacre" --version 2>&1) || step_failed "The installed command does not run" "$_out"
+  _out=$("$BIN_DIR/nexus" --version 2>&1) || step_failed "The installed command does not run" "$_out"
   ok "Checked" "$_out"
-  _first=$(command -v nacre 2>/dev/null || true)
-  if [ -n "$_first" ] && [ "$_first" != "$BIN_DIR/nacre" ]; then
-    warn "Another \`nacre\` comes first on your PATH" "$_first"
+  _first=$(command -v nexus 2>/dev/null || true)
+  if [ -n "$_first" ] && [ "$_first" != "$BIN_DIR/nexus" ]; then
+    warn "Another \`nexus\` comes first on your PATH" "$_first"
     note "Remove it or put $(tilde "$BIN_DIR") earlier in PATH to use this one."
   fi
 }
@@ -664,7 +687,7 @@ offer_setup() {
   blank
   if ask_yes_no "Run the setup wizard now? It takes about a minute." y n; then
     blank
-    "$BIN_DIR/nacre" setup </dev/tty || true
+    "$BIN_DIR/nexus" setup </dev/tty || true
     return 0
   fi
   return 1
@@ -674,51 +697,64 @@ finish() {
   # $1 = 1 when the wizard already printed its own next steps
   blank
   if [ "$REPAIR" = 1 ]; then
-    printf '  %s%s%s %sNacreframe is repaired.%s\n' "$GREEN" "$S_OK" "$RESET" "$BOLD" "$RESET"
+    printf '  %s%s%s %sNexusHarness is repaired.%s\n' "$GREEN" "$S_OK" "$RESET" "$BOLD" "$RESET"
   elif [ "$UPDATING" = 1 ]; then
-    printf '  %s%s%s %sNacreframe is up to date.%s\n' "$GREEN" "$S_OK" "$RESET" "$BOLD" "$RESET"
+    printf '  %s%s%s %sNexusHarness is up to date.%s\n' "$GREEN" "$S_OK" "$RESET" "$BOLD" "$RESET"
   else
-    printf '  %s%s%s %sNacreframe is installed.%s\n' "$GREEN" "$S_OK" "$RESET" "$BOLD" "$RESET"
+    printf '  %s%s%s %sNexusHarness is installed.%s\n' "$GREEN" "$S_OK" "$RESET" "$BOLD" "$RESET"
   fi
   blank
   if [ "${NEED_NEW_SHELL:-0}" = 1 ]; then
-    note "Open a new terminal window so \`nacre\` is on your PATH."
+    note "Open a new terminal window so \`nexus\` is on your PATH."
     note "(Or run now:  $PATH_LINE)"
     blank
   elif [ "${PATH_READY:-0}" = 0 ]; then
-    note "Until $(tilde "$BIN_DIR") is on your PATH, run it as:  $(tilde "$BIN_DIR")/nacre"
+    note "Until $(tilde "$BIN_DIR") is on your PATH, run it as:  $(tilde "$BIN_DIR")/nexus"
     blank
   fi
   if [ "${1:-0}" != 1 ]; then
     note "Next:"
-    note "  nacre setup     guided setup: provider, API key, model, safety"
-    note "  nacre doctor    check your environment (add --fix to repair problems)"
+    note "  nexus setup     guided setup: provider, API key, model, safety"
+    note "  nexus doctor    check your environment (add --fix to repair problems)"
   fi
-  note "Start it inside a project folder:  cd your-project && nacre"
-  note "Update later with:  nacre update   (or /update inside nacre)"
+  note "Start it inside a project folder:  cd your-project && nexus"
+  note "Update later with:  nexus update   (or /update inside nexus)"
   blank
 }
 
 # ---- uninstall ------------------------------------------------------------------------------------
 
+# Remove our PATH block (and the one written before the rename) from a shell profile.
 strip_profile_block() {
   [ -f "$1" ] || return 0
-  grep -qF "$MARK_BEGIN" "$1" 2>/dev/null || return 0
-  _tmp="$1.nacre-tmp.$$"
-  awk -v b="$MARK_BEGIN" -v e="$MARK_END" '
-    $0 == b { skip = 1; next }
-    $0 == e { skip = 0; next }
-    !skip { print }
-  ' "$1" >"$_tmp"
-  cat "$_tmp" >"$1"
-  rm -f "$_tmp"
-  ok "Removed the PATH entry from $(tilde "$1")"
+  for _pair in "$MARK_BEGIN|$MARK_END" "$LEGACY_MARK_BEGIN|$LEGACY_MARK_END"; do
+    _b=${_pair%%|*}
+    _e=${_pair#*|}
+    grep -qF "$_b" "$1" 2>/dev/null || continue
+    _tmp="$1.nexus-tmp.$$"
+    awk -v b="$_b" -v e="$_e" '
+      $0 == b { skip = 1; next }
+      $0 == e { skip = 0; next }
+      !skip { print }
+    ' "$1" >"$_tmp"
+    cat "$_tmp" >"$1"
+    rm -f "$_tmp"
+    ok "Removed the PATH entry from $(tilde "$1")"
+  done
 }
 
 do_uninstall() {
   banner
-  _link="$BIN_DIR/nacre"
-  if is_our_launcher "$_link" && grep -qF "NACRE_DIR=$(sq "$INSTALL_DIR")" "$_link" 2>/dev/null; then
+  for _name in nexus nacre; do
+    remove_launcher "$BIN_DIR/$_name"
+  done
+  uninstall_files
+}
+
+# Remove a launcher (current or from before the rename) if it starts this install.
+remove_launcher() {
+  _link="$1"
+  if is_our_launcher "$_link" && { grep -qF "NEXUS_DIR=$(sq "$INSTALL_DIR")" "$_link" 2>/dev/null || grep -qF "NACRE_DIR=$(sq "$INSTALL_DIR")" "$_link" 2>/dev/null; }; then
     rm -f "$_link"
     ok "Removed $(tilde "$_link")"
   elif [ -L "$_link" ]; then
@@ -733,11 +769,14 @@ do_uninstall() {
   elif [ -e "$_link" ]; then
     warn "Left $(tilde "$_link") alone" "it was not made for this install"
   fi
+}
+
+uninstall_files() {
   if is_our_checkout && [ "$INSTALL_DIR" != "/" ] && [ "$INSTALL_DIR" != "$HOME" ]; then
     rm -rf "$INSTALL_DIR"
     ok "Removed $(tilde "$INSTALL_DIR")"
   elif [ -e "$INSTALL_DIR" ]; then
-    warn "Left $(tilde "$INSTALL_DIR") alone" "it does not look like a Nacreframe install"
+    warn "Left $(tilde "$INSTALL_DIR") alone" "it does not look like a NexusHarness install"
   else
     info "Nothing installed at $(tilde "$INSTALL_DIR")"
   fi
@@ -745,19 +784,22 @@ do_uninstall() {
   strip_profile_block "$HOME/.bashrc"
   strip_profile_block "$HOME/.bash_profile"
   strip_profile_block "$HOME/.profile"
-  _fish="${XDG_CONFIG_HOME:-$HOME/.config}/fish/conf.d/nacreframe.fish"
-  if [ -f "$_fish" ]; then
-    rm -f "$_fish"
-    ok "Removed $(tilde "$_fish")"
-  fi
+  for _fish in nexusharness nacreframe; do
+    _fish="${XDG_CONFIG_HOME:-$HOME/.config}/fish/conf.d/$_fish.fish"
+    if [ -f "$_fish" ]; then
+      rm -f "$_fish"
+      ok "Removed $(tilde "$_fish")"
+    fi
+  done
 
-  # Where `nacre` keeps settings, keys and sessions (mirrors src/paths.ts).
-  if [ -n "${NACRE_HOME:-}" ]; then
-    _keep="\"$NACRE_HOME\""
+  # Where `nexus` keeps settings, keys and sessions (mirrors src/paths.ts).
+  NEXUS_HOME="${NEXUS_HOME:-${NACRE_HOME:-}}"
+  if [ -n "${NEXUS_HOME:-}" ]; then
+    _keep="\"$NEXUS_HOME\""
   elif [ "$OS" = macOS ]; then
-    _keep="\"$HOME/Library/Application Support/nacreframe\""
+    _keep="\"$HOME/Library/Application Support/nexusharness\""
   else
-    _keep="\"${XDG_CONFIG_HOME:-$HOME/.config}/nacreframe\" \"${XDG_DATA_HOME:-$HOME/.local/share}/nacreframe\" \"${XDG_STATE_HOME:-$HOME/.local/state}/nacreframe\""
+    _keep="\"${XDG_CONFIG_HOME:-$HOME/.config}/nexusharness\" \"${XDG_DATA_HOME:-$HOME/.local/share}/nexusharness\" \"${XDG_STATE_HOME:-$HOME/.local/state}/nexusharness\""
   fi
   blank
   note "Your settings, API keys and sessions were kept. To delete those too:"
@@ -776,12 +818,12 @@ main() {
       --no-modify-path) MODIFY_PATH=never ;;
       --uninstall) UNINSTALL=1 ;;
       --repair) REPAIR=1; ASSUME_YES=1; RUN_SETUP=never ;;
-      --ref) [ $# -ge 2 ] || die "--ref needs a value"; NACRE_REF=$2; shift ;;
-      --ref=*) NACRE_REF=${1#--ref=} ;;
-      --dir) [ $# -ge 2 ] || die "--dir needs a value"; NACRE_INSTALL_DIR=$2; shift ;;
-      --dir=*) NACRE_INSTALL_DIR=${1#--dir=} ;;
-      --bin-dir) [ $# -ge 2 ] || die "--bin-dir needs a value"; NACRE_BIN_DIR=$2; shift ;;
-      --bin-dir=*) NACRE_BIN_DIR=${1#--bin-dir=} ;;
+      --ref) [ $# -ge 2 ] || die "--ref needs a value"; NEXUS_REF=$2; shift ;;
+      --ref=*) NEXUS_REF=${1#--ref=} ;;
+      --dir) [ $# -ge 2 ] || die "--dir needs a value"; NEXUS_INSTALL_DIR=$2; shift ;;
+      --dir=*) NEXUS_INSTALL_DIR=${1#--dir=} ;;
+      --bin-dir) [ $# -ge 2 ] || die "--bin-dir needs a value"; NEXUS_BIN_DIR=$2; shift ;;
+      --bin-dir=*) NEXUS_BIN_DIR=${1#--bin-dir=} ;;
       -h | --help) usage; exit 0 ;;
       *) die "Unknown option: $1" "Run with --help to see what is available." ;;
     esac
@@ -789,25 +831,35 @@ main() {
   done
 
   if [ -z "${HOME:-}" ]; then die "\$HOME is not set, so there is nowhere to install to."; fi
-  INSTALL_DIR="${NACRE_INSTALL_DIR:-$HOME/.nacreframe}"
-  BIN_DIR="${NACRE_BIN_DIR:-$HOME/.local/bin}"
+  INSTALL_DIR="${NEXUS_INSTALL_DIR:-$HOME/.nexusharness}"
+  # Installed before the rename? Move ~/.nacreframe to the new default place (launchers are rewritten below).
+  if [ -z "$NEXUS_INSTALL_DIR" ] && [ ! -e "$INSTALL_DIR" ] && is_ours "$HOME/.nacreframe"; then
+    LEGACY_MOVE="$HOME/.nacreframe"
+  fi
+  BIN_DIR="${NEXUS_BIN_DIR:-$HOME/.local/bin}"
   # Absolute paths only, so the symlink and PATH entry keep working from anywhere.
   case "$INSTALL_DIR" in /*) ;; *) INSTALL_DIR="$(pwd)/$INSTALL_DIR" ;; esac
   case "$BIN_DIR" in /*) ;; *) BIN_DIR="$(pwd)/$BIN_DIR" ;; esac
 
   detect_os
 
-  LOG=$(mktemp "${TMPDIR:-/tmp}/nacreframe-install.XXXXXX")
+  LOG=$(mktemp "${TMPDIR:-/tmp}/nexusharness-install.XXXXXX")
   trap cleanup EXIT
   trap 'exit 130' INT TERM
 
   if [ "$UNINSTALL" = 1 ]; then
+    # Nothing at the new place, but an install from before the rename: that is the one to remove.
+    if [ -n "$LEGACY_MOVE" ]; then INSTALL_DIR="$LEGACY_MOVE"; fi
     do_uninstall
     return 0
   fi
 
   banner
-  note "Installing to $(tilde "$INSTALL_DIR"), with the \`nacre\` command in $(tilde "$BIN_DIR")."
+  if [ -n "$LEGACY_MOVE" ]; then
+    mv "$LEGACY_MOVE" "$INSTALL_DIR"
+    ok "NexusHarness was Nacreframe: moved $(tilde "$LEGACY_MOVE") to $(tilde "$INSTALL_DIR")"
+  fi
+  note "Installing to $(tilde "$INSTALL_DIR"), with the \`nexus\` command in $(tilde "$BIN_DIR")."
   note "No sudo needed. Nothing outside those two places changes without asking."
 
   heading "Checking your system"

@@ -115,7 +115,7 @@ let ws: ReturnType<typeof tmpWorkspace>;
 let paths: AppPaths;
 beforeEach(() => {
   ws = tmpWorkspace();
-  paths = appPaths({ NACRE_HOME: join(ws.dir, 'home') });
+  paths = appPaths({ NEXUS_HOME: join(ws.dir, 'home') });
   mkdirSync(ws.dir + '/proj');
 });
 afterEach(() => ws.cleanup());
@@ -133,7 +133,7 @@ function wizard(
     runWizard({
       term: out.term,
       prompt,
-      env: { NACRE_HOME: join(ws.dir, 'home'), ...extra.env },
+      env: { NEXUS_HOME: join(ws.dir, 'home'), ...extra.env },
       cwd: join(ws.dir, 'proj'),
       paths,
       fetchImpl: extra.fetchImpl ?? fakeNetwork(extra.mock),
@@ -362,7 +362,7 @@ describe('setup wizard', () => {
       // 2) not running -> continue without checking, type a model name
       ws.cleanup();
       ws = tmpWorkspace();
-      paths = appPaths({ NACRE_HOME: join(ws.dir, 'home') });
+      paths = appPaths({ NEXUS_HOME: join(ws.dir, 'home') });
       mkdirSync(ws.dir + '/proj');
       const b = wizard([
         'Ollama',
@@ -443,10 +443,10 @@ describe('setup wizard', () => {
 
   it('warns when an environment variable will override what was just saved', async () => {
     const w = wizard(['Skip for now', 'ask', 'guard', false, 'Not now', 'Save and finish'], {
-      env: { NACRE_SANDBOX: 'off' },
+      env: { NEXUS_SANDBOX: 'off' },
     });
     expect(await w.run()).toBe(0);
-    expect(w.out.output()).toContain('NACRE_SANDBOX is set in your environment');
+    expect(w.out.output()).toContain('NEXUS_SANDBOX is set in your environment');
   });
 
   it('explains a broken existing config instead of asking questions on top of it', async () => {
@@ -581,7 +581,7 @@ describe('terminal prompts', () => {
 
 // ---- the command ---------------------------------------------------------------------------------
 
-describe('nacre setup (command line)', () => {
+describe('nexus setup (command line)', () => {
   const TSX = resolve('node_modules/tsx/dist/cli.mjs');
   const CLI = resolve('src/cli.ts');
   let cws: ReturnType<typeof tmpWorkspace>;
@@ -591,7 +591,7 @@ describe('nacre setup (command line)', () => {
   afterAll(() => cws.cleanup());
   const run = (args: string[], input?: string) =>
     spawnSync(process.execPath, [TSX, CLI, 'setup', ...args], {
-      env: { ...process.env, NACRE_HOME: join(cws.dir, 'home'), NO_COLOR: '1' },
+      env: { ...process.env, NEXUS_HOME: join(cws.dir, 'home'), NO_COLOR: '1' },
       encoding: 'utf8',
       timeout: 60_000,
       cwd: cws.dir,
@@ -673,7 +673,7 @@ function fakeTelegram(opts: { rejectToken?: string } = {}) {
       case 'getMe':
         return Response.json({
           ok: true,
-          result: { id: 1, is_bot: true, first_name: 'Nacre', username: 'nacre_test_bot' },
+          result: { id: 1, is_bot: true, first_name: 'Nexus', username: 'nexus_test_bot' },
         });
       case 'getUpdates': {
         const result =
@@ -720,7 +720,7 @@ describe('setup: telegram', () => {
         folder,
         'Save and finish',
       ],
-      { fetchImpl: tg.impl, env: { NACRE_TELEGRAM_WAIT_MS: '2000' } },
+      { fetchImpl: tg.impl, env: { NEXUS_TELEGRAM_WAIT_MS: '2000' } },
     );
     expect(await w.run()).toBe(0);
     w.prompt.assertDone();
@@ -731,8 +731,8 @@ describe('setup: telegram', () => {
     // The "hi" that identified the account is marked as read, so the bot does not take it for a task.
     expect(tg.calls.some((c) => c.method === 'getUpdates' && c.body.offset === 8)).toBe(true);
     expect(tg.calls.some((c) => c.method === 'sendMessage')).toBe(true); // "Connected." to the user
-    expect(w.out.output()).toContain('@nacre_test_bot');
-    expect(w.out.output()).toContain('nacre telegram');
+    expect(w.out.output()).toContain('@nexus_test_bot');
+    expect(w.out.output()).toContain('nexus telegram');
   });
 
   it('asks again for a rejected token, and can take a typed user id instead of waiting', async () => {
@@ -753,7 +753,7 @@ describe('setup: telegram', () => {
         join(ws.dir, 'proj'),
         'Save and finish',
       ],
-      { fetchImpl: tg.impl, env: { NACRE_TELEGRAM_WAIT_MS: '2000' } },
+      { fetchImpl: tg.impl, env: { NEXUS_TELEGRAM_WAIT_MS: '2000' } },
     );
     expect(await w.run()).toBe(0);
     w.prompt.assertDone();

@@ -1,6 +1,6 @@
-/* Nacreframe dashboard.
-   Black and deep purple. Structure comes from hairlines and small steps in surface lightness, not from shadows,
-   glows or gradients. Purple means one of three things: you can act here, this is selected, or the agent is live.
+/* NexusHarness dashboard.
+   Black and blue. Structure comes from hairlines and small steps in surface lightness, not from shadows,
+   glows or gradients. Blue means one of three things: you can act here, this is selected, or the agent is live.
    IBM Plex Sans for the interface and prose; JetBrains Mono only for machine text (code, paths, tool calls, counts).
    No external requests; fonts are bundled (OFL). */
 @font-face {
@@ -19,31 +19,31 @@
 :root {
   color-scheme: dark;
 
-  /* ink: near-black with a violet undertone, darkest first */
-  --ink-0: #060509; /* the page and the transcript */
-  --ink-1: #0b0a10; /* chrome: sidebar, top bar, panel, composer */
-  --ink-2: #110f17; /* controls, tool rows */
-  --ink-3: #17141f; /* hover */
-  --ink-4: #1e1a29; /* pressed */
-  --code: #040306;
+  /* ink: near-black with a cool blue undertone, darkest first */
+  --ink-0: #04060a; /* the page and the transcript */
+  --ink-1: #080b12; /* chrome: sidebar, top bar, panel, composer */
+  --ink-2: #0d1119; /* controls, tool rows */
+  --ink-3: #131925; /* hover */
+  --ink-4: #1a2131; /* pressed */
+  --code: #020407;
 
-  --line: #1c1825; /* hairlines */
-  --line-2: #29233a; /* control borders */
-  --line-3: #3a3150; /* hover borders */
+  --line: #161d2a; /* hairlines */
+  --line-2: #222c3e; /* control borders */
+  --line-3: #324058; /* hover borders */
 
   /* text (all at least 4.5:1 on every surface above) */
-  --fg: #ebe7f2;
-  --fg-2: #a59db5;
-  --fg-3: #857d99;
+  --fg: #e6edf7;
+  --fg-2: #9eabc0;
+  --fg-3: #7f8ca3;
 
-  /* deep purple */
-  --violet-1: #140e22; /* your messages, selected rows */
-  --violet-2: #1c1430; /* hover on purple */
-  --violet-line: #3b2a6b;
-  --violet: #6a4bd0; /* solid: primary buttons (white text 5.9:1) */
-  --violet-hover: #7558db;
-  --violet-text: #b7a4ff; /* purple text, focus rings */
-  --violet-ring: rgb(138 108 240 / 0.45);
+  /* blue, from the logo: electric blue for what you act on, a cyan glow for what is live or selected */
+  --accent-1: #0a1730; /* your messages, selected rows */
+  --accent-2: #0f1f40; /* hover on blue */
+  --accent-line: #1f3f7a;
+  --accent: #1d5fe0; /* solid: primary buttons (white text 5.6:1) */
+  --accent-hover: #2563eb;
+  --accent-text: #5cc8ff; /* blue text, focus rings */
+  --accent-ring: rgb(92 200 255 / 0.45);
 
   /* status */
   --amber: #e2b866;
@@ -99,21 +99,21 @@ textarea {
   color: inherit;
 }
 :focus-visible {
-  outline: 2px solid var(--violet-text);
+  outline: 2px solid var(--accent-text);
   outline-offset: 2px;
 }
 [hidden] {
   display: none !important;
 }
 a {
-  color: var(--violet-text);
+  color: var(--accent-text);
   text-underline-offset: 3px;
 }
 a:hover {
   color: var(--fg);
 }
 ::selection {
-  background: rgb(138 108 240 / 0.38);
+  background: rgb(92 200 255 / 0.3);
 }
 .sr-only {
   position: absolute;
@@ -190,7 +190,7 @@ kbd {
   gap: 8px;
 }
 .side-new .plus {
-  color: var(--violet-text);
+  color: var(--accent-text);
   font: 500 16px/1 var(--mono);
 }
 .side-list {
@@ -231,7 +231,7 @@ kbd {
   color: var(--fg);
 }
 .side-item[aria-current='true'] {
-  background: var(--violet-1);
+  background: var(--accent-1);
   color: var(--fg);
 }
 .side-item .name {
@@ -279,7 +279,7 @@ kbd {
   flex: none;
 }
 .dot.run {
-  background: var(--violet-text);
+  background: var(--accent-text);
   animation: pulse 1.4s ease-in-out infinite;
 }
 .side-foot .btn {
@@ -324,13 +324,13 @@ kbd {
   background: var(--ink-4);
 }
 .btn.primary {
-  background: var(--violet);
-  border-color: var(--violet);
+  background: var(--accent);
+  border-color: var(--accent);
   color: #fff;
 }
 .btn.primary:hover {
-  background: var(--violet-hover);
-  border-color: var(--violet-hover);
+  background: var(--accent-hover);
+  border-color: var(--accent-hover);
 }
 .btn.danger {
   background: transparent;
@@ -401,8 +401,8 @@ input[type='text']:focus,
 input[type='password']:focus,
 select:focus {
   outline: none;
-  border-color: var(--violet-line);
-  box-shadow: 0 0 0 2px var(--violet-ring);
+  border-color: var(--accent-line);
+  box-shadow: 0 0 0 2px var(--accent-ring);
 }
 input::placeholder,
 textarea::placeholder {
@@ -506,7 +506,7 @@ textarea::placeholder {
   background: var(--pink);
 }
 .chip[data-mode='plan']::before {
-  background: var(--violet-text);
+  background: var(--accent-text);
 }
 .meter {
   display: flex;
@@ -533,7 +533,7 @@ textarea::placeholder {
   position: absolute;
   inset: 0 auto 0 0;
   border-radius: 2px;
-  background: var(--violet-text);
+  background: var(--accent-text);
   transition:
     width 0.3s,
     background 0.3s;
@@ -571,9 +571,9 @@ textarea::placeholder {
 .msg-user {
   margin-top: 12px;
   padding: 10px 14px;
-  border: 1px solid var(--violet-line);
+  border: 1px solid var(--accent-line);
   border-radius: var(--r-lg);
-  background: var(--violet-1);
+  background: var(--accent-1);
   color: var(--fg);
   white-space: pre-wrap;
   overflow-wrap: anywhere;
@@ -584,7 +584,7 @@ textarea::placeholder {
 }
 .msg-assistant .who {
   font: 500 12px/1 var(--mono);
-  color: var(--violet-text);
+  color: var(--accent-text);
   margin-bottom: 8px;
 }
 /* The edge of the reply that is still being written. */
@@ -595,7 +595,7 @@ textarea::placeholder {
   height: 1.1em;
   margin-left: 2px;
   vertical-align: text-bottom;
-  background: var(--violet-text);
+  background: var(--accent-text);
   animation: blink 1s steps(2, start) infinite;
 }
 .md > * + * {
@@ -640,7 +640,7 @@ textarea::placeholder {
   font-size: 1em;
 }
 .md blockquote {
-  border-left: 2px solid var(--violet-line);
+  border-left: 2px solid var(--accent-line);
   padding-left: 12px;
   color: var(--fg-2);
 }
@@ -654,7 +654,7 @@ textarea::placeholder {
   background: var(--ink-3);
   border-radius: 4px;
   padding: 0.12em 0.38em;
-  color: #cfc2ff;
+  color: #a8dcff;
 }
 .md pre {
   margin: 0;
@@ -713,7 +713,7 @@ textarea::placeholder {
 }
 .md .hunk,
 .card pre .hunk {
-  color: var(--violet-text);
+  color: var(--accent-text);
 }
 
 /* Tool calls: one quiet line each, expandable to the output. */
@@ -751,7 +751,7 @@ textarea::placeholder {
   font-size: 9px;
 }
 .tool.live .glyph {
-  color: var(--violet-text);
+  color: var(--accent-text);
   animation: pulse 1.2s ease-in-out infinite;
 }
 .tool.error .glyph {
@@ -836,7 +836,7 @@ textarea::placeholder {
 }
 /* An agent's reasoning: collapsed to one quiet line; opened, set off by a rule in the agent's colour. */
 .thought {
-  --agent: var(--violet-text);
+  --agent: var(--accent-text);
   font-size: 13px;
   color: var(--fg-3);
 }
@@ -937,7 +937,7 @@ textarea::placeholder {
   transition: background var(--ease);
 }
 .folders button:hover {
-  background: var(--violet-1);
+  background: var(--accent-1);
 }
 .folders .path {
   flex: 1;
@@ -950,7 +950,7 @@ textarea::placeholder {
 }
 .folders .go {
   font-size: 12.5px;
-  color: var(--violet-text);
+  color: var(--accent-text);
 }
 .defaults {
   display: grid;
@@ -988,10 +988,10 @@ textarea::placeholder {
   border-color: rgb(226 184 102 / 0.42);
 }
 .card.question {
-  border-color: var(--violet-line);
+  border-color: var(--accent-line);
 }
 .card.question h3 {
-  color: var(--violet-text);
+  color: var(--accent-text);
 }
 .card.banner-pause {
   border-color: rgb(226 184 102 / 0.3);
@@ -1046,10 +1046,10 @@ textarea::placeholder {
   border-color: var(--line-3);
 }
 #composer:focus-within {
-  border-color: var(--violet-line);
-  box-shadow: 0 0 0 2px var(--violet-ring);
+  border-color: var(--accent-line);
+  box-shadow: 0 0 0 2px var(--accent-ring);
 }
-/* The one moving thing on the page: while the agent works, a band of nacre crosses the top edge of the composer. */
+/* The one moving thing on the page: while the agent works, a band of nexus crosses the top edge of the composer. */
 #composer::before {
   content: '';
   position: absolute;
@@ -1057,14 +1057,14 @@ textarea::placeholder {
   right: 12px;
   top: -1px;
   height: 1px;
-  background: linear-gradient(90deg, transparent, #8a6cf0 30%, #e98bd0 50%, #66cfc0 70%, transparent);
+  background: linear-gradient(90deg, transparent, #1d5fe0 30%, #5cc8ff 50%, #66cfc0 70%, transparent);
   background-size: 200% 100%;
   opacity: 0;
   transition: opacity 0.3s;
 }
 #dock.running #composer::before {
   opacity: 1;
-  animation: nacre 2.4s linear infinite;
+  animation: nexus 2.4s linear infinite;
 }
 #input {
   flex: 1;
@@ -1094,7 +1094,7 @@ textarea::placeholder {
   color: var(--fg-2);
 }
 #speed.live {
-  color: var(--violet-text);
+  color: var(--accent-text);
 }
 #budget.warn {
   color: var(--amber);
@@ -1140,7 +1140,7 @@ textarea::placeholder {
   text-decoration: line-through;
 }
 .todo.in_progress {
-  color: var(--violet-text);
+  color: var(--accent-text);
 }
 .agent {
   display: flex;
@@ -1184,7 +1184,7 @@ dialog {
   width: min(540px, calc(100vw - 32px));
 }
 dialog::backdrop {
-  background: rgb(3 2 6 / 0.78);
+  background: rgb(2 4 8 / 0.78);
 }
 dialog form {
   padding: 22px;
@@ -1247,13 +1247,18 @@ dialog .row {
   border: 1px solid var(--line-2);
   border-radius: var(--r-lg);
 }
+#login .login-logo {
+  align-self: center;
+  margin: -4px 0 -6px;
+  /* The artwork sits on near-black: screen-blend it into the card and fade its edges, so no square shows. */
+  mix-blend-mode: screen;
+  mask-image: radial-gradient(closest-side, #000 78%, transparent);
+}
 #login h1 {
   font: 600 18px var(--sans);
-  letter-spacing: -0.01em;
+  letter-spacing: 0.02em;
   margin: 0 0 4px;
-  display: flex;
-  gap: 10px;
-  align-items: center;
+  text-align: center;
 }
 #login .err {
   color: var(--red);
@@ -1290,7 +1295,7 @@ dialog .row {
     visibility: hidden;
   }
 }
-@keyframes nacre {
+@keyframes nexus {
   from {
     background-position: 100% 0;
   }
@@ -1404,5 +1409,5 @@ dialog .row {
 }
 .m-plan,
 .m-swarm {
-  color: var(--violet-text);
+  color: var(--accent-text);
 }

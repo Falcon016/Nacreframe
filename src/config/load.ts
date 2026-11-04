@@ -2,6 +2,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve, sep } from 'node:path';
 import { appPaths, type AppPaths } from '../paths.js';
 import { configSchema, type Config, type PartialConfig } from './schema.js';
+import { LEGACY, PROJECT_DIR } from '../legacy.js';
 
 export interface LoadOptions {
   cwd: string;
@@ -50,7 +51,7 @@ export function loadConfig(opts: LoadOptions): LoadedConfig {
       project = safe;
       if (dropped.length) {
         warnings.push(
-          `Project config ${projectConfigPath} is not trusted; ignored: ${dropped.join(', ')}. Run \`nacre trust\` to enable it.`,
+          `Project config ${projectConfigPath} is not trusted; ignored: ${dropped.join(', ')}. Run \`nexus trust\` to enable it.`,
         );
       }
     }
@@ -87,14 +88,14 @@ export function loadConfig(opts: LoadOptions): LoadedConfig {
 
 function fromEnv(env: NodeJS.ProcessEnv): PartialConfig {
   const out: PartialConfig = {};
-  if (env.NACRE_MODEL) out.model = env.NACRE_MODEL;
-  if (env.NACRE_APPROVAL) out.approval = { mode: env.NACRE_APPROVAL };
-  if (env.NACRE_SANDBOX) out.sandbox = { mode: env.NACRE_SANDBOX };
+  if (env.NEXUS_MODEL) out.model = env.NEXUS_MODEL;
+  if (env.NEXUS_APPROVAL) out.approval = { mode: env.NEXUS_APPROVAL };
+  if (env.NEXUS_SANDBOX) out.sandbox = { mode: env.NEXUS_SANDBOX };
   return out;
 }
 
 /**
- * A cloned repository can ship `.nacreframe/config.json`. Until the user trusts the project, only settings
+ * A cloned repository can ship `.nexusharness/config.json`. Until the user trusts the project, only settings
  * that can *tighten* behaviour are honoured: anything that could widen access, run code, or auto-approve is dropped.
  */
 export function restrictUntrusted(raw: PartialConfig): { safe: PartialConfig; dropped: string[] } {
@@ -154,12 +155,17 @@ function readJson(path: string, warnings: string[]): PartialConfig | undefined {
   }
 }
 
-/** Walk up from cwd looking for `.nacreframe/config.json`, stopping at the filesystem root. */
+/**
+ * Walk up from cwd looking for `.nexusharness/config.json` (or the old `.nacreframe/config.json`), stopping at the
+ * filesystem root.
+ */
 export function findProjectConfig(cwd: string): string | undefined {
   let dir = resolve(cwd);
   for (;;) {
-    const candidate = join(dir, '.nacreframe', 'config.json');
-    if (existsSync(candidate)) return candidate;
+    for (const folder of [PROJECT_DIR, LEGACY.projectDir]) {
+      const candidate = join(dir, folder, 'config.json');
+      if (existsSync(candidate)) return candidate;
+    }
     const parent = dirname(dir);
     if (parent === dir) return undefined;
     dir = parent;

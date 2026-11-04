@@ -1,5 +1,5 @@
 /**
- * Small terminal toolkit for `nacre setup`: colour, symbols, headings and a spinner.
+ * Small terminal toolkit for `nexus setup`: colour, symbols, headings and a spinner.
  * No dependencies. Colour and Unicode degrade gracefully (NO_COLOR, dumb terminals, legacy consoles, pipes).
  */
 
@@ -32,7 +32,7 @@ const SYMBOLS_UNICODE = {
   fail: '✗',
   info: '•',
   title: '●',
-  pearl: '●',
+  node: '◉',
   pointer: '❯',
   arrow: '→',
   mask: '•',
@@ -45,7 +45,7 @@ const SYMBOLS_ASCII = {
   fail: 'x',
   info: '-',
   title: '*',
-  pearl: 'o',
+  node: 'o',
   pointer: '>',
   arrow: '->',
   mask: '*',
@@ -88,8 +88,8 @@ export class Term {
   }
   bold = (s: string) => this.wrap('1', s);
   dim = (s: string) => this.wrap('2', s);
-  /** The Nacre violet. */
-  accent = (s: string) => this.wrap(this.truecolor ? '38;2;157;132;255' : '38;5;141', s);
+  /** The Nexus blue. */
+  accent = (s: string) => this.wrap(this.truecolor ? '38;2;92;200;255' : '38;5;81', s);
   good = (s: string) => this.wrap('32', s);
   warn = (s: string) => this.wrap('33', s);
   bad = (s: string) => this.wrap('31', s);
@@ -104,8 +104,8 @@ export class Term {
 
   banner(title: string, tagline: string): void {
     this.line();
-    // The logo in text form: a pearl held between two brackets.
-    this.line(`  ${this.accent('[')}${this.sym.pearl}${this.accent(']')} ${this.bold(title)}`);
+    // The logo in text form: a glowing node in its ring.
+    this.line(`  ${this.accent(this.sym.node)} ${this.bold(title)}`);
     this.line(`    ${this.dim(tagline)}`);
     this.line();
   }

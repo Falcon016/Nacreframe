@@ -1,10 +1,11 @@
 {
-  "name": "nacreframe",
+  "name": "nexusharness",
   "version": "0.1.0",
   "description": "A terminal-native AI agent harness with sandboxing, approval modes, live browser control and collaborating agent swarms.",
   "license": "MIT",
   "type": "module",
   "bin": {
+    "nexus": "dist/cli.js",
     "nacre": "dist/cli.js"
   },
   "exports": {

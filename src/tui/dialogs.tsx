@@ -66,8 +66,8 @@ export function SelectList<T>({
   const win = 10;
   const start = Math.max(0, Math.min(i - 4, items.length - win));
   return (
-    <Box flexDirection="column" borderStyle="round" borderColor={t.lavender} paddingX={1}>
-      <Text bold color={t.lavender}>
+    <Box flexDirection="column" borderStyle="round" borderColor={t.sky} paddingX={1}>
+      <Text bold color={t.sky}>
         {title}
       </Text>
       {items.length === 0 ? <Text color={t.dim}>Nothing to show.</Text> : null}
@@ -140,7 +140,7 @@ export function ApprovalDialog({
     <Box flexDirection="column" borderStyle="round" borderColor={t.gold} paddingX={1}>
       <Text>
         <Text bold color={t.gold}>
-          {GLYPH.pearl} Approve this action?
+          {GLYPH.node} Approve this action?
         </Text>
         {req.agentId !== 'main' ? <Text color={color}> {req.agentId}</Text> : null}
         {pending > 1 ? <Text color={t.faint}> ({pending - 1} more waiting)</Text> : null}
@@ -209,7 +209,7 @@ export function QuestionDialog({
     <Box flexDirection="column" borderStyle="round" borderColor={t.teal} paddingX={1}>
       <Text>
         <Text bold color={t.teal}>
-          {GLYPH.pearl} Question
+          {GLYPH.node} Question
         </Text>
         {agent !== 'main' ? <Text color={color}> from {agent}</Text> : null}
       </Text>
