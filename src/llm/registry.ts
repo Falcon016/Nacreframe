@@ -143,5 +143,5 @@ function defaultContext(type: 'anthropic' | 'openai' | undefined): number {
 }
 
 function missingKey(id: string, env?: string): string {
-  return `No API key for "${id}". Set ${env ?? 'the key'} in your environment or run \`nacre auth set ${id}\`.`;
+  return `No API key for "${id}". Set ${env ?? 'the key'} in your environment or run \`nexus auth set ${id}\`.`;
 }

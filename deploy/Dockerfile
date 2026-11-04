@@ -1,5 +1,5 @@
-# Nacreframe dashboard for a homelab.
-#   docker build -f deploy/Dockerfile -t nacreframe .
+# NexusHarness dashboard for a homelab.
+#   docker build -f deploy/Dockerfile -t nexusharness .
 #   docker compose -f deploy/docker-compose.yml up -d
 FROM node:22-bookworm-slim AS build
 WORKDIR /app
@@ -12,7 +12,7 @@ RUN npm run build && npm prune --omit=dev --ignore-scripts
 
 FROM node:22-bookworm-slim
 ENV NODE_ENV=production \
-    NACRE_HOME=/data
+    NEXUS_HOME=/data
 # git is what agents most often shell out to; add whatever else your projects need.
 RUN apt-get update && apt-get install -y --no-install-recommends git ca-certificates \
     && rm -rf /var/lib/apt/lists/* \

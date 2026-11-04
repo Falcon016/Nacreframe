@@ -11,9 +11,9 @@ coverage/
 auth.json
 *.pem
 *.key
-.nacreframe/local/
-.nacreframe/sessions/
-.nacreframe/browser-profile/
+.nexusharness/local/
+.nexusharness/sessions/
+.nexusharness/browser-profile/
 .DS_Store
 Thumbs.db
-.nacre-ref
+.nexus-ref

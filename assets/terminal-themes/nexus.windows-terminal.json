@@ -1,0 +1,23 @@
+{
+  "name": "Nexus",
+  "background": "#04060A",
+  "foreground": "#E6EDF7",
+  "cursorColor": "#5CC8FF",
+  "selectionBackground": "#15294D",
+  "black": "#0D1119",
+  "red": "#EF7B7B",
+  "green": "#74D19B",
+  "yellow": "#E2B866",
+  "blue": "#5B8CFF",
+  "purple": "#E98BD0",
+  "cyan": "#5CC8FF",
+  "white": "#E6EDF7",
+  "brightBlack": "#6B7891",
+  "brightRed": "#F59A9A",
+  "brightGreen": "#98E0B4",
+  "brightYellow": "#EFCD8A",
+  "brightBlue": "#8FB8FF",
+  "brightPurple": "#F0A3C0",
+  "brightCyan": "#9ADCFF",
+  "brightWhite": "#F7FAFF"
+}

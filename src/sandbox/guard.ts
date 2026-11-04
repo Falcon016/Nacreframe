@@ -64,7 +64,7 @@ export class GuardSandbox implements Sandbox {
     this.roots = [
       this.cwd,
       ...(opts.allowPaths ?? []).map((p) => realResolve(p)),
-      realResolve(join(tmpdir(), 'nacreframe')),
+      realResolve(join(tmpdir(), 'nexusharness')),
     ];
     this.deny = opts.denyPaths ?? [];
     if (!this.enforce) this.mode = 'off';

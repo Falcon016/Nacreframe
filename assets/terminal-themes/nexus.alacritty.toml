@@ -1,0 +1,32 @@
+# Alacritty: import with `general.import = ["~/.config/alacritty/nexus.toml"]`
+[colors.primary]
+background = "#04060a"
+foreground = "#e6edf7"
+
+[colors.cursor]
+cursor = "#5cc8ff"
+text = "#04060a"
+
+[colors.selection]
+background = "#15294d"
+text = "#e6edf7"
+
+[colors.normal]
+black = "#0d1119"
+red = "#ef7b7b"
+green = "#74d19b"
+yellow = "#e2b866"
+blue = "#5b8cff"
+magenta = "#e98bd0"
+cyan = "#5cc8ff"
+white = "#e6edf7"
+
+[colors.bright]
+black = "#6b7891"
+red = "#f59a9a"
+green = "#98e0b4"
+yellow = "#efcd8a"
+blue = "#8fb8ff"
+magenta = "#f0a3c0"
+cyan = "#9adcff"
+white = "#f7faff"

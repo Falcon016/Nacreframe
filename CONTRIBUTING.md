@@ -4,7 +4,7 @@
 npm ci
 npm run check      # typecheck, lint, tests, secret scan — must pass
 npm run dev        # run from source
-npm run mock       # offline OpenAI-compatible model for trying the UI (second terminal: NACRE_MODEL=mock/m)
+npm run mock       # offline OpenAI-compatible model for trying the UI (second terminal: NEXUS_MODEL=mock/m)
 ```
 
 Requires Node ≥ 22.18. Windows, macOS and Linux are all first-class: avoid POSIX-only assumptions (use `node:path`,

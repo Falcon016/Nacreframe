@@ -30,7 +30,7 @@ const safeName = (s: string) => s.replace(/[^a-zA-Z0-9_-]/g, '_');
 
 /** Connect to one MCP server and expose its tools as `mcp__<server>__<tool>`. */
 export async function connectMcp(name: string, cfg: McpServerConfig): Promise<McpConnection> {
-  const client = new Client({ name: 'nacreframe', version: VERSION });
+  const client = new Client({ name: 'nexusharness', version: VERSION });
   const transport =
     'command' in cfg
       ? new StdioClientTransport({

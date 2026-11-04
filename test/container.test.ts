@@ -6,7 +6,7 @@ import { ContainerSandbox } from '../src/sandbox/container.js';
 import { bashTool } from '../src/tools/bash.js';
 import { testConfig, tmpWorkspace } from './helpers.js';
 
-const image = process.env.NACRE_TEST_IMAGE ?? 'node:22-bookworm-slim';
+const image = process.env.NEXUS_TEST_IMAGE ?? 'node:22-bookworm-slim';
 const hasDocker = ContainerSandbox.available('docker');
 // Only run when the image is already present so the suite never triggers a surprise download.
 const hasImage =
@@ -41,17 +41,17 @@ describe.skipIf(!hasImage)('container sandbox', () => {
   }, 90_000);
 
   it('hides host files outside the workspace and host environment variables', async () => {
-    process.env.NACRE_CONTAINER_TEST_VALUE = 'leak-me';
+    process.env.NEXUS_CONTAINER_TEST_VALUE = 'leak-me';
     try {
       const r = await run(
-        'echo "env=[$NACRE_CONTAINER_TEST_VALUE]"; test -d /Users && echo HOST_USERS_VISIBLE || echo no-host-users; test -d /mnt/c && echo HOST_C_VISIBLE || echo no-host-c',
+        'echo "env=[$NEXUS_CONTAINER_TEST_VALUE]"; test -d /Users && echo HOST_USERS_VISIBLE || echo no-host-users; test -d /mnt/c && echo HOST_C_VISIBLE || echo no-host-c',
       );
       expect(r.content).toContain('env=[]');
       expect(r.content).not.toContain('leak-me');
       expect(r.content).toContain('no-host-users');
       expect(r.content).toContain('no-host-c');
     } finally {
-      delete process.env.NACRE_CONTAINER_TEST_VALUE;
+      delete process.env.NEXUS_CONTAINER_TEST_VALUE;
     }
   }, 90_000);
 
@@ -76,7 +76,7 @@ describe.skipIf(!hasImage)('container sandbox', () => {
     expect(r.isError).toBe(true);
     expect(r.content).toContain('timed out');
     await new Promise((res) => setTimeout(res, 1500));
-    const left = spawnSync('docker', ['ps', '-q', '--filter', 'name=nacre-'], {
+    const left = spawnSync('docker', ['ps', '-q', '--filter', 'name=nexus-'], {
       encoding: 'utf8',
     }).stdout.trim();
     expect(left).toBe('');

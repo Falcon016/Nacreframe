@@ -1,36 +1,43 @@
 import { Text } from 'ink';
 
 /**
- * The Nacreframe mascot: a pearl peeking out of its oyster shell. Drawn as pixel art with half-block
- * characters, two pixels per cell (top in the foreground colour, bottom in the background colour), so it
+ * The NexusHarness mascot, Nex: one of the small agent robots from the NexusHarness artwork, with a blue helmet, a
+ * dark visor with two glowing eyes, and an antenna node like the nodes on the logo's ring. Drawn as pixel art with
+ * half-block characters, two pixels per cell (top in the foreground colour, bottom in the background colour), so it
  * keeps its shape in any terminal with true colour. 18 × 14 pixels = 18 columns × 7 rows.
  */
 const PIXELS = [
-  '....hhhhhhhhhh....',
-  '..hhssssssssssh...',
-  '.hsSsSsSsSsSsSsh..',
-  '.sSSSSSSSSSSSSSs..',
-  '..ss.PPPPPPPP.ss..',
-  '....PPPPPPPPPPp...',
-  '...PPPEEPPPEEPPp..',
-  '...PPPEWPPPEWPPp..',
-  '...PrPPPPPPPPrPp..',
-  '....PPPPEEPPPPp...',
-  '.sSSSPPPPPPPPSSSs.',
-  '.sSSSSSSSSSSSSSSs.',
-  '..ssssssssssssss..',
-  '..................',
+  '........NN........',
+  '........aa........',
+  '.....hhhhhhhh.....',
+  '...hhHHHHHHHHhh...',
+  '..hHHVVVVVVVVHHh..',
+  'nHHVVWeVVVVWeVVHHn',
+  'nHHVVEEVVVVEEVVHHn',
+  '.HHHVVVVVVVVVVHHH.',
+  '..HHHHHHHHHHHHHH..',
+  '...dddddddddddd...',
+  '.......cccc.......',
+  '....bbbbbbbbbb....',
+  '...bbbbbLLbbbbb...',
+  '...BBBBBBBBBBBB...',
 ];
 
 const PALETTE: Record<string, string | undefined> = {
-  h: '#a792ff', // shell rim
-  s: '#7a60e6', // shell
-  S: '#4a34a0', // shell ridges
-  P: '#ece8f3', // pearl
-  p: '#c4b6fa', // pearl shade
-  E: '#100c18', // eyes and mouth
+  N: '#a8f3ff', // antenna node (glowing)
+  a: '#2f6bff', // antenna
+  h: '#86dcff', // helmet highlight
+  H: '#2f7bff', // helmet
+  d: '#1c4cc0', // helmet shade
+  V: '#071226', // visor
   W: '#ffffff', // eye glint
-  r: '#e98bd0', // blush
+  e: '#6ff3ff', // eyes
+  E: '#2bb7ff', // eyes, lower half
+  n: '#5cc8ff', // ear nodes
+  c: '#14306e', // neck
+  b: '#2463e8', // body
+  L: '#a8f3ff', // chest light
+  B: '#163c9e', // body shade
 };
 
 export const MASCOT_WIDTH = PIXELS[0]!.length;

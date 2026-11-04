@@ -43,7 +43,7 @@ export class ContainerSandbox extends GuardSandbox {
   }
 
   override wrapExec(spec: ExecSpec): WrappedExec {
-    const name = newId('nacre-');
+    const name = newId('nexus-');
     const rel = relative(this.cwdRoot, spec.cwd).replaceAll('\\', '/');
     const workdir = rel && !rel.startsWith('..') ? `/workspace/${rel}` : '/workspace';
     const args = [

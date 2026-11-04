@@ -30,6 +30,7 @@ import { globTool, grepTool, lsTool } from './tools/search-tools.js';
 import type { Question, TodoItem } from './tools/types.js';
 import { webFetchTool } from './tools/web.js';
 import { Emitter } from './util/emitter.js';
+import { projectDirIn } from './legacy.js';
 
 export interface RuntimeOptions {
   cwd: string;
@@ -102,7 +103,7 @@ function contextWarnings(spec: string, m: ResolvedModel): string[] {
   if (m.contextSource !== 'default' || m.providerId === 'none') return [];
   return [
     `${spec}: the server did not report a context window, so ${m.contextWindow.toLocaleString()} tokens is assumed. ` +
-      `Set the real size with /context <tokens> (e.g. /context 128k) so compaction triggers at the right point.`,
+      `Set the real size with /context <tokens> in the terminal (e.g. /context 128k), or contextWindows in your config, so compaction triggers at the right point.`,
   ];
 }
 
@@ -185,7 +186,7 @@ export class Runtime {
     const trusted = loaded.projectTrusted;
     const projectRoot = loaded.projectConfigPath
       ? join(loaded.projectConfigPath, '..')
-      : join(opts.cwd, '.nacreframe');
+      : projectDirIn(opts.cwd);
     warnings.push(
       ...skills.load([
         { dir: BUILTIN_SKILLS_DIR, source: 'built-in' },

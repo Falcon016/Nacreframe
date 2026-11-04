@@ -62,10 +62,10 @@ export function Banner({ info }: { info: BannerInfo }) {
   // As wide as the input box below it, so the two frames line up.
   const width = Math.max(40, columns);
   const showMascot = t.name !== 'mono' && width >= 72;
-  const title = ` ${NAME.toLowerCase()} `;
+  const title = ` ${NAME} `;
   const version = ` v${VERSION} `;
-  // ╭─[●] nacreframe ─────────────── v0.1.0 ─╮
-  const rule = '─'.repeat(Math.max(1, width - 2 - 3 - title.length - version.length - 2));
+  // ╭─◉ NexusHarness ─────────────── v0.1.0 ─╮
+  const rule = '─'.repeat(Math.max(1, width - 2 - GLYPH.mark.length - title.length - version.length - 2));
   const tips: [string, string][] = [
     ['/model', 'pick or switch the model'],
     ['/swarm duo', 'start a planner and a builder'],
@@ -78,11 +78,7 @@ export function Banner({ info }: { info: BannerInfo }) {
       <Text>
         <Text color={t.frame}>╭─</Text>
         <Text color={t.accent} bold>
-          {GLYPH.mark[0]}
-        </Text>
-        <Text color={t.text}>{GLYPH.mark[1]}</Text>
-        <Text color={t.accent} bold>
-          {GLYPH.mark[2]}
+          {GLYPH.mark}
         </Text>
         <Text bold>{title}</Text>
         <Text color={t.frame}>{rule}</Text>
@@ -119,7 +115,7 @@ export function Banner({ info }: { info: BannerInfo }) {
           <Box flexDirection="column" marginTop={1}>
             {tips.map(([k, what]) => (
               <Text key={k} wrap="truncate-end">
-                <Text color={t.lavender}>{k.padEnd(12)}</Text>
+                <Text color={t.sky}>{k.padEnd(12)}</Text>
                 <Text color={t.faint}>{what}</Text>
               </Text>
             ))}
@@ -161,7 +157,7 @@ export function ThinkingView({
   shown: boolean;
 }) {
   const t = useTheme();
-  const c = agent === 'main' ? t.lavender : agentColor(t, agent);
+  const c = agent === 'main' ? t.sky : agentColor(t, agent);
   const header = (
     <Text>
       <Text color={c}>{GLYPH.think}</Text>
@@ -224,7 +220,7 @@ export function ItemView({
         <Box marginTop={item.cont && !item.gap ? 0 : 1} paddingLeft={1} flexDirection="column">
           {item.agent !== 'main' && !item.cont ? (
             <Text bold color={c}>
-              {GLYPH.pearl} {item.agent}
+              {GLYPH.node} {item.agent}
             </Text>
           ) : null}
           <Box>
@@ -555,7 +551,7 @@ export function LiveArea({
       !main.text &&
       snap.showThinking ? (
         <Box marginTop={1} paddingLeft={1} flexDirection="column">
-          <Text color={t.lavender}>
+          <Text color={t.sky}>
             {GLYPH.think} <Text color={t.faint}>thinking</Text>
           </Text>
           <Box
@@ -565,7 +561,7 @@ export function LiveArea({
             borderTop={false}
             borderRight={false}
             borderBottom={false}
-            borderColor={t.lavender}
+            borderColor={t.sky}
             flexDirection="column"
           >
             {wrapTail(main.thought, columns - 6, thoughtLines).map((l, i) => (
@@ -752,13 +748,7 @@ export function Footer({
     ...(snap.browser.open ? [part('browser', 4, <Text color={t.blue}>browser</Text>)] : []),
     ...(queued ? [part(`${queued} queued`, 1, <Text color={t.gold}>{queued} queued</Text>)] : []),
     ...(snap.showThinking
-      ? [
-          part(
-            `${GLYPH.think} thinking shown`,
-            8,
-            <Text color={t.lavender}>{GLYPH.think} thinking shown</Text>,
-          ),
-        ]
+      ? [part(`${GLYPH.think} thinking shown`, 8, <Text color={t.sky}>{GLYPH.think} thinking shown</Text>)]
       : []),
   ];
   const speed = snap.speed;

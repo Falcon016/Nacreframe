@@ -3,25 +3,25 @@
 ## One command (Linux, macOS, WSL)
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/Falcon016/Nacreframe/main/install.sh | sh
+curl -fsSL https://raw.githubusercontent.com/Falcon016/NexusHarness/main/install.sh | sh
 ```
 
-Nacreframe needs **Node.js 22.18+** and **git**. The installer looks after both for you (see step 1).
+NexusHarness needs **Node.js 22.18+** and **git**. The installer looks after both for you (see step 1).
 If you would like to read it before running it, download it first: `curl -fsSL <url> -o install.sh`, then `sh install.sh`.
 
 What happens, in order:
 
 1. **Checks your system and installs what is missing.**
    - **Node.js 22.18+**: if it is missing or too old, the installer offers a private copy from nodejs.org
-     (about 40 MB, kept in `~/.nacreframe/runtime`, verified against nodejs.org's published SHA-256). It touches nothing
-     system-wide and needs no `sudo`. The `nacre` command uses it automatically.
+     (about 40 MB, kept in `~/.nexusharness/runtime`, verified against nodejs.org's published SHA-256). It touches nothing
+     system-wide and needs no `sudo`. The `nexus` command uses it automatically.
    - **git**: if it is missing, the installer shows the command for your package manager (`apt`, `dnf`, `brew`,
      `pacman`, ...) and runs it only if you say yes, because that step needs `sudo`. With `--yes` it never runs it.
    - **npm** comes with Node.js; the project's own dependencies are installed in step 2.
-2. **Downloads and builds** Nacreframe into `~/.nacreframe` (a shallow git checkout), installs its dependencies,
+2. **Downloads and builds** NexusHarness into `~/.nexusharness` (a shallow git checkout), installs its dependencies,
    builds it, then trims the build tools.
-3. **Adds the `nacre` command** to `~/.local/bin`. It is a small launcher: it picks the right Node.js and, if
-   Nacreframe's files have gone missing, repairs them before starting.
+3. **Adds the `nexus` command** to `~/.local/bin`. It is a small launcher: it picks the right Node.js and, if
+   NexusHarness's files have gone missing, repairs them before starting.
 4. **Asks before touching your shell profile** to put `~/.local/bin` on your `PATH` (only if it is not already there).
 5. **Offers the setup wizard** (below).
 
@@ -34,7 +34,7 @@ The whole script runs from one function called on its last line, so a download t
 Pass them after `sh -s --`:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/Falcon016/Nacreframe/main/install.sh | sh -s -- --yes --no-setup
+curl -fsSL https://raw.githubusercontent.com/Falcon016/NexusHarness/main/install.sh | sh -s -- --yes --no-setup
 ```
 
 | Option             | Meaning                                                                      |
@@ -43,16 +43,16 @@ curl -fsSL https://raw.githubusercontent.com/Falcon016/Nacreframe/main/install.s
 | `--no-setup`       | Do not offer the wizard                                                      |
 | `--no-modify-path` | Never edit shell profile files; the installer prints the line to add instead |
 | `--ref <ref>`      | Install a branch, tag or commit (default `main`)                             |
-| `--dir <path>`     | Install location (default `~/.nacreframe`)                                   |
-| `--bin-dir <path>` | Where the `nacre` command goes (default `~/.local/bin`)                      |
-| `--uninstall`      | Remove Nacreframe                                                            |
+| `--dir <path>`     | Install location (default `~/.nexusharness`)                                 |
+| `--bin-dir <path>` | Where the `nexus` command goes (default `~/.local/bin`)                      |
+| `--uninstall`      | Remove NexusHarness                                                          |
 
-The same settings exist as environment variables: `NACRE_REF`, `NACRE_INSTALL_DIR`, `NACRE_BIN_DIR`, and
-`NACRE_REPO` (the git URL). `NO_COLOR=1` gives plain output.
+The same settings exist as environment variables: `NEXUS_REF`, `NEXUS_INSTALL_DIR`, `NEXUS_BIN_DIR`, and
+`NEXUS_REPO` (the git URL). `NO_COLOR=1` gives plain output.
 
 ### Updating and uninstalling
 
-Update from inside Nacreframe with `/update`, or from a shell with `nacre update` (`nacre update --check` only
+Update from inside NexusHarness with `/update`, or from a shell with `nexus update` (`nexus update --check` only
 looks). It checks the branch you installed from (`main` unless you used `--ref`), shows the new version and the
 latest change, and asks before installing. After `/update` you can restart straight into the new version; it
 continues the conversation you were in (a swarm comes back with `/swarm resume`). Your settings, keys and saved
@@ -63,10 +63,10 @@ the `PATH` entry. Copies made by hand (`git clone` + `npm link`) update with `gi
 `/update` says so instead of touching them.
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/Falcon016/Nacreframe/main/install.sh | sh -s -- --uninstall
+curl -fsSL https://raw.githubusercontent.com/Falcon016/NexusHarness/main/install.sh | sh -s -- --uninstall
 ```
 
-Uninstalling removes the program, the `nacre` command and the `PATH` entry it added. Your settings, API keys and
+Uninstalling removes the program, the `nexus` command and the `PATH` entry it added. Your settings, API keys and
 sessions stay where they are; the command prints the exact `rm -rf` line if you want those gone too.
 
 ### Windows
@@ -74,12 +74,12 @@ sessions stay where they are; the command prints the exact `rm -rf` line if you 
 The script is for Linux, macOS and WSL. In WSL, run the command above in your Linux shell. On native Windows, install by hand:
 
 ```powershell
-git clone https://github.com/Falcon016/Nacreframe.git
-cd Nacreframe
+git clone https://github.com/Falcon016/NexusHarness.git
+cd NexusHarness
 npm ci
 npm run build
 npm link
-nacre setup
+nexus setup
 ```
 
 ### If something goes wrong
@@ -87,17 +87,34 @@ nacre setup
 | You see                               | Do this                                                                                          |
 | ------------------------------------- | ------------------------------------------------------------------------------------------------ |
 | `Node.js is too old` / not found      | Say yes when it offers a private copy. (Alpine and other non-glibc Linux: `apk add nodejs npm`.) |
-| Anything stopped working              | Run `nacre doctor --fix`. If `nacre` itself will not start, run the install command again.       |
-| `nacre: command not found`            | Open a new terminal, or add `~/.local/bin` to `PATH` (the installer prints the exact line).      |
-| `Could not download Nacreframe`       | Check your connection. For a private repository, sign git in first (`gh auth login`).            |
+| Anything stopped working              | Run `nexus doctor --fix`. If `nexus` itself will not start, run the install command again.       |
+| `nexus: command not found`            | Open a new terminal, or add `~/.local/bin` to `PATH` (the installer prints the exact line).      |
+| `Could not download NexusHarness`     | Check your connection. For a private repository, sign git in first (`gh auth login`).            |
 | Installing dependencies fails         | The last lines of the log are shown; usually a proxy or registry setting for npm.                |
-| Another `nacre` comes first on `PATH` | Remove it, or put `~/.local/bin` earlier in `PATH`.                                              |
+| Another `nexus` comes first on `PATH` | Remove it, or put `~/.local/bin` earlier in `PATH`.                                              |
 
-## `nacre doctor`: check and repair
+## Coming from Nacreframe
 
-`nacre doctor` checks Node.js, git, Chrome/Edge, Docker/Podman, your config, your provider keys, the key file's
-permissions, and (for an installer-made copy) the `nacre` command and your `PATH`. When something can be repaired it
-says so and asks; `nacre doctor --fix` goes ahead, and `-y` / `--yes` answers every question for you.
+NexusHarness was called Nacreframe, and its command was `nacre`. Nothing needs doing by hand:
+
+- **Command:** `nacre` keeps working beside `nexus`. An install you update with `/update` or `nacre update` gets the
+  `nexus` command added the first time the new version starts.
+- **Install folder:** running the installer again moves `~/.nacreframe` to `~/.nexusharness` and rewrites both
+  commands.
+- **Your data:** settings, API keys, sessions and trusted projects move from the old folders (for example
+  `~/.config/nacreframe`) to the new ones (`~/.config/nexusharness`) the first time `nexus` starts. Nothing is moved
+  over a folder that already exists.
+- **Environment variables:** `NACRE_*` variables still work. `NEXUS_*` wins when both are set.
+- **Project files:** a project's old `.nacreframe/` folder and `NACREFRAME.md` are still read.
+- **Theme:** `"theme": "nacre"` in your config means the new `nexus` theme.
+- **Docker (`deploy/`):** the data volume keeps its old name, so sessions and settings stay. Rename the variables in
+  `deploy/.env` from `NACRE_*` to `NEXUS_*` (for example `NEXUS_SERVER_TOKEN`).
+
+## `nexus doctor`: check and repair
+
+`nexus doctor` checks Node.js, git, Chrome/Edge, Docker/Podman, your config, your provider keys, the key file's
+permissions, and (for an installer-made copy) the `nexus` command and your `PATH`. When something can be repaired it
+says so and asks; `nexus doctor --fix` goes ahead, and `-y` / `--yes` answers every question for you.
 
 | Problem                                              | What `--fix` does                                                                  |
 | ---------------------------------------------------- | ---------------------------------------------------------------------------------- |
@@ -106,19 +123,19 @@ says so and asks; `nacre doctor --fix` goes ahead, and `-y` / `--yes` answers ev
 | No default model yet                                 | Runs the setup wizard                                                              |
 | Key file readable by other users                     | Makes it owner-only                                                                |
 | Settings or data folder missing                      | Creates it                                                                         |
-| `nacre` command missing, not on `PATH`, Node too old | Runs the installer in repair mode: re-downloads, reinstalls, rebuilds, relinks     |
+| `nexus` command missing, not on `PATH`, Node too old | Runs the installer in repair mode: re-downloads, reinstalls, rebuilds, relinks     |
 | No Chrome or Edge for the browser tool               | Downloads Chromium (about 150 MB) after asking, and points `browser.channel` at it |
 | Ollama is your default and is not running            | Starts `ollama serve`                                                              |
 
 It cannot install git or Docker for you (that needs `sudo`); it says what to run.
 
-If `nacre` will not even start because its files are damaged, the launcher notices and repairs them on the spot. To do
-that by hand: `sh ~/.nacreframe/install.sh --repair`.
+If `nexus` will not even start because its files are damaged, the launcher notices and repairs them on the spot. To do
+that by hand: `sh ~/.nexusharness/install.sh --repair`.
 
 ## The setup wizard
 
 ```bash
-nacre setup
+nexus setup
 ```
 
 A short, guided walkthrough. Arrow keys (or number keys) move, <kbd>Enter</kbd> accepts, <kbd>Ctrl</kbd>+<kbd>C</kbd>
@@ -148,11 +165,11 @@ Run it again whenever you like to switch provider or tighten safety.
 `--yes` asks nothing and applies only the options you pass:
 
 ```bash
-printf '%s' "$ANTHROPIC_API_KEY" | nacre setup --yes --provider anthropic --key-stdin \
+printf '%s' "$ANTHROPIC_API_KEY" | nexus setup --yes --provider anthropic --key-stdin \
   --model claude-sonnet-5-5 --approval edits --sandbox guard --no-browser
 
-nacre setup --yes --provider ollama --model qwen3:8b
-nacre setup --yes --provider vllm --base-url http://gpu-box:8000/v1 --model my-model
+nexus setup --yes --provider ollama --model qwen3:8b
+nexus setup --yes --provider vllm --base-url http://gpu-box:8000/v1 --model my-model
 ```
 
 | Option                       | Meaning                                                                          |

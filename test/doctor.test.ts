@@ -78,7 +78,7 @@ describe('nodeIsNewEnough', () => {
   });
 });
 
-describe('nacre doctor', () => {
+describe('nexus doctor', () => {
   let s: ReturnType<typeof sandbox>;
   beforeEach(() => {
     s = sandbox();
@@ -214,21 +214,21 @@ describe('nacre doctor', () => {
   });
 
   describe.skipIf(process.platform === 'win32')('an installation made by install.sh', () => {
-    const MARK = '# nacre launcher written by the Nacreframe installer';
+    const MARK = '# nexus launcher written by the NexusHarness installer';
     const setupInstall = (launcher: boolean, pathHasBin: boolean) => {
-      const root = join(s.home, '.nacreframe');
+      const root = join(s.home, '.nexusharness');
       const bin = join(s.home, '.local', 'bin');
       mkdirSync(root, { recursive: true });
       mkdirSync(bin, { recursive: true });
       writeFileSync(join(root, 'install.sh'), '#!/bin/sh\n');
-      if (launcher) writeFileSync(join(bin, 'nacre'), `#!/bin/sh\n${MARK}\nNACRE_DIR='${root}'\n`);
+      if (launcher) writeFileSync(join(bin, 'nexus'), `#!/bin/sh\n${MARK}\nNEXUS_DIR='${root}'\n`);
       return { root, bin, env: { PATH: pathHasBin ? `${bin}:/usr/bin` : '/usr/bin' } };
     };
 
     it('puts back a launcher that has gone missing, by running the installer in repair mode', async () => {
       const i = setupInstall(false, false);
       await doctor(s.cwd, { ...s.opts, installRoot: i.root, env: i.env, fix: true });
-      expect(s.text()).toMatch(/! nacre command\s+missing/);
+      expect(s.text()).toMatch(/! nexus command\s+missing/);
       expect(s.commands).toEqual([
         ['sh', join(i.root, 'install.sh'), '--repair', '--dir', i.root, '--bin-dir', i.bin],
       ]);
@@ -251,7 +251,7 @@ describe('nacre doctor', () => {
     it('is happy when the launcher exists and its folder is on PATH', async () => {
       const i = setupInstall(true, true);
       await doctor(s.cwd, { ...s.opts, installRoot: i.root, env: i.env });
-      expect(s.text()).toMatch(/✓ nacre command/);
+      expect(s.text()).toMatch(/✓ nexus command/);
       expect(s.text()).toMatch(/✓ PATH/);
     });
 
@@ -259,7 +259,10 @@ describe('nacre doctor', () => {
       const i = setupInstall(true, false);
       await doctor(s.cwd, { ...s.opts, installRoot: i.root, env: i.env });
       expect(s.text()).toMatch(/! PATH\s+.*is not on it/);
-      writeFileSync(join(s.home, '.bashrc'), '# >>> nacreframe >>>\nexport PATH="$HOME/.local/bin:$PATH"\n');
+      writeFileSync(
+        join(s.home, '.bashrc'),
+        '# >>> nexusharness >>>\nexport PATH="$HOME/.local/bin:$PATH"\n',
+      );
       const after = sandbox();
       Object.assign(after.opts, { installRoot: i.root, env: i.env, home: s.home });
       await doctor(after.cwd, after.opts);

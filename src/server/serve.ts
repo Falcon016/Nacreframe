@@ -18,7 +18,7 @@ Options
       --host <addr>          Address to listen on                (default 127.0.0.1)
       --port <n>             Port                                (default ${DEFAULT_PORT})
       --root <dir>           Folder sessions may work in; repeat for more (default: current folder)
-      --token <secret>       Login token (default: generated once and stored; or NACRE_SERVER_TOKEN)
+      --token <secret>       Login token (default: generated once and stored; or NEXUS_SERVER_TOKEN)
       --rotate-token         Replace the stored login token
       --no-auth              Disable login (only allowed on a loopback address)
       --allow-host <name>    Accept this Host header (your reverse-proxy name); repeat as needed
@@ -104,7 +104,7 @@ export async function serve(args: string[]): Promise<number> {
   let token: string | undefined;
   let created = false;
   if (!v['no-auth']) {
-    const given = v.token ?? process.env.NACRE_SERVER_TOKEN;
+    const given = v.token ?? process.env.NEXUS_SERVER_TOKEN;
     if (given) {
       if (given.length < 16) {
         console.error('The login token must be at least 16 characters.');

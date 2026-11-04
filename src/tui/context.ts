@@ -1,7 +1,7 @@
 import { createContext, useContext } from 'react';
-import { NACRE, type Theme } from './theme.js';
+import { NEXUS, type Theme } from './theme.js';
 
-export const ThemeContext = createContext<Theme>(NACRE);
+export const ThemeContext = createContext<Theme>(NEXUS);
 export const useTheme = (): Theme => useContext(ThemeContext);
 
 const assigned = new Map<string, number>();

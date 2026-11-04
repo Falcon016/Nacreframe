@@ -81,7 +81,7 @@ describe.skipIf(!channel)('live browser control', () => {
       expect(link).toBeTruthy();
       const after = await strict.click(link!);
       expect(blocked.some((u) => u.includes('localhost'))).toBe(true);
-      expect(after).toContain('Blocked by Nacreframe policy'); // the agent is told why
+      expect(after).toContain('Blocked by NexusHarness policy'); // the agent is told why
       expect(after).not.toContain('should never load'); // the real page was never fetched
       await expect(strict.navigate(`http://localhost:${new URL(base).port}/`)).rejects.toThrow(/blocked/);
     } finally {

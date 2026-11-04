@@ -250,7 +250,7 @@ export const BUILTINS: BuiltinCommand[] = [
       store.setStatus(undefined);
       if (!models.length) {
         return store.notice(
-          'No provider answered. Start a local server, run `nacre auth set <provider>`, or pass --model <provider>/<model>.',
+          'No provider answered. Start a local server, run `nexus auth set <provider>`, or pass --model <provider>/<model>.',
           'warn',
         );
       }
@@ -331,7 +331,7 @@ export const BUILTINS: BuiltinCommand[] = [
   },
   {
     name: 'update',
-    description: 'Update Nacreframe to the latest version',
+    description: 'Update NexusHarness to the latest version',
     async run(_a, c) {
       const { runtime, store } = c;
       if (runtime.agent.isRunning || runtime.swarm?.names.some((n) => runtime.swarm?.agent(n)?.isRunning))
@@ -342,13 +342,13 @@ export const BUILTINS: BuiltinCommand[] = [
       const { check } = r;
       if (check.upToDate)
         return store.notice(
-          `Nacreframe ${check.current.version} is up to date (${check.ref} @ ${short(check.current.commit)}).`,
+          `NexusHarness ${check.current.version} is up to date (${check.ref} @ ${short(check.current.commit)}).`,
           'success',
         );
       const newer =
         check.latest.version !== check.current.version
-          ? `Nacreframe ${check.latest.version} is available (you have ${check.current.version}).`
-          : `A newer build of Nacreframe ${check.current.version} is available (${short(check.current.commit)} → ${short(check.latest.commit)}).`;
+          ? `NexusHarness ${check.latest.version} is available (you have ${check.current.version}).`
+          : `A newer build of NexusHarness ${check.current.version} is available (${short(check.current.commit)} → ${short(check.latest.commit)}).`;
       const go = await pick(c, `${newer} Latest change: ${check.latest.subject}`, [
         {
           label: 'Update now',
@@ -380,10 +380,10 @@ export const BUILTINS: BuiltinCommand[] = [
               ? 'continues this conversation; /swarm resume brings the team back'
               : 'continues this conversation',
           },
-          { label: 'Later', value: false, hint: 'the new version starts next time you run nacre' },
+          { label: 'Later', value: false, hint: 'the new version starts next time you run nexus' },
         ],
       );
-      if (!again) return store.notice('Updated. The new version starts next time you run nacre.', 'success');
+      if (!again) return store.notice('Updated. The new version starts next time you run nexus.', 'success');
       requestRelaunch(check);
       c.exit();
     },
@@ -731,7 +731,7 @@ export const BUILTINS: BuiltinCommand[] = [
     description: "Trust this project's config, skills and extensions",
     run(_a, { runtime, store }) {
       if (!runtime.loaded.projectConfigPath)
-        return store.notice('No project config (.nacreframe/config.json) here.');
+        return store.notice('No project config (.nexusharness/config.json) here.');
       trustProject(runtime.loaded.paths, resolve(runtime.loaded.projectConfigPath, '..', '..'));
       store.notice(`Trusted. Restart ${BIN} to load the project's full configuration.`, 'success');
     },
@@ -741,13 +741,13 @@ export const BUILTINS: BuiltinCommand[] = [
     usage: 'export [file.md]',
     description: 'Save the conversation as Markdown',
     run(args, { runtime, store }) {
-      const file = resolve(runtime.cwd, args.trim() || `nacreframe-${runtime.agent.session.id}.md`);
+      const file = resolve(runtime.cwd, args.trim() || `nexusharness-${runtime.agent.session.id}.md`);
       try {
         runtime.sandbox.checkPath(file, 'write');
       } catch (e) {
         return store.notice((e as Error).message, 'error');
       }
-      const out: string[] = [`# Nacreframe session ${runtime.agent.session.id}\n`];
+      const out: string[] = [`# NexusHarness session ${runtime.agent.session.id}\n`];
       for (const m of runtime.agent.session.messages()) {
         for (const b of m.content) {
           if (b.type === 'text') out.push(`**${m.role === 'user' ? 'You' : 'Assistant'}**\n\n${b.text}\n`);

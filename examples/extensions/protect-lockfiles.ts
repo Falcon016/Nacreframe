@@ -1,6 +1,6 @@
-// Example Nacreframe extension. Copy to <config>/extensions/ (see `nacre doctor` for the path).
+// Example NexusHarness extension. Copy to <config>/extensions/ (see `nexus doctor` for the path).
 // Blocks any tool call that tries to touch a lockfile, and adds a /todo-scan command.
-import type { ExtensionApi } from 'nacreframe/extensions';
+import type { ExtensionApi } from 'nexusharness/extensions';
 
 export default function (api: ExtensionApi) {
   api.onBeforeTool(async ({ name, input }) => {

@@ -30,7 +30,7 @@ export function isPrivateAddress(ip: string): boolean {
 
 /** Resolve a hostname and refuse private/loopback/link-local targets (SSRF + cloud-metadata protection). */
 export async function assertPublicHost(hostname: string): Promise<void> {
-  if (process.env.NACRE_ALLOW_PRIVATE_FETCH === '1') return;
+  if (process.env.NEXUS_ALLOW_PRIVATE_FETCH === '1') return;
   const host = hostname.replace(/^\[|\]$/g, '');
   const addrs = isIP(host) ? [{ address: host }] : await lookup(host, { all: true });
   for (const a of addrs) {
@@ -81,7 +81,7 @@ export const webFetchTool = defineTool({
         redirect: 'manual',
         signal: ctx.signal,
         headers: {
-          'user-agent': 'Nacreframe/0.1 (+https://github.com/nacreframe)',
+          'user-agent': 'NexusHarness/0.1 (+https://github.com/nexusharness)',
           accept: 'text/html,text/plain,application/json;q=0.9,*/*;q=0.5',
         },
       });

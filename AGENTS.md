@@ -1,4 +1,4 @@
-# Nacreframe: notes for coding agents
+# NexusHarness: notes for coding agents
 
 TypeScript (ESM, strict), Node ≥ 22.18, Ink 8 + React 19 for the TUI, zod 4 for schemas, vitest for tests.
 

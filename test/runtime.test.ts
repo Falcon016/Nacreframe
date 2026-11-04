@@ -103,7 +103,7 @@ describe('context window detection', () => {
           contextWindows: { 'llamacpp/tiny-16k': 12000 },
         }),
       );
-      const { config, paths } = loadConfig({ cwd: ws.dir, env: { NACRE_HOME: home }, paths: undefined });
+      const { config, paths } = loadConfig({ cwd: ws.dir, env: { NEXUS_HOME: home }, paths: undefined });
       const registry = new ProviderRegistry(
         config,
         new AuthStore(paths),
@@ -129,13 +129,13 @@ describe('context window detection', () => {
     try {
       const home = join(ws.dir, 'h');
       mkdirSync(join(home, 'config'), { recursive: true });
-      const plain = loadConfig({ cwd: ws.dir, env: { NACRE_HOME: home } }).config;
+      const plain = loadConfig({ cwd: ws.dir, env: { NEXUS_HOME: home } }).config;
       expect(plain.providers.llamacpp?.baseUrl).toBe('http://127.0.0.1:8080/v1');
       writeFileSync(
         join(home, 'config', 'config.json'),
         JSON.stringify({ providers: { llamacpp: { baseUrl: 'http://127.0.0.1:11434/v1' } } }),
       );
-      const custom = loadConfig({ cwd: ws.dir, env: { NACRE_HOME: home } }).config;
+      const custom = loadConfig({ cwd: ws.dir, env: { NEXUS_HOME: home } }).config;
       expect(custom.providers.llamacpp).toMatchObject({
         type: 'openai',
         baseUrl: 'http://127.0.0.1:11434/v1',
@@ -169,7 +169,7 @@ describe('runtime with the mock server', () => {
     const boot = (extra: { model?: string } = {}) =>
       Runtime.create({
         cwd: work,
-        env: { ...process.env, NACRE_HOME: home },
+        env: { ...process.env, NEXUS_HOME: home },
         ...(extra.model ? { overrides: { model: extra.model } } : {}),
       });
     return { ws, boot, work };
@@ -395,7 +395,7 @@ describe('setting the context window by hand', () => {
           providers: { mock: { type: 'openai', baseUrl: server.url } },
         }),
       );
-      const boot = () => Runtime.create({ cwd: ws.dir, env: { ...process.env, NACRE_HOME: home } });
+      const boot = () => Runtime.create({ cwd: ws.dir, env: { ...process.env, NEXUS_HOME: home } });
 
       let rt = await boot();
       expect(rt.agent.model).toMatchObject({

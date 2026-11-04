@@ -1,0 +1,22 @@
+# Ghostty: save as ~/.config/ghostty/themes/nexus, then set `theme = nexus`
+background = 04060a
+foreground = e6edf7
+cursor-color = 5cc8ff
+selection-background = 15294d
+selection-foreground = e6edf7
+palette = 0=#0d1119
+palette = 1=#ef7b7b
+palette = 2=#74d19b
+palette = 3=#e2b866
+palette = 4=#5b8cff
+palette = 5=#e98bd0
+palette = 6=#5cc8ff
+palette = 7=#e6edf7
+palette = 8=#6b7891
+palette = 9=#f59a9a
+palette = 10=#98e0b4
+palette = 11=#efcd8a
+palette = 12=#8fb8ff
+palette = 13=#f0a3c0
+palette = 14=#9adcff
+palette = 15=#f7faff

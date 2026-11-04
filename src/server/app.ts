@@ -33,7 +33,7 @@ export interface ServerOptions {
 
 const MAX_BODY = 1_000_000;
 const MAX_DISCARD = 32_000_000; // how much of an oversized upload is read and thrown away before the socket is cut
-const COOKIE = 'nacre_sid';
+const COOKIE = 'nexus_sid';
 const SESSION_TTL_MS = 7 * 24 * 3600 * 1000;
 
 const TYPES: Record<string, string> = {
@@ -41,6 +41,7 @@ const TYPES: Record<string, string> = {
   '.js': 'text/javascript; charset=utf-8',
   '.css': 'text/css; charset=utf-8',
   '.svg': 'image/svg+xml',
+  '.png': 'image/png',
   '.woff2': 'font/woff2',
   '.txt': 'text/plain; charset=utf-8',
 };
@@ -205,7 +206,7 @@ export async function startServer(opts: ServerOptions): Promise<RunningServer> {
 
     // State-changing requests must be same-origin XHR/fetch: custom header + matching Origin.
     if (method !== 'GET' && method !== 'HEAD') {
-      if (req.headers['x-nacre'] !== '1') throw new HttpError(403, 'Missing X-Nacre header');
+      if (req.headers['x-nexus'] !== '1') throw new HttpError(403, 'Missing X-Nexus header');
       const origin = req.headers.origin;
       if (origin) {
         let oh = '';
@@ -353,7 +354,7 @@ export async function startServer(opts: ServerOptions): Promise<RunningServer> {
       if (e instanceof HttpError) {
         return json(res, e.status, { error: e.message });
       }
-      process.stderr.write(`[nacre serve] ${(e as Error).stack ?? e}\n`);
+      process.stderr.write(`[nexus serve] ${(e as Error).stack ?? e}\n`);
       json(res, 500, { error: 'Internal error' });
     });
   };

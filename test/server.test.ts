@@ -24,7 +24,7 @@ let srv: RunningServer;
 let work: string;
 let cookie = '';
 
-const H = { 'content-type': 'application/json', 'x-nacre': '1' };
+const H = { 'content-type': 'application/json', 'x-nexus': '1' };
 const api = (path: string, init: RequestInit & { json?: unknown; cookie?: string } = {}) =>
   fetch(srv.url + path, {
     ...init,
@@ -102,7 +102,7 @@ beforeAll(async () => {
     roots: [work],
     token: TOKEN,
     staticDir: web,
-    env: { ...process.env, NACRE_HOME: home },
+    env: { ...process.env, NEXUS_HOME: home },
   });
   const login = await api('/api/login', { json: { token: TOKEN } });
   cookie = login.headers.get('set-cookie')!.split(';')[0]!;
@@ -122,7 +122,7 @@ describe('authentication and request hardening', () => {
         port: 0,
         roots: [work],
         staticDir: ws.dir,
-        env: { ...process.env, NACRE_HOME: join(ws.dir, 'home') },
+        env: { ...process.env, NEXUS_HOME: join(ws.dir, 'home') },
       }),
     ).rejects.toThrow(/without a login token/);
   });
@@ -156,7 +156,7 @@ describe('authentication and request hardening', () => {
     expect((await api('/api/login', { json: { token: TOKEN }, cookie: '' })).status).toBe(429);
   });
 
-  it('rejects state-changing requests without the X-Nacre header or from another origin', async () => {
+  it('rejects state-changing requests without the X-Nexus header or from another origin', async () => {
     const noHeader = await fetch(srv.url + '/api/sessions', {
       method: 'POST',
       headers: { 'content-type': 'application/json', cookie },
@@ -386,7 +386,7 @@ describe('sessions over the API', () => {
       token: TOKEN,
       staticDir: ws.dir,
       maxSessions: 1,
-      env: { ...process.env, NACRE_HOME: join(ws.dir, 'home') },
+      env: { ...process.env, NEXUS_HOME: join(ws.dir, 'home') },
     });
     try {
       const login = await fetch(small.url + '/api/login', {

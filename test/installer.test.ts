@@ -37,8 +37,8 @@ describe.skipIf(!hasSh || !hasGit)('install.sh', () => {
         HOME: who,
         SHELL: '/bin/bash',
         NO_COLOR: '1',
-        NACRE_REPO: source,
-        NACRE_HOME: join(who, 'nacre-home'),
+        NEXUS_REPO: source,
+        NEXUS_HOME: join(who, 'nexus-home'),
         npm_config_cache: process.env.npm_config_cache ?? join(homedir(), '.npm'),
         TMPDIR: ws.dir,
         ...extra,
@@ -91,7 +91,7 @@ describe.skipIf(!hasSh || !hasGit)('install.sh', () => {
     const r = sh(['--frobnicate']);
     expect(r.status).toBe(1);
     expect(r.stderr).toContain('Unknown option: --frobnicate');
-    expect(existsSync(join(home, '.nacreframe'))).toBe(false);
+    expect(existsSync(join(home, '.nexusharness'))).toBe(false);
   });
 
   const oldNode = () => {
@@ -104,13 +104,13 @@ describe.skipIf(!hasSh || !hasGit)('install.sh', () => {
 
   it('replaces a Node.js that is too old, and says what to do if it cannot', () => {
     // It offers a private copy by default; with the download unreachable it stops and explains.
-    const r = sh(['--yes'], { PATH: `${oldNode()}:${process.env.PATH}`, NACRE_NODE_DIST: 'file:///nowhere' });
+    const r = sh(['--yes'], { PATH: `${oldNode()}:${process.env.PATH}`, NEXUS_NODE_DIST: 'file:///nowhere' });
     expect(r.status).toBe(1);
     expect(r.stdout).toContain('Node.js is too old');
     expect(r.stdout).toContain('v18.19.0');
     expect(r.stderr).toContain('Could not install Node.js');
     expect(r.stderr).toContain('22.18');
-    expect(existsSync(join(home, '.nacreframe', 'package.json'))).toBe(false);
+    expect(existsSync(join(home, '.nexusharness', 'package.json'))).toBe(false);
   });
 
   it('points to Node.js downloads on systems it has no build for', () => {
@@ -123,7 +123,7 @@ describe.skipIf(!hasSh || !hasGit)('install.sh', () => {
     expect(r.stderr).toContain('no official Node.js download');
     expect(r.stderr).toContain('22.18');
     expect(r.stderr).toContain('fnm');
-    expect(existsSync(join(home, '.nacreframe'))).toBe(false);
+    expect(existsSync(join(home, '.nexusharness'))).toBe(false);
   });
 
   it('sends native Windows shells to WSL or the manual steps', () => {
@@ -141,28 +141,32 @@ describe.skipIf(!hasSh || !hasGit)('install.sh', () => {
     // ---- fresh install ----
     const first = sh(['--yes']);
     expect(first.status, first.stdout + first.stderr).toBe(0);
-    expect(first.stdout).toContain('Nacreframe is installed.');
-    const link = join(home, '.local', 'bin', 'nacre');
-    // `nacre` is a small launcher (it can use a private Node.js and repairs a damaged install), not a symlink.
+    expect(first.stdout).toContain('NexusHarness is installed.');
+    const link = join(home, '.local', 'bin', 'nexus');
+    // `nexus` is a small launcher (it can use a private Node.js and repairs a damaged install), not a symlink.
     expect(lstatSync(link).isSymbolicLink()).toBe(false);
     expect(lstatSync(link).mode & 0o111).not.toBe(0);
-    expect(readFileSync(link, 'utf8')).toContain(`NACRE_DIR='${join(home, '.nacreframe')}'`);
-    expect(existsSync(join(home, '.nacreframe', 'node_modules', 'typescript'))).toBe(false); // dev tools pruned
+    expect(readFileSync(link, 'utf8')).toContain(`NEXUS_DIR='${join(home, '.nexusharness')}'`);
+    // `nacre`, the command's name before the rename, starts the same install.
+    expect(readFileSync(join(home, '.local', 'bin', 'nacre'), 'utf8')).toContain(
+      `NEXUS_DIR='${join(home, '.nexusharness')}'`,
+    );
+    expect(existsSync(join(home, '.nexusharness', 'node_modules', 'typescript'))).toBe(false); // dev tools pruned
 
     const rc = readFileSync(join(home, RC_NAME), 'utf8');
-    expect(rc).toContain('# >>> nacreframe >>>');
+    expect(rc).toContain('# >>> nexusharness >>>');
     expect(rc).toContain('export PATH="$HOME/.local/bin:$PATH"');
 
     // The installed command works, and so does its wizard in scripted mode.
-    const env = { ...process.env, HOME: home, NACRE_HOME: join(home, 'nacre-home') };
+    const env = { ...process.env, HOME: home, NEXUS_HOME: join(home, 'nexus-home') };
     const version = spawnSync(link, ['--version'], { encoding: 'utf8', env });
-    expect(version.stdout).toMatch(/^Nacreframe \d+\.\d+\.\d+/);
+    expect(version.stdout).toMatch(/^NexusHarness \d+\.\d+\.\d+/);
     const setup = spawnSync(link, ['setup', '--yes', '--provider', 'ollama', '--model', 'qwen3:8b'], {
       encoding: 'utf8',
       env,
     });
     expect(setup.status, setup.stderr).toBe(0);
-    expect(JSON.parse(readFileSync(join(home, 'nacre-home', 'config', 'config.json'), 'utf8'))).toMatchObject(
+    expect(JSON.parse(readFileSync(join(home, 'nexus-home', 'config', 'config.json'), 'utf8'))).toMatchObject(
       {
         model: 'ollama/qwen3:8b',
       },
@@ -172,8 +176,8 @@ describe.skipIf(!hasSh || !hasGit)('install.sh', () => {
     const again = sh(['--yes'], { PATH: `${join(home, '.local', 'bin')}:${process.env.PATH}` });
     expect(again.status, again.stdout + again.stderr).toBe(0);
     expect(again.stdout).toContain('is already up to date');
-    expect(again.stdout).toContain('Nacreframe is up to date.');
-    expect(readFileSync(join(home, RC_NAME), 'utf8').match(/>>> nacreframe >>>/g)).toHaveLength(1);
+    expect(again.stdout).toContain('NexusHarness is up to date.');
+    expect(readFileSync(join(home, RC_NAME), 'utf8').match(/>>> nexusharness >>>/g)).toHaveLength(1);
 
     // ---- a new version upstream is picked up ----
     const pkgPath = join(source, 'package.json');
@@ -181,26 +185,26 @@ describe.skipIf(!hasSh || !hasGit)('install.sh', () => {
     git(source, 'commit', '-qam', 'bump');
     const update = sh(['--yes']);
     expect(update.status, update.stdout + update.stderr).toBe(0);
-    expect(update.stdout).toMatch(/Downloaded Nacreframe 9\.9\.9/);
+    expect(update.stdout).toMatch(/Downloaded NexusHarness 9\.9\.9/);
     expect(update.stdout).toContain('was 0.1.0');
 
-    // ---- `nacre update` does the same from the installed command, following the installed branch ----
-    expect(readFileSync(join(home, '.nacreframe', '.nacre-ref'), 'utf8').trim()).toBe('main');
-    const nacre = (...args: string[]) =>
+    // ---- `nexus update` does the same from the installed command, following the installed branch ----
+    expect(readFileSync(join(home, '.nexusharness', '.nexus-ref'), 'utf8').trim()).toBe('main');
+    const nexus = (...args: string[]) =>
       spawnSync(link, args, { encoding: 'utf8', env: { ...env, NO_COLOR: '1' }, timeout: 280_000 });
-    expect(nacre('update', '--check').stdout).toContain('is up to date');
+    expect(nexus('update', '--check').stdout).toContain('is up to date');
     writeFileSync(
       pkgPath,
       readFileSync(pkgPath, 'utf8').replace(/"version": "[^"]+"/, '"version": "9.9.10"'),
     );
     git(source, 'commit', '-qam', 'Add the frobnicator');
-    const check = nacre('update', '--check');
+    const check = nexus('update', '--check');
     expect(check.stdout).toContain('9.9.10 is available (you have 9.9.9');
     expect(check.stdout).toContain('Latest change: Add the frobnicator');
-    expect(nacre('--version').stdout).toContain('9.9.9'); // --check changed nothing
-    const upd = nacre('update');
+    expect(nexus('--version').stdout).toContain('9.9.9'); // --check changed nothing
+    const upd = nexus('update');
     expect(upd.status, upd.stdout + upd.stderr).toBe(0);
-    expect(nacre('--version').stdout).toContain('9.9.10');
+    expect(nexus('--version').stdout).toContain('9.9.10');
   }, 290_000);
 
   it('can leave profile files alone, and says how to finish by hand', () => {
@@ -208,7 +212,7 @@ describe.skipIf(!hasSh || !hasGit)('install.sh', () => {
     mkdirSync(other);
     // Reuses the finished build, so this is quick.
     const r = sh(
-      ['--yes', '--no-modify-path', '--dir', join(home, '.nacreframe'), '--bin-dir', join(other, 'bin')],
+      ['--yes', '--no-modify-path', '--dir', join(home, '.nexusharness'), '--bin-dir', join(other, 'bin')],
       {},
       other,
     );
@@ -216,18 +220,18 @@ describe.skipIf(!hasSh || !hasGit)('install.sh', () => {
     expect(existsSync(join(other, RC_NAME))).toBe(false);
     expect(r.stdout).toContain('is not on your PATH');
     expect(r.stdout).toContain('export PATH=');
-    expect(lstatSync(join(other, 'bin', 'nacre')).isSymbolicLink()).toBe(false);
-    expect(readFileSync(join(other, 'bin', 'nacre'), 'utf8')).toContain('NACRE_DIR=');
+    expect(lstatSync(join(other, 'bin', 'nexus')).isSymbolicLink()).toBe(false);
+    expect(readFileSync(join(other, 'bin', 'nexus'), 'utf8')).toContain('NEXUS_DIR=');
   }, 120_000);
 
   it('refuses to overwrite a folder or command it does not own', () => {
     const squat = join(ws.dir, 'home3');
-    mkdirSync(join(squat, '.nacreframe'), { recursive: true });
-    writeFileSync(join(squat, '.nacreframe', 'precious.txt'), 'keep me');
+    mkdirSync(join(squat, '.nexusharness'), { recursive: true });
+    writeFileSync(join(squat, '.nexusharness', 'precious.txt'), 'keep me');
     const folder = sh(['--yes'], {}, squat);
     expect(folder.status).toBe(1);
-    expect(folder.stderr).toContain('is not a Nacreframe install');
-    expect(readFileSync(join(squat, '.nacreframe', 'precious.txt'), 'utf8')).toBe('keep me');
+    expect(folder.stderr).toContain('is not a NexusHarness install');
+    expect(readFileSync(join(squat, '.nexusharness', 'precious.txt'), 'utf8')).toBe('keep me');
   });
 
   // ---- a machine that is missing things -------------------------------------------------------------
@@ -271,34 +275,34 @@ describe.skipIf(!hasSh || !hasGit)('install.sh', () => {
   };
 
   it.skipIf(!nodeArch)(
-    'installs a private Node.js when there is none, and the nacre command uses it',
+    'installs a private Node.js when there is none, and the nexus command uses it',
     () => {
       const bare = join(ws.dir, 'home-bare');
       mkdirSync(bare);
       const dist = fakeNodeDist('node-dist');
-      const env = { PATH: bareTools('tools-nonode', ['node', 'npm', 'npx']), NACRE_NODE_DIST: dist };
+      const env = { PATH: bareTools('tools-nonode', ['node', 'npm', 'npx']), NEXUS_NODE_DIST: dist };
       const r = sh(['--yes'], env, bare);
       expect(r.status, r.stdout + r.stderr).toBe(0);
       expect(r.stdout).toMatch(/Installed Node\.js v\d+\.\d+\.\d+, private copy/);
-      const nodeBin = join(bare, '.nacreframe', 'runtime', 'node', 'bin', 'node');
+      const nodeBin = join(bare, '.nexusharness', 'runtime', 'node', 'bin', 'node');
       expect(existsSync(nodeBin)).toBe(true);
 
       // Still no Node.js on PATH: the launcher finds the private one.
-      const cmd = join(bare, '.local', 'bin', 'nacre');
+      const cmd = join(bare, '.local', 'bin', 'nexus');
       const run = (args: string[]) =>
         spawnSync(cmd, args, {
           encoding: 'utf8',
-          env: { PATH: env.PATH, HOME: bare, NACRE_HOME: join(bare, 'nh'), NACRE_REPO: source },
+          env: { PATH: env.PATH, HOME: bare, NEXUS_HOME: join(bare, 'nh'), NEXUS_REPO: source },
         });
-      expect(run(['--version']).stdout).toMatch(/^Nacreframe \d+\.\d+\.\d+/);
+      expect(run(['--version']).stdout).toMatch(/^NexusHarness \d+\.\d+\.\d+/);
 
-      // Damage the install: the next `nacre` repairs it before starting.
-      rmSync(join(bare, '.nacreframe', 'node_modules'), { recursive: true, force: true });
-      rmSync(join(bare, '.nacreframe', 'dist'), { recursive: true, force: true });
+      // Damage the install: the next `nexus` repairs it before starting.
+      rmSync(join(bare, '.nexusharness', 'node_modules'), { recursive: true, force: true });
+      rmSync(join(bare, '.nexusharness', 'dist'), { recursive: true, force: true });
       const healed = run(['--version']);
       expect(healed.stderr).toContain('missing or damaged');
-      expect(healed.stdout).toMatch(/^Nacreframe \d+\.\d+\.\d+/);
-      expect(existsSync(join(bare, '.nacreframe', 'dist', 'cli.js'))).toBe(true);
+      expect(healed.stdout).toMatch(/^NexusHarness \d+\.\d+\.\d+/);
+      expect(existsSync(join(bare, '.nexusharness', 'dist', 'cli.js'))).toBe(true);
 
       // A later run reuses the private copy instead of downloading again.
       const again = sh(['--yes', '--no-modify-path'], env, bare);
@@ -315,13 +319,13 @@ describe.skipIf(!hasSh || !hasGit)('install.sh', () => {
       ['--yes'],
       {
         PATH: bareTools('tools-badsum', ['node', 'npm', 'npx']),
-        NACRE_NODE_DIST: fakeNodeDist('bad-dist', true),
+        NEXUS_NODE_DIST: fakeNodeDist('bad-dist', true),
       },
       other,
     );
     expect(r.status).toBe(1);
     expect(r.stderr + r.stdout).toContain('Checksum mismatch');
-    expect(existsSync(join(other, '.nacreframe', 'runtime', 'node'))).toBe(false);
+    expect(existsSync(join(other, '.nexusharness', 'runtime', 'node'))).toBe(false);
   });
 
   it('says how to get git when it is missing, and never runs sudo on its own', () => {
@@ -336,13 +340,59 @@ describe.skipIf(!hasSh || !hasGit)('install.sh', () => {
     expect(readdirSync(other)).toEqual([]);
   });
 
+  it('moves an install from before the rename (Nacreframe, `nacre`) and keeps the old command working', () => {
+    const old = join(ws.dir, 'old-home');
+    mkdirSync(join(old, '.local', 'bin'), { recursive: true });
+    // An install made by the old installer: ~/.nacreframe, a `nacre` launcher and its PATH block.
+    cpSync(join(home, '.nexusharness'), join(old, '.nacreframe'), {
+      recursive: true,
+      verbatimSymlinks: true,
+    });
+    const pkg = join(old, '.nacreframe', 'package.json');
+    writeFileSync(pkg, readFileSync(pkg, 'utf8').replace('"name": "nexusharness"', '"name": "nacreframe"'));
+    writeFileSync(
+      join(old, '.local', 'bin', 'nacre'),
+      `#!/bin/sh\n# nacre launcher written by the Nacreframe installer\nNACRE_DIR='${join(old, '.nacreframe')}'\nexec node "$NACRE_DIR/dist/cli.js" "$@"\n`,
+      { mode: 0o755 },
+    );
+    writeFileSync(
+      join(old, RC_NAME),
+      '# >>> nacreframe >>>\nexport PATH="$HOME/.local/bin:$PATH"\n# <<< nacreframe <<<\n',
+    );
+
+    const r = sh(['--yes'], { NEXUS_HOME: join(old, 'nexus-home') }, old);
+    expect(r.status, r.stdout + r.stderr).toBe(0);
+    expect(r.stdout).toContain('moved ~/.nacreframe to ~/.nexusharness');
+    expect(existsSync(join(old, '.nacreframe'))).toBe(false);
+    for (const name of ['nexus', 'nacre']) {
+      const text = readFileSync(join(old, '.local', 'bin', name), 'utf8');
+      expect(text).toContain(`NEXUS_DIR='${join(old, '.nexusharness')}'`);
+      const v = spawnSync(join(old, '.local', 'bin', name), ['--version'], {
+        encoding: 'utf8',
+        env: { ...process.env, HOME: old, NEXUS_HOME: join(old, 'nexus-home') },
+      });
+      expect(v.stdout).toMatch(/^NexusHarness /);
+    }
+    // The old PATH block counts: no second one is added.
+    const rc = readFileSync(join(old, RC_NAME), 'utf8');
+    expect(rc).not.toContain('>>> nexusharness >>>');
+
+    const u = sh(['--uninstall'], { NEXUS_HOME: join(old, 'nexus-home') }, old);
+    expect(u.status, u.stdout + u.stderr).toBe(0);
+    expect(
+      existsSync(join(old, '.local', 'bin', 'nexus')) || existsSync(join(old, '.local', 'bin', 'nacre')),
+    ).toBe(false);
+    expect(readFileSync(join(old, RC_NAME), 'utf8')).not.toContain('nacreframe');
+  }, 290_000);
+
   it('uninstalls: removes the program, link and PATH entry, keeps your settings', () => {
     const r = sh(['--uninstall']);
     expect(r.status, r.stdout + r.stderr).toBe(0);
-    expect(existsSync(join(home, '.nacreframe'))).toBe(false);
+    expect(existsSync(join(home, '.nexusharness'))).toBe(false);
+    expect(existsSync(join(home, '.local', 'bin', 'nexus'))).toBe(false);
     expect(existsSync(join(home, '.local', 'bin', 'nacre'))).toBe(false);
-    expect(readFileSync(join(home, RC_NAME), 'utf8')).not.toContain('nacreframe');
-    expect(existsSync(join(home, 'nacre-home', 'config', 'config.json'))).toBe(true);
+    expect(readFileSync(join(home, RC_NAME), 'utf8')).not.toContain('nexusharness');
+    expect(existsSync(join(home, 'nexus-home', 'config', 'config.json'))).toBe(true);
     expect(r.stdout).toContain('settings, API keys and sessions were kept');
     // And a second uninstall is harmless.
     expect(sh(['--uninstall']).status).toBe(0);

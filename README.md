@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="assets/banner.svg" alt="Nacreframe" width="720">
+  <img src="assets/banner.jpg" alt="NexusHarness: the agent orchestration platform" width="860">
 </p>
 
 <p align="center">
@@ -8,14 +8,14 @@
 </p>
 
 <p align="center">
-  <img alt="License" src="https://img.shields.io/badge/license-MIT-b4a7e8">
-  <img alt="Node" src="https://img.shields.io/badge/node-%E2%89%A522.18-e6c384">
-  <img alt="Platforms" src="https://img.shields.io/badge/Linux%20%C2%B7%20macOS%20%C2%B7%20Windows-e3b7c4">
+  <img alt="License" src="https://img.shields.io/badge/license-MIT-2f7bff">
+  <img alt="Node" src="https://img.shields.io/badge/node-%E2%89%A522.18-5cc8ff">
+  <img alt="Platforms" src="https://img.shields.io/badge/Linux%20%C2%B7%20macOS%20%C2%B7%20Windows-8fb8ff">
 </p>
 
 ---
 
-Nacreframe is a coding-agent harness in the spirit of [pi](https://pi.dev) (small core, extensible, session trees,
+NexusHarness is a coding-agent harness in the spirit of [pi](https://pi.dev) (small core, extensible, session trees,
 steering) with the day-to-day features of Claude Code (approvals, plan mode, diffs, MCP, skills, sub-agents). It runs
 against Anthropic, OpenAI-compatible endpoints, and local models (llama.cpp, Ollama, LM Studio, Unsloth Studio, vLLM...).
 It has **no default model**: you pick one, and the harness reads that model's real context window from the server.
@@ -27,11 +27,11 @@ It has **no default model**: you pick one, and the harness reads that model's re
   touched if a valid summary was produced, the full history stays in the append-only session file, and if compaction
   fails or cannot free enough room the chat pauses with everything intact rather than sending an oversized request.
   Messages you type meanwhile are queued, not lost. [Details](docs/compaction.md).
-- **Telegram.** `nacre telegram` runs a private bot so you can hand the agent tasks from your phone, with approvals as
-  buttons. `nacre setup` connects it and finds your account for you. [Details](docs/telegram.md).
+- **Telegram.** `nexus telegram` runs a private bot so you can hand the agent tasks from your phone, with approvals as
+  buttons. `nexus setup` connects it and finds your account for you. [Details](docs/telegram.md).
 - **Built-in skills** for repairing Python environments, security reviews and pre-commit checks, loaded only when a
   task needs them (`/skills` lists them).
-- **Web dashboard you can self-host.** `nacre serve` gives you the whole harness in a browser: sessions, streaming
+- **Web dashboard you can self-host.** `nexus serve` gives you the whole harness in a browser: sessions, streaming
   chat, approvals, a context meter with the compaction line, swarm roster, live browser view. Token login, loopback by
   default, strict CSP, no external requests. [Details](docs/web.md).
 - **Four approval modes.** `ask`, `edits`, `auto`, `plan` — switch live with <kbd>Shift</kbd>+<kbd>Tab</kbd>. Per-tool
@@ -51,21 +51,21 @@ It has **no default model**: you pick one, and the harness reads that model's re
   losing the original.
 - **Extensible.** TypeScript extensions (tools, slash commands, before/after-tool hooks), skills (`SKILL.md`), prompt
   templates, an MCP client, `AGENTS.md` project instructions.
-- **Scriptable.** `nacre -p "..."` for pipelines, `--mode json` for event streams, `--mode rpc` for embedding.
+- **Scriptable.** `nexus -p "..."` for pipelines, `--mode json` for event streams, `--mode rpc` for embedding.
 - **Safe by default.** Secrets are redacted from tool output before the model or the session log sees them; project
-  config from a cloned repo can only _tighten_ policy until you run `nacre trust`.
+  config from a cloned repo can only _tighten_ policy until you run `nexus trust`.
 
 ## Install
 
-On Linux, macOS or WSL, one command installs Nacreframe and walks you through setup:
+On Linux, macOS or WSL, one command installs NexusHarness and walks you through setup:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/Falcon016/Nacreframe/main/install.sh | sh
+curl -fsSL https://raw.githubusercontent.com/Falcon016/NexusHarness/main/install.sh | sh
 ```
 
-It sets up what Nacreframe needs: if Node.js 22.18+ is missing it downloads a private, checksum-verified copy (no
+It sets up what NexusHarness needs: if Node.js 22.18+ is missing it downloads a private, checksum-verified copy (no
 `sudo`), and if git is missing it offers to install it with your package manager. Everything lives under
-`~/.nacreframe`, `nacre` goes into `~/.local/bin`, and it asks before it edits your shell profile. Run it again to
+`~/.nexusharness`, `nexus` goes into `~/.local/bin`, and it asks before it edits your shell profile. Run it again to
 update; add `-s -- --uninstall` after `sh` to remove it. Options, troubleshooting and a Windows recipe:
 [docs/install.md](docs/install.md).
 
@@ -73,12 +73,12 @@ update; add `-s -- --uninstall` after `sh` to remove it. Options, troubleshootin
 <summary>Install by hand (any OS, including native Windows)</summary>
 
 ```bash
-git clone https://github.com/Falcon016/Nacreframe.git nacreframe
-cd nacreframe
+git clone https://github.com/Falcon016/NexusHarness.git nexusharness
+cd nexusharness
 npm ci
 npm run build
-npm link          # puts `nacre` on your PATH
-nacre setup       # guided setup
+npm link          # puts `nexus` on your PATH
+nexus setup       # guided setup
 ```
 
 </details>
@@ -86,23 +86,23 @@ nacre setup       # guided setup
 ## Set up
 
 ```bash
-nacre setup       # provider, API key, model and safety, in about a minute
-nacre doctor      # checks your environment any time
-nacre doctor --fix  # ...and repairs what it can: settings, keys, permissions, PATH, the install itself
+nexus setup       # provider, API key, model and safety, in about a minute
+nexus doctor      # checks your environment any time
+nexus doctor --fix  # ...and repairs what it can: settings, keys, permissions, PATH, the install itself
 ```
 
 The wizard uses arrow-key menus, checks your API key with the provider before saving it, finds local model servers
 (Ollama, LM Studio, llama.cpp) that are already running, and writes nothing until you confirm. For scripts and CI:
-`nacre setup --yes --provider anthropic --key-stdin --model <model>` ([all options](docs/install.md#the-setup-wizard)).
+`nexus setup --yes --provider anthropic --key-stdin --model <model>` ([all options](docs/install.md#the-setup-wizard)).
 
 ## First run
 
 ```bash
 cd your-project
-nacre                                       # no -m: the UI opens a model picker if you skipped it in setup
-nacre models                                # what your providers offer right now, with context windows
-nacre -m llamacpp/<model>                   # a local llama.cpp server (see below for non-default ports)
-nacre auth set anthropic && nacre -m anthropic/<model>
+nexus                                       # no -m: the UI opens a model picker if you skipped it in setup
+nexus models                                # what your providers offer right now, with context windows
+nexus -m llamacpp/<model>                   # a local llama.cpp server (see below for non-default ports)
+nexus auth set anthropic && nexus -m anthropic/<model>
 ```
 
 Inside the UI: type a request, <kbd>Enter</kbd> to send, `\`+<kbd>Enter</kbd> or <kbd>Ctrl</kbd>+<kbd>J</kbd> for a
@@ -132,17 +132,17 @@ not report one, 32,768 tokens is assumed and you are told; set `"contextWindows"
 | `/tree` · `/resume` · `/clear`                | Branch from an earlier message · resume · start fresh              |
 | `/flush [all\|<days>] [everywhere]`           | Delete old saved conversations and swarms (asks first)             |
 | `/thinking [on\|off]` (ctrl+t)                | Show or hide each agent's reasoning                                |
-| `/update`                                     | Update Nacreframe (also `nacre update` in a shell)                 |
+| `/update`                                     | Update NexusHarness (also `nexus update` in a shell)               |
 | `/compact [focus]`                            | Summarise older context now (it also happens by itself)            |
 | `/skills` · `/tools` · `/mcp`                 | Inspect what is loaded                                             |
 | `/export [file]`                              | Save the conversation as Markdown                                  |
-| `/trust`                                      | Trust this project's `.nacreframe` config                          |
+| `/trust`                                      | Trust this project's `.nexusharness` config                        |
 
 ### Web dashboard
 
 ```bash
-nacre serve                                  # http://127.0.0.1:7437 — prints a sign-in link with your token
-nacre serve --host 0.0.0.0 --allow-host nacre.lan --root ~/projects   # on a homelab, behind TLS
+nexus serve                                  # http://127.0.0.1:7437 — prints a sign-in link with your token
+nexus serve --host 0.0.0.0 --allow-host nexus.lan --root ~/projects   # on a homelab, behind TLS
 ```
 
 Docker and systemd files for homelab use are in [deploy/](deploy/). See [docs/web.md](docs/web.md).
@@ -206,18 +206,18 @@ locks and read-before-edit checks so two agents cannot silently overwrite each o
 
 ## Configuration
 
-Layered: built-in defaults → user config → project `.nacreframe/config.json` → environment → flags. Paths follow each
-OS's conventions (`nacre doctor` prints them). Annotated example: [examples/config.json](examples/config.json).
+Layered: built-in defaults → user config → project `.nexusharness/config.json` → environment → flags. Paths follow each
+OS's conventions (`nexus doctor` prints them). Annotated example: [examples/config.json](examples/config.json).
 Reference: [docs/configuration.md](docs/configuration.md).
 
-API keys come from the environment (`ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, ...) or `nacre auth set`. They are never
+API keys come from the environment (`ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, ...) or `nexus auth set`. They are never
 read from project config and never written to the repository.
 
 ## Extending
 
 ```ts
-// ~/.config/nacreframe/extensions/protect-lockfiles.ts   (Node ≥ 22.18 runs TypeScript directly)
-import type { ExtensionApi } from 'nacreframe/extensions';
+// ~/.config/nexusharness/extensions/protect-lockfiles.ts   (Node ≥ 22.18 runs TypeScript directly)
+import type { ExtensionApi } from 'nexusharness/extensions';
 
 export default function (api: ExtensionApi) {
   api.onBeforeTool(async ({ name, input }) => {
@@ -233,11 +233,14 @@ install code you trust.
 
 ## Terminal theme
 
-The terminal UI and the dashboard share one palette: black, deep purple, pearl-white text, and a few status colours
-(amber for "asks first", teal for edits, pink for auto, violet for plan). Purple marks what you can act on, what is
-selected, and what is running; nothing glows. The logo is a pearl held between two brackets, `[●]` in the terminal.
-The terminal's own background is left alone; matching black-and-purple schemes for Windows Terminal, Ghostty and
-Alacritty are in [assets/terminal-themes](assets/terminal-themes). The dashboard bundles IBM Plex Sans and JetBrains
+<img src="assets/logo.png" alt="The NexusHarness logo: an N whose diagonal links glowing nodes, inside a ring of nodes" width="140" align="right">
+
+The terminal UI and the dashboard share one palette, taken from the logo: black, electric blue, a cyan accent,
+cool white text, and a few status colours (amber for "asks first", teal for edits, pink for auto, sky blue for plan).
+Blue marks what you can act on, what is selected, and what is running. In the terminal the logo is `◉`, a glowing node
+in its ring, and the welcome panel has Nex, a small agent robot in pixel art. The terminal's own background is left
+alone; matching black-and-blue schemes for Windows Terminal, Ghostty and Alacritty are in
+[assets/terminal-themes](assets/terminal-themes). The dashboard bundles IBM Plex Sans and JetBrains
 Mono (both SIL OFL). `NO_COLOR=1` switches the terminal UI to monochrome.
 
 ## Development

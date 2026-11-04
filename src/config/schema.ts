@@ -103,14 +103,14 @@ export const configSchema = z.object({
     }),
 
   /**
-   * `nacre telegram`: talk to the agent from Telegram. Only read from the user config, never from a project's.
-   * The bot token is a secret: it lives in auth.json (`nacre setup`) or $NACRE_TELEGRAM_TOKEN.
+   * `nexus telegram`: talk to the agent from Telegram. Only read from the user config, never from a project's.
+   * The bot token is a secret: it lives in auth.json (`nexus setup`) or $NEXUS_TELEGRAM_TOKEN.
    */
   telegram: z
     .object({
       /** Telegram user ids allowed to use the bot. Nobody else gets an answer. */
       allowedUsers: z.array(z.number().int().positive()).default([]),
-      /** The folder the bot's agent works in (default: the folder `nacre telegram` is started from). */
+      /** The folder the bot's agent works in (default: the folder `nexus telegram` is started from). */
       cwd: z.string().optional(),
     })
     .default({ allowedUsers: [] }),
@@ -156,7 +156,8 @@ export const configSchema = z.object({
   mcpServers: z.record(z.string(), mcpServerSchema).default({}),
   /** Tool calls an agent may make in one turn before it stops and waits for you. 0 means no limit. */
   maxToolIterations: z.number().int().min(0).default(60),
-  theme: z.enum(['nacre', 'mono']).default('nacre'),
+  // `nacre` is the theme's name from before the rename.
+  theme: z.preprocess((v) => (v === 'nacre' ? 'nexus' : v), z.enum(['nexus', 'mono'])).default('nexus'),
   /** Show agents' reasoning in full in the terminal UI (toggle with ctrl+t or /thinking). */
   showThinking: z.boolean().default(false),
 });

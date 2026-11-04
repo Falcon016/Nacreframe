@@ -15,7 +15,7 @@ folder, and its replies, approvals and questions come back to Telegram. Set it u
 
   --cwd <folder>   Folder the agent works in (default: telegram.cwd in your config, else this folder)
 
-The bot token comes from $NACRE_TELEGRAM_TOKEN or the one \`${BIN} setup\` stored. Stop with Ctrl+C.`;
+The bot token comes from $NEXUS_TELEGRAM_TOKEN or the one \`${BIN} setup\` stored. Stop with Ctrl+C.`;
 
 export async function telegramCommand(args: string[], env: NodeJS.ProcessEnv = process.env): Promise<number> {
   let values;
@@ -33,10 +33,10 @@ export async function telegramCommand(args: string[], env: NodeJS.ProcessEnv = p
     return 0;
   }
   const loaded = loadConfig({ cwd: process.cwd(), env });
-  const token = env.NACRE_TELEGRAM_TOKEN || new AuthStore(loaded.paths).get(TELEGRAM_KEY);
+  const token = env.NEXUS_TELEGRAM_TOKEN || new AuthStore(loaded.paths).get(TELEGRAM_KEY);
   if (!token) {
     console.error(
-      `No Telegram bot token yet. Run \`${BIN} setup\` to connect one (or set NACRE_TELEGRAM_TOKEN).`,
+      `No Telegram bot token yet. Run \`${BIN} setup\` to connect one (or set NEXUS_TELEGRAM_TOKEN).`,
     );
     return 1;
   }

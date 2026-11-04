@@ -80,7 +80,7 @@ describe('guard sandbox', () => {
   });
 
   it('the bash tool runs in the workspace with secrets scrubbed', async () => {
-    process.env.NACRE_TEST_API_KEY = 'super-secret-value-123456';
+    process.env.NEXUS_TEST_API_KEY = 'super-secret-value-123456';
     const sb = new GuardSandbox({ cwd: ws.dir, denyPaths: [] });
     const ctx = {
       cwd: ws.dir,
@@ -93,10 +93,10 @@ describe('guard sandbox', () => {
     };
     const cmd =
       process.platform === 'win32'
-        ? 'echo "[$NACRE_TEST_API_KEY]"; pwd'
-        : 'echo "[$NACRE_TEST_API_KEY]"; pwd';
+        ? 'echo "[$NEXUS_TEST_API_KEY]"; pwd'
+        : 'echo "[$NEXUS_TEST_API_KEY]"; pwd';
     const r = await bashTool.execute({ command: cmd }, ctx);
-    delete process.env.NACRE_TEST_API_KEY;
+    delete process.env.NEXUS_TEST_API_KEY;
     expect(r.content).toContain('[]');
     expect(r.content).not.toContain('super-secret');
   });
@@ -202,9 +202,9 @@ describe('config trust model', () => {
   it('applies full project config only after trust, with a user-config base', () => {
     const paths = { config: join(ws.dir, 'cfg'), data: join(ws.dir, 'data'), state: join(ws.dir, 'state') };
     const proj = join(ws.dir, 'proj');
-    mkdirSync(join(proj, '.nacreframe'), { recursive: true });
+    mkdirSync(join(proj, '.nexusharness'), { recursive: true });
     writeFileSync(
-      join(proj, '.nacreframe', 'config.json'),
+      join(proj, '.nexusharness', 'config.json'),
       JSON.stringify({ approval: { mode: 'auto' }, maxTokens: 1234 }),
     );
 
@@ -229,18 +229,18 @@ describe('config trust model', () => {
 
   it('lets CLI overrides win and validates', () => {
     const paths = { config: join(ws.dir, 'c'), data: join(ws.dir, 'd'), state: join(ws.dir, 's') };
-    expect(loadConfig({ cwd: ws.dir, env: { NACRE_APPROVAL: 'edits' }, paths }).config.approval.mode).toBe(
+    expect(loadConfig({ cwd: ws.dir, env: { NEXUS_APPROVAL: 'edits' }, paths }).config.approval.mode).toBe(
       'edits',
     );
     expect(
       loadConfig({
         cwd: ws.dir,
-        env: { NACRE_APPROVAL: 'edits' },
+        env: { NEXUS_APPROVAL: 'edits' },
         paths,
         overrides: { approval: { mode: 'plan' } },
       }).config.approval.mode,
     ).toBe('plan');
-    expect(() => loadConfig({ cwd: ws.dir, env: { NACRE_APPROVAL: 'yolo' }, paths })).toThrow(
+    expect(() => loadConfig({ cwd: ws.dir, env: { NEXUS_APPROVAL: 'yolo' }, paths })).toThrow(
       /Invalid configuration/,
     );
   });

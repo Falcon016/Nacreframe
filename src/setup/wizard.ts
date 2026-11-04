@@ -645,9 +645,9 @@ function save(ctx: WizardContext, plan: SetupPlan, outcome: ProviderOutcome | nu
     );
 
   const overrides: [string, string, unknown][] = [
-    ['NACRE_MODEL', 'model', plan.model],
-    ['NACRE_APPROVAL', 'approval mode', plan.approval],
-    ['NACRE_SANDBOX', 'sandbox', plan.sandbox],
+    ['NEXUS_MODEL', 'model', plan.model],
+    ['NEXUS_APPROVAL', 'approval mode', plan.approval],
+    ['NEXUS_SANDBOX', 'sandbox', plan.sandbox],
   ];
   for (const [name, what, chosen] of overrides) {
     if (chosen !== undefined && ctx.env[name])

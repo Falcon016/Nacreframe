@@ -16,7 +16,7 @@ src/
   sandbox/           guard (path confinement), container (docker/podman), shell detection
   browser/           Playwright service (policy, control hand-off) + the browser_* tools
   swarm/             message bus, wake rules, budget guard, persistence (store.ts), swarm_* tools
-  server/            `nacre serve`: HTTP + SSE API, auth, session manager (web/ holds the dashboard)
+  server/            `nexus serve`: HTTP + SSE API, auth, session manager (web/ holds the dashboard)
   ext/               extensions, skills, prompt templates, MCP client
   config/            zod schema, layered loading, trust model, auth store
   tui/               Ink UI: store (events → state), views, input, dialogs, slash commands, theme

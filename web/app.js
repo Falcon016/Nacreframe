@@ -1,4 +1,4 @@
-// Nacreframe dashboard. Plain ES modules, no build step, no external requests.
+// NexusHarness dashboard. Plain ES modules, no build step, no external requests.
 // Everything dynamic is built with DOM nodes / textContent (never innerHTML) so model output cannot inject markup.
 
 const $ = (sel, root = document) => root.querySelector(sel);
@@ -20,7 +20,7 @@ function h(tag, props, ...kids) {
 }
 
 // Agent colours: kept in step with the status tokens in app.css and the terminal theme.
-const PALETTE = ['#e98bd0', '#66cfc0', '#e2b866', '#82aaf2', '#74d19b', '#b7a4ff', '#f0a3c0', '#f0a98e'];
+const PALETTE = ['#e98bd0', '#66cfc0', '#e2b866', '#82aaf2', '#74d19b', '#5cc8ff', '#f0a3c0', '#f0a98e'];
 const NAMED = {
   magenta: '#e98bd0',
   cyan: '#66cfc0',
@@ -30,8 +30,8 @@ const NAMED = {
   red: '#ef7b7b',
 };
 const colorOf = (name, preferred) => {
-  if (name === 'you') return '#b7a4ff';
-  if (name === 'system') return '#857d99';
+  if (name === 'you') return '#5cc8ff';
+  if (name === 'system') return '#7f8ca3';
   if (preferred && (NAMED[preferred] || /^#[0-9a-f]{6}$/i.test(preferred)))
     return NAMED[preferred] ?? preferred;
   let n = 0;
@@ -46,7 +46,7 @@ async function api(path, { method = 'GET', body } = {}) {
   const res = await fetch(path, {
     method,
     credentials: 'same-origin',
-    headers: { 'x-nacre': '1', ...(body !== undefined ? { 'content-type': 'application/json' } : {}) },
+    headers: { 'x-nexus': '1', ...(body !== undefined ? { 'content-type': 'application/json' } : {}) },
     ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
   });
   if (res.status === 401 && path !== '/api/login') {

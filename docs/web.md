@@ -1,7 +1,7 @@
 # Web dashboard (self-hosted)
 
 ```bash
-nacre serve                       # http://127.0.0.1:7437
+nexus serve                       # http://127.0.0.1:7437
 ```
 
 The first run generates a login token, stores it with owner-only permissions in the state directory, and prints a
@@ -22,7 +22,7 @@ phone.
 | ------------------------------- | ----------------------------------------------------------------------------------- |
 | `--host`, `--port`              | Default `127.0.0.1:7437` (chosen to avoid common dev/AI-tool ports)                 |
 | `--root <dir>` (repeatable)     | Folders sessions may open. Default: the current folder. Anything outside is refused |
-| `--token`, `NACRE_SERVER_TOKEN` | Use your own token (≥ 16 chars). `--rotate-token` replaces the stored one           |
+| `--token`, `NEXUS_SERVER_TOKEN` | Use your own token (≥ 16 chars). `--rotate-token` replaces the stored one           |
 | `--no-auth`                     | Only allowed on a loopback address                                                  |
 | `--allow-host <name>`           | Accept this `Host` header (your reverse-proxy name); repeatable                     |
 | `--tls-cert`, `--tls-key`       | Serve HTTPS directly                                                                |
@@ -32,11 +32,11 @@ phone.
 ## Putting it on your homelab
 
 1. Run it: [deploy/docker-compose.yml](../deploy/docker-compose.yml) (with a [Dockerfile](../deploy/Dockerfile)) or
-   [deploy/nacreframe.service](../deploy/nacreframe.service) for systemd.
+   [deploy/nexusharness.service](../deploy/nexusharness.service) for systemd.
 2. **Put TLS in front.** The token and your conversations are sensitive. Use Caddy/Traefik/nginx with a certificate,
    or reach it over Tailscale/WireGuard. Pass `--allow-host <your-name>` so the `Host` check accepts your hostname.
-   A minimal Caddyfile: `nacre.example.internal { reverse_proxy 127.0.0.1:7437 }` (SSE needs no special config).
-3. Point it at your model server by adding it to the config in the data directory (`NACRE_HOME/config/config.json`),
+   A minimal Caddyfile: `nexus.example.internal { reverse_proxy 127.0.0.1:7437 }` (SSE needs no special config).
+3. Point it at your model server by adding it to the config in the data directory (`NEXUS_HOME/config/config.json`),
    e.g. `{"providers":{"llamacpp":{"baseUrl":"http://host.docker.internal:11434/v1"}}}`.
 4. In a container the agent's `bash` runs _inside that container_ (the `container` sandbox needs a Docker socket and is
    best left to the non-Docker deployment). The compose file drops capabilities and mounts only `/workspace` and
@@ -48,7 +48,7 @@ phone.
 - **Login:** constant-time token comparison, 10 failed attempts per 5 minutes per IP, then locked out. Sessions use a
   random id in an `HttpOnly`, `SameSite=Strict` cookie (`Secure` behind HTTPS). `Authorization: Bearer` also works for
   scripts.
-- **Browser-origin protection:** every state-changing request needs a custom `X-Nacre` header and a matching `Origin`
+- **Browser-origin protection:** every state-changing request needs a custom `X-Nexus` header and a matching `Origin`
   (blocks CSRF), and the `Host` header is checked when bound to loopback or `--allow-host` is used (blocks DNS
   rebinding).
 - **Strict Content-Security-Policy** (`default-src 'self'`, no inline script or style), no external requests, no

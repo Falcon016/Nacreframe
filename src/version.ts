@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 
-export const NAME = 'Nacreframe';
-export const BIN = 'nacre';
+export const NAME = 'NexusHarness';
+export const BIN = 'nexus';
 
 /** Read from package.json (one folder up from both src/ and dist/), so an update shows its new version. */
 export const VERSION: string = (() => {
