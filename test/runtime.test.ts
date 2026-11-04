@@ -7,6 +7,7 @@ import { contextFromArgs, OpenAICompatProvider } from '../src/llm/openai.js';
 import { ProviderRegistry } from '../src/llm/registry.js';
 import { projectKey } from '../src/paths.js';
 import { Runtime } from '../src/runtime.js';
+import { parseTokenCount } from '../src/util/text.js';
 import { startMockLlm } from './mock-llm.js';
 import { tmpWorkspace } from './helpers.js';
 
@@ -359,6 +360,85 @@ describe('runtime with the mock server', () => {
       expect(planner.session.messages()[0]!.content[0]).toMatchObject({ type: 'text' });
     } finally {
       await rt.dispose();
+      ws.cleanup();
+    }
+  });
+});
+
+describe('setting the context window by hand', () => {
+  it('reads sizes as people write them', () => {
+    expect(parseTokenCount('131072')).toBe(131_072);
+    expect(parseTokenCount('131,072')).toBe(131_072);
+    expect(parseTokenCount('128k')).toBe(131_072);
+    expect(parseTokenCount('32K')).toBe(32_768);
+    expect(parseTokenCount('1m')).toBe(1_048_576);
+    expect(parseTokenCount('1.5k')).toBe(1536);
+    expect(parseTokenCount('lots')).toBeUndefined();
+    expect(parseTokenCount('-5')).toBeUndefined();
+  });
+
+  it("starts from the server's size, keeps a size set by hand (saved, used on the next start), and can go back", async () => {
+    // One model whose server reports its window, one whose server does not.
+    const server = await startMockLlm(0, {
+      models: [{ id: 'sized', meta: { n_ctx: 65_536 } }, { id: 'quiet' }],
+    });
+    const ws = tmpWorkspace();
+    try {
+      const home = join(ws.dir, '.home');
+      mkdirSync(join(home, 'config'), { recursive: true });
+      const configFile = join(home, 'config', 'config.json');
+      writeFileSync(
+        configFile,
+        JSON.stringify({
+          model: 'mock/sized',
+          browser: { enabled: false },
+          providers: { mock: { type: 'openai', baseUrl: server.url } },
+        }),
+      );
+      const boot = () => Runtime.create({ cwd: ws.dir, env: { ...process.env, NACRE_HOME: home } });
+
+      let rt = await boot();
+      expect(rt.agent.model).toMatchObject({
+        contextWindow: 65_536,
+        contextSource: 'detected',
+        serverWindow: 65_536,
+      });
+      await rt.setContextWindow(32_768);
+      expect(rt.agent.model).toMatchObject({ contextWindow: 32_768, contextSource: 'config' });
+      expect(rt.agent.limits().target).toBe(Math.floor(32_768 * 0.8)); // compaction follows at once
+      expect(JSON.parse(readFileSync(configFile, 'utf8')).contextWindows).toEqual({ 'mock/sized': 32_768 });
+      await rt.dispose();
+
+      // The next start still asks the server, but the size set by hand wins.
+      rt = await boot();
+      expect(rt.agent.model).toMatchObject({
+        contextWindow: 32_768,
+        contextSource: 'config',
+        serverWindow: 65_536,
+      });
+      await rt.setContextWindow(undefined);
+      expect(rt.agent.model).toMatchObject({ contextWindow: 65_536, contextSource: 'detected' });
+      expect(JSON.parse(readFileSync(configFile, 'utf8')).contextWindows).toBeUndefined();
+
+      // A server that reports nothing: the default, with a warning that says how to fix it.
+      await rt.setModel('mock/quiet');
+      expect(rt.agent.model.contextSource).toBe('default');
+      await rt.setContextWindow(131_072);
+      expect(rt.agent.model).toMatchObject({ contextWindow: 131_072, contextSource: 'config' });
+      await rt.dispose();
+      writeFileSync(
+        configFile,
+        JSON.stringify({
+          ...JSON.parse(readFileSync(configFile, 'utf8')),
+          model: 'mock/quiet',
+          contextWindows: {},
+        }),
+      );
+      rt = await boot();
+      expect(rt.warnings.join()).toContain('/context <tokens>');
+      await rt.dispose();
+    } finally {
+      server.server.close();
       ws.cleanup();
     }
   });

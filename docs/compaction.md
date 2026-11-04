@@ -24,6 +24,12 @@ part. Because a bad compaction can corrupt or silently truncate a conversation, 
 
 ## How the size is measured
 
+The window is asked of the server once at startup (llama.cpp's `--ctx-size`, LM Studio, Ollama). A size you set
+yourself wins over it: `/context 128k` in the terminal (or Telegram) sets and saves it for the model in use, as
+`contextWindows` in your config, and `/context auto` goes back to the server's figure. `/context` alone shows the
+window, where it came from, how much is in use and where compaction starts. With neither, 32,768 tokens is assumed,
+and you are warned at startup.
+
 The window comes from the server (llama.cpp's `--ctx-size`, LM Studio, Ollama, `contextWindows` in config). The
 current size is what the provider reported for the last response, plus an estimate for anything added since; with no
 report, a conservative estimate of the whole request (system prompt, tool schemas and messages) is used. A reply

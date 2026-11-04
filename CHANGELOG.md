@@ -16,6 +16,9 @@ First release of the ground-up rewrite (replaces the earlier turtlebot harness).
 - **Built-in skills**: `python-env`, `security-review` and `pre-commit-review` ship with the harness (user and
   project skills of the same name replace them); `/skills` lists what is installed. The swarm's reviewer and
   security advisor are pointed at theirs.
+- **`/context`**: shows the context window, where it came from, how much is used and where compaction starts.
+  `/context 128k` sets it for the model in use and saves it (it then wins over what the server reports, which is
+  still asked at every start); `/context auto` goes back to the server's figure. Also in the Telegram bot.
 - **Tokens per second** in the terminal footer and the dashboard: live while a reply streams, then the reply's
   measured speed. The footer now fits narrow windows by dropping its least useful parts instead of running together.
 - **No repeated text in the terminal**: a reply taller than the window used to leave copies of itself in the

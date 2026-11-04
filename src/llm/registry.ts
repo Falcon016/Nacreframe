@@ -12,6 +12,8 @@ export interface ResolvedModel {
   /** Context window in tokens; compaction is measured against it. Updated if the server proves it smaller. */
   contextWindow: number;
   contextSource: 'config' | 'detected' | 'default';
+  /** What the server reported at startup, when it did (kept when the user sets another size). */
+  serverWindow?: number;
   /** The most output tokens the provider accepts in one reply, once it has told us (from a rejected request). */
   maxOutput?: number;
 }
@@ -87,17 +89,26 @@ export class ProviderRegistry {
   /**
    * Resolve and find out the model's real context window. Compaction triggers at a fraction of this number,
    * so a wrong guess would mean overflowing the server (too large) or compacting needlessly (too small).
-   * Order: explicit config → what the server reports → a conservative default.
+   * The server is always asked (once, here); a size the user set (`contextWindows`, `/context`) wins over what it
+   * reports, and with neither a conservative default is used.
    */
   async resolveDetected(spec: string, timeoutMs = 3000): Promise<ResolvedModel> {
     const r = this.resolve(spec);
-    if (r.contextSource === 'config' || !r.provider.listModels) return r;
+    if (!r.provider.listModels) return r;
     const ctrl = new AbortController();
     const timer = setTimeout(() => ctrl.abort(), timeoutMs);
     try {
       const models = await r.provider.listModels(ctrl.signal);
       const hit = models.find((m) => m.id === r.model || m.aliases?.includes(r.model));
-      if (hit?.contextWindow) return { ...r, contextWindow: hit.contextWindow, contextSource: 'detected' };
+      if (hit?.contextWindow)
+        return r.contextSource === 'config'
+          ? { ...r, serverWindow: hit.contextWindow }
+          : {
+              ...r,
+              contextWindow: hit.contextWindow,
+              contextSource: 'detected',
+              serverWindow: hit.contextWindow,
+            };
     } catch {
       /* server unreachable or not reporting: keep the default */
     } finally {

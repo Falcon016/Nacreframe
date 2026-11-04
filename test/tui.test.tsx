@@ -124,6 +124,22 @@ describe('interactive UI', () => {
     }
   });
 
+  it('shows and sets the context window with /context', async () => {
+    const ui = await boot();
+    try {
+      await until(() => ui.screen().includes('nacreframe'));
+      await ui.type('/context 128k');
+      ui.key('\r');
+      await until(() => ui.screen().includes('Context window now: 131,072 tokens (set by you)'));
+      expect(ui.runtime.agent.model.contextWindow).toBe(131_072);
+      await ui.type('/context lots');
+      ui.key('\r');
+      await until(() => ui.screen().includes('Usage: /context <size>'));
+    } finally {
+      await ui.stop();
+    }
+  });
+
   it('renders the banner, streams a reply and shows markdown', async () => {
     const ui = await boot();
     try {

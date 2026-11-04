@@ -1,5 +1,6 @@
 import { writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
+import { parseTokenCount } from '../util/text.js';
 import { Session, sessionDir } from '../agent/session.js';
 import type { ApprovalMode, SandboxMode } from '../config/schema.js';
 import { trustProject } from '../config/load.js';
@@ -385,6 +386,55 @@ export const BUILTINS: BuiltinCommand[] = [
       if (!again) return store.notice('Updated. The new version starts next time you run nacre.', 'success');
       requestRelaunch(check);
       c.exit();
+    },
+  },
+  {
+    name: 'context',
+    usage: 'context [size|auto]',
+    description: 'Show or set the context window size (e.g. /context 128k)',
+    async run(args, { runtime, store }) {
+      const a = args.trim().toLowerCase();
+      if (a) {
+        const tokens = a === 'auto' ? undefined : parseTokenCount(a);
+        if (a !== 'auto' && tokens === undefined)
+          return store.notice(
+            'Usage: /context <size>, e.g. /context 131072 or /context 128k; /context auto',
+            'warn',
+          );
+        if (tokens !== undefined && (tokens < 1024 || tokens > 10_000_000))
+          return store.notice('The context window must be between 1,024 and 10,000,000 tokens.', 'warn');
+        try {
+          await runtime.setContextWindow(tokens);
+        } catch (e) {
+          return store.notice((e as Error).message, 'warn');
+        }
+      }
+      const m = runtime.agent.model;
+      if (!runtime.modelSpec) return store.notice('No model selected. Choose one with /model first.', 'warn');
+      const from =
+        m.contextSource === 'config'
+          ? 'set by you'
+          : m.contextSource === 'detected'
+            ? 'reported by the server'
+            : 'assumed: the server did not report one';
+      const used = runtime.agent.contextTokens;
+      const n = (x: number) => x.toLocaleString('en-US');
+      const lines = [
+        `${a ? 'Context window now' : 'Context window'}: ${n(m.contextWindow)} tokens (${from}) for ${runtime.modelSpec}.`,
+        `In use: ${n(used)} (${Math.round((used / m.contextWindow) * 100)}%). Compaction starts at ${n(runtime.agent.limits().target)}.`,
+      ];
+      if (m.contextSource === 'config' && m.serverWindow && m.serverWindow !== m.contextWindow)
+        lines.push(
+          m.contextWindow > m.serverWindow
+            ? `The server reported ${n(m.serverWindow)}: requests larger than that will fail until it runs with a bigger context.`
+            : `The server reported ${n(m.serverWindow)}.`,
+        );
+      lines.push(
+        m.contextSource === 'config'
+          ? 'Saved for this model. /context auto goes back to what the server reports.'
+          : 'Change it with /context <size>, e.g. /context 128k. It is saved for this model.',
+      );
+      store.notice(lines.join('\n'), m.contextSource === 'default' ? 'warn' : a ? 'success' : 'info');
     },
   },
   {

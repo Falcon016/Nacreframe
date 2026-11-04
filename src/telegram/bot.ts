@@ -4,6 +4,7 @@ import { approvalModeSchema } from '../config/schema.js';
 import { projectKey } from '../paths.js';
 import type { Runtime } from '../runtime.js';
 import type { Question } from '../tools/types.js';
+import { parseTokenCount } from '../util/text.js';
 import { BIN, NAME } from '../version.js';
 import {
   MAX_MESSAGE,
@@ -38,6 +39,7 @@ const COMMANDS = [
   { command: 'mode', description: 'Approvals: ask, edits, auto or plan' },
   { command: 'model', description: 'Show or switch the model' },
   { command: 'compact', description: 'Summarise the older conversation now' },
+  { command: 'context', description: 'Show or set the context window (e.g. /context 128k)' },
   { command: 'help', description: 'What this bot can do' },
 ];
 
@@ -354,6 +356,36 @@ class ChatSession {
         } catch (e) {
           await this.say(`Could not switch: ${escapeHtml((e as Error).message)}`);
         }
+        return;
+      }
+      case 'context': {
+        const a = arg.toLowerCase();
+        if (a) {
+          const tokens = a === 'auto' ? undefined : parseTokenCount(a);
+          if (
+            (a !== 'auto' && tokens === undefined) ||
+            (tokens !== undefined && (tokens < 1024 || tokens > 10_000_000))
+          )
+            return void (await this.say('Use /context 131072, /context 128k, or /context auto.'));
+          try {
+            await rt.setContextWindow(tokens);
+          } catch (e) {
+            return void (await this.say(escapeHtml((e as Error).message)));
+          }
+        }
+        const m = agent.model;
+        const from =
+          m.contextSource === 'config'
+            ? 'set by you'
+            : m.contextSource === 'detected'
+              ? 'from the server'
+              : 'assumed';
+        await this.say(
+          `<b>Context window</b> ${m.contextWindow.toLocaleString('en-US')} tokens (${from}). ` +
+            (m.contextSource === 'config'
+              ? '/context auto goes back to the server.'
+              : 'Set it with /context 128k.'),
+        );
         return;
       }
       case 'compact':

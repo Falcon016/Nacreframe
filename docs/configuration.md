@@ -27,7 +27,7 @@ project's skills, extensions, prompt templates and `SYSTEM.md` are not loaded.
 | ------------------------------------------------ | -------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `model`                                          | _(none)_                                                 | `<provider>/<model>`. Deliberately no default: pick with `--model`, `NACRE_MODEL` or `/model`                                                             |
 | `smallModel`                                     | = `model`                                                | Used for compaction summaries (same model by default: no model swap on a single-GPU server)                                                               |
-| `contextWindows`                                 | `{}`                                                     | `{ "<provider>/<model>": tokens }` overrides what the server reports                                                                                      |
+| `contextWindows`                                 | `{}`                                                     | `{ "<provider>/<model>": tokens }` overrides what the server reports; `/context <size>` sets it for you                                                   |
 | `maxTokens`                                      | `0`                                                      | Output tokens per model call. `0` = all the room left in the context window after the prompt; hosted APIs that cap lower are learned on the first refusal |
 | `thinkingBudget`                                 | `0`                                                      | Extended-thinking tokens (Anthropic); `0` disables                                                                                                        |
 | `providers.<id>`                                 | anthropic, openai, ollama, lmstudio                      | `{ type: "anthropic" \| "openai", baseUrl?, apiKeyEnv?, headers?, contextWindow? }`                                                                       |
@@ -68,7 +68,8 @@ project's skills, extensions, prompt templates and `SYSTEM.md` are not loaded.
 Anything that speaks OpenAI's `/chat/completions` streaming protocol works (Ollama, LM Studio, vLLM, llama.cpp server,
 Unsloth Studio...). Local `localhost` endpoints need no key. The context window is read from the server (llama.cpp `--ctx-size` via the
 router's `/v1/models`, or `/props`; LM Studio; Ollama `/api/ps`). If it is not reported, 32,768 tokens is assumed and
-you get a warning: set `contextWindows` (or the provider's `contextWindow`) so compaction triggers at the right size.
+you get a warning: set the size with `/context <tokens>` (saved as `contextWindows`), or the provider's `contextWindow`, so
+compaction triggers at the right size.
 Built-in providers: `anthropic`, `openai`, `ollama` (:11434), `lmstudio` (:1234), `llamacpp` (:8080). Ollama's default
 port is also 11434, so if you run llama.cpp there, override `providers.llamacpp.baseUrl` and use the `llamacpp/` prefix. Tool calling must be supported by the model/server you pick.
 
