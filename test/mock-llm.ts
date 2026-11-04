@@ -14,12 +14,15 @@ import type { AddressInfo } from 'node:net';
  *   anything else  → plain text reply
  * Each tool result is answered with a short wrap-up so the loop terminates.
  */
-export function startMockLlm(port = 0): Promise<{ server: Server; url: string; requests: unknown[] }> {
+export function startMockLlm(
+  port = 0,
+  opts: { models?: object[] } = {},
+): Promise<{ server: Server; url: string; requests: unknown[] }> {
   const requests: unknown[] = [];
   const server = createServer((req, res) => {
     if (req.url?.endsWith('/models')) {
       res.setHeader('content-type', 'application/json');
-      return void res.end(JSON.stringify({ data: [{ id: 'mock-1' }, { id: 'mock-2' }] }));
+      return void res.end(JSON.stringify({ data: opts.models ?? [{ id: 'mock-1' }, { id: 'mock-2' }] }));
     }
     if (req.method !== 'POST' || !req.url?.endsWith('/chat/completions')) {
       res.statusCode = 404;

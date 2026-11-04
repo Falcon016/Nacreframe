@@ -20,7 +20,7 @@ import type { Sandbox } from './sandbox/types.js';
 import { SWARM_PRESETS } from './swarm/roles.js';
 import { Swarm } from './swarm/swarm.js';
 import { SwarmStore, type SwarmSummary } from './swarm/store.js';
-import { patchUserConfig } from './setup/plan.js';
+import { editUserConfig, isPlain, patchUserConfig } from './setup/plan.js';
 import { swarmTools } from './swarm/tools.js';
 import { bashTool } from './tools/bash.js';
 import { editTool, readTool, writeTool } from './tools/fs-tools.js';
@@ -102,7 +102,7 @@ function contextWarnings(spec: string, m: ResolvedModel): string[] {
   if (m.contextSource !== 'default' || m.providerId === 'none') return [];
   return [
     `${spec}: the server did not report a context window, so ${m.contextWindow.toLocaleString()} tokens is assumed. ` +
-      `Set "contextWindows": { "${spec}": <tokens> } in your config so compaction triggers at the right size.`,
+      `Set the real size with /context <tokens> (e.g. /context 128k) so compaction triggers at the right point.`,
   ];
 }
 
@@ -413,6 +413,44 @@ export class Runtime {
    * `maxMessages` agent-to-agent swarm messages between yours, `maxToolIterations` tool calls in one turn.
    * Takes effect at once, including for a swarm that is running (a paused one carries on if raised).
    */
+  /**
+   * Set the context window of the model in use, by hand, and save it for that model (`contextWindows` in the user
+   * config), so it is used from now on instead of what the server reports. `undefined` forgets the setting and
+   * goes back to the server's figure (asking it again), or the default when it reports none.
+   */
+  async setContextWindow(tokens: number | undefined): Promise<ResolvedModel> {
+    const spec = this.modelSpec;
+    if (!spec) throw new Error('No model selected. Choose one with /model first.');
+    if (tokens === undefined) {
+      delete this.config.contextWindows[spec];
+      editUserConfig((c) => {
+        const windows = isPlain(c.contextWindows) ? { ...c.contextWindows } : {};
+        delete windows[spec];
+        const { contextWindows: _old, ...rest } = c;
+        return Object.keys(windows).length ? { ...rest, contextWindows: windows } : rest;
+      }, this.loaded.paths);
+    } else {
+      this.config.contextWindows[spec] = tokens;
+      patchUserConfig({ contextWindows: { [spec]: tokens } }, this.loaded.paths);
+    }
+    const fresh = await this.registry.resolveDetected(spec);
+    // Change the model objects in place: swarm members on the same model share them, and the agents read the
+    // window from them on every request.
+    const current = this.agent.model;
+    const targets = [
+      current,
+      ...(this.swarm ? this.swarm.names.map((n) => this.swarm!.agent(n)?.model) : []),
+    ];
+    for (const m of new Set(targets)) {
+      if (!m || `${m.providerId}/${m.model}` !== spec) continue;
+      m.contextWindow = fresh.contextWindow;
+      m.contextSource = fresh.contextSource;
+      if (fresh.serverWindow !== undefined) m.serverWindow = fresh.serverWindow;
+    }
+    this.events.emit('model', spec);
+    return current;
+  }
+
   setLimits(l: { maxMessages?: number; maxToolIterations?: number }): void {
     const patch: { swarm?: { maxMessages: number }; maxToolIterations?: number } = {};
     if (l.maxMessages !== undefined) {

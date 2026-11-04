@@ -88,6 +88,14 @@ export function planToPatch(plan: SetupPlan): PartialConfig {
 
 /** Merge `patch` into the user's config file (keeping a `.bak` of the old one). Used by `nacre doctor --fix`. */
 export function patchUserConfig(patch: PartialConfig, paths: AppPaths = appPaths()): void {
+  editUserConfig((current) => mergeConfig(current, patch), paths);
+}
+
+/** Change the user's config file with `edit` (keeping a `.bak` of the old one): for removals a merge cannot do. */
+export function editUserConfig(
+  edit: (current: PartialConfig) => PartialConfig,
+  paths: AppPaths = appPaths(),
+): void {
   const configPath = join(paths.config, 'config.json');
   mkdirSync(dirname(configPath), { recursive: true });
   let current: PartialConfig = {};
@@ -101,7 +109,7 @@ export function patchUserConfig(patch: PartialConfig, paths: AppPaths = appPaths
     copyFileSync(configPath, `${configPath}.bak`);
   }
   const tmp = `${configPath}.${process.pid}.tmp`;
-  writeFileSync(tmp, JSON.stringify(mergeConfig(current, patch), null, 2) + '\n');
+  writeFileSync(tmp, JSON.stringify(edit(current), null, 2) + '\n');
   renameSync(tmp, configPath);
 }
 
