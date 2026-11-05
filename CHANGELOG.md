@@ -4,6 +4,11 @@
 
 First release of the ground-up rewrite (replaces the earlier turtlebot harness).
 
+- **Reasoning effort**: `/effort` picks low, medium, high or xhigh (or the model's default) for every agent, and
+  saves it; the footer shows it, the dashboard has a selector, and the Telegram bot has `/effort`. It is sent as
+  `reasoning_effort` plus the chat template's `reasoning_effort` (llama.cpp, Ollama, vLLM, LM Studio; only the
+  former to OpenAI) and as `output_config.effort` to Anthropic. A model that refuses `xhigh` is asked again at
+  `high`, and one that takes no effort setting is asked without it, with a note instead of an error.
 - **Renamed to NexusHarness** (it was Nacreframe), with the `nexus` command; `nacre` still works. Settings, API keys
   and sessions move to the new folders on first start; `NACRE_*` environment variables, `.nacreframe/` project
   folders and `NACREFRAME.md` are still read; the installer moves `~/.nacreframe` to `~/.nexusharness`, and an install

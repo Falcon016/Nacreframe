@@ -27,6 +27,7 @@ export function App({ runtime, store, theme, initialPrompt }: Props) {
 
   const [mode, setMode] = useState<ApprovalMode>(runtime.policy.mode);
   const [sandbox, setSandbox] = useState(runtime.sandbox.describe());
+  const [effort, setEffort] = useState(runtime.config.reasoningEffort);
   const [todos, setTodos] = useState<TodoItem[]>(runtime.todos);
   const [approval, setApproval] = useState<{
     req: ApprovalRequest;
@@ -99,6 +100,7 @@ export function App({ runtime, store, theme, initialPrompt }: Props) {
   useEffect(() => {
     runtime.events.on('mode', setMode);
     runtime.events.on('sandbox', setSandbox);
+    runtime.events.on('effort', setEffort);
     runtime.events.on('todos', setTodos);
     runtime.events.on('model', () => force((n) => n + 1));
     runtime.broker.approvalHandler = (req, signal) =>
@@ -306,6 +308,7 @@ export function App({ runtime, store, theme, initialPrompt }: Props) {
         />
         <Footer
           mode={mode}
+          effort={effort}
           sandbox={sandbox}
           snap={snap}
           contextWindow={runtime.agent.model.contextWindow}

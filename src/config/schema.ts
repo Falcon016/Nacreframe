@@ -57,6 +57,8 @@ export const configSchema = z.object({
   /** Output tokens per model call. 0 (the default) = all the room left in the context window after the prompt. */
   maxTokens: z.number().int().min(0).default(0),
   thinkingBudget: z.number().int().min(0).default(0),
+  /** How hard reasoning models think: `/effort`. Unset = the model's own default (nothing is sent). */
+  reasoningEffort: z.enum(['low', 'medium', 'high', 'xhigh']).optional(),
   providers: z.record(z.string(), providerSchema).default({}),
 
   approval: z

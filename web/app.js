@@ -627,6 +627,7 @@ function renderTop() {
   mode.className = `mode-${st.session.mode}`;
   mode.closest('.chip').dataset.mode = st.session.mode;
   $('#sandbox').value = st.session.sandbox;
+  $('#effort').value = st.session.effort ?? 'default';
 
   const sel = $('#model');
   const want = st.session.model ?? '';
@@ -1264,6 +1265,10 @@ function wire() {
     guard((e) =>
       api(`/api/sessions/${S.id}/settings`, { method: 'POST', body: { sandbox: e.target.value } }),
     ),
+  );
+  $('#effort').addEventListener(
+    'change',
+    guard((e) => api(`/api/sessions/${S.id}/settings`, { method: 'POST', body: { effort: e.target.value } })),
   );
   $('#model').addEventListener(
     'change',

@@ -13,6 +13,7 @@ import { BIN } from '../version.js';
 import type { Choice } from './dialogs.js';
 import { replayInto, type UiStore } from './store.js';
 import { MODE_STYLE } from './theme.js';
+import { REASONING_EFFORTS, type ReasoningEffort } from '../llm/types.js';
 
 export type Overlay = {
   title: string;
@@ -386,6 +387,43 @@ export const BUILTINS: BuiltinCommand[] = [
       if (!again) return store.notice('Updated. The new version starts next time you run nexus.', 'success');
       requestRelaunch(check);
       c.exit();
+    },
+  },
+  {
+    name: 'effort',
+    usage: 'effort [low|medium|high|xhigh|default]',
+    description: 'How hard reasoning models think',
+    async run(args, c) {
+      const { runtime, store } = c;
+      const a = args.trim().toLowerCase();
+      const describe = (e: ReasoningEffort | undefined) =>
+        e
+          ? `Reasoning effort: ${e}. Saved; applies to every agent from the next request.`
+          : "Reasoning effort: the model's default (nothing is sent).";
+      let choice: ReasoningEffort | 'default' | undefined;
+      if (a) {
+        if (a !== 'default' && !(REASONING_EFFORTS as readonly string[]).includes(a))
+          return store.notice('Usage: /effort low|medium|high|xhigh, or /effort default', 'warn');
+        choice = a as ReasoningEffort | 'default';
+      } else {
+        const current = runtime.config.reasoningEffort ?? 'default';
+        const options: { label: string; value: ReasoningEffort | 'default'; hint: string }[] = [
+          { label: 'low', value: 'low', hint: 'quick answers, little thinking' },
+          { label: 'medium', value: 'medium', hint: 'a balance of speed and depth' },
+          { label: 'high', value: 'high', hint: 'thinks it through' },
+          { label: 'xhigh', value: 'xhigh', hint: 'thinks longest; models without it get high' },
+          { label: 'default', value: 'default', hint: "leave it to each model's own default" },
+        ];
+        choice = await pick(
+          c,
+          'Reasoning effort (models without reasoning levels ignore it)',
+          options.map((o) => ({ ...o, hint: o.value === current ? `${o.hint} (current)` : o.hint })),
+          options.findIndex((o) => o.value === current),
+        );
+        if (!choice) return;
+      }
+      runtime.setReasoningEffort(choice === 'default' ? undefined : choice);
+      store.notice(describe(runtime.config.reasoningEffort), 'success');
     },
   },
   {

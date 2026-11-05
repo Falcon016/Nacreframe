@@ -2,7 +2,7 @@ import type { AuthStore } from '../config/auth.js';
 import type { Config } from '../config/schema.js';
 import { AnthropicProvider } from './anthropic.js';
 import { OpenAICompatProvider } from './openai.js';
-import type { Provider, StreamEvent } from './types.js';
+import type { Provider, ReasoningEffort, StreamEvent } from './types.js';
 import { ProviderError } from './types.js';
 
 export interface ResolvedModel {
@@ -14,6 +14,11 @@ export interface ResolvedModel {
   contextSource: 'config' | 'detected' | 'default';
   /** What the server reported at startup, when it did (kept when the user sets another size). */
   serverWindow?: number;
+  /**
+   * The highest reasoning effort the model accepted, learned from a refusal: `none` when it takes no effort
+   * setting at all. Unset until a request is refused.
+   */
+  effortCap?: ReasoningEffort | 'none';
   /** The most output tokens the provider accepts in one reply, once it has told us (from a rejected request). */
   maxOutput?: number;
 }

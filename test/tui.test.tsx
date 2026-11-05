@@ -124,6 +124,31 @@ describe('interactive UI', () => {
     }
   });
 
+  it('sets the reasoning effort with /effort, from the picker or directly, and shows it in the footer', async () => {
+    const ui = await boot();
+    try {
+      await until(() => ui.screen().includes('NexusHarness'));
+      await ui.type('/effort');
+      ui.key('\r');
+      await until(() => ui.screen().includes('Reasoning effort (models'));
+      await sleep(250); // the picker's keys attach after it renders
+      ui.key('\u001b[A'); // the cursor starts on the current choice, "default" (last): up is xhigh
+      await sleep(100); // keys sent together arrive as one chunk
+      ui.key('\r');
+      await until(() => ui.screen().includes('Reasoning effort: xhigh'));
+      await ui.type('/effort high');
+      ui.key('\r');
+      await until(() => ui.screen().includes('Reasoning effort: high'));
+      await until(() => ui.screen().includes('effort high'));
+      expect(ui.runtime.config.reasoningEffort).toBe('high');
+      await ui.type('/effort sideways');
+      ui.key('\r');
+      await until(() => ui.screen().includes('Usage: /effort'));
+    } finally {
+      await ui.stop();
+    }
+  });
+
   it('shows and sets the context window with /context', async () => {
     const ui = await boot();
     try {

@@ -1,7 +1,15 @@
 import type { Config } from '../config/schema.js';
 import { assemble } from '../llm/assemble.js';
 import type { ResolvedModel } from '../llm/registry.js';
-import type { ContentBlock, Message, StopReason, StreamEvent, Usage } from '../llm/types.js';
+import {
+  REASONING_EFFORTS,
+  type ContentBlock,
+  type Message,
+  type ReasoningEffort,
+  type StopReason,
+  type StreamEvent,
+  type Usage,
+} from '../llm/types.js';
 import { ProviderError } from '../llm/types.js';
 import type { PolicyEngine } from '../policy/engine.js';
 import { describeGrant, grantKey } from '../policy/engine.js';
@@ -152,6 +160,21 @@ const formatTodos = (todos: TodoItem[]) =>
     )
     .join('\n');
 
+/**
+ * What a refusal of the reasoning effort says to do: try a lower level (`xhigh` is newer than the rest and not
+ * every server or model knows it), or stop sending one to this model. Undefined when the error is about something
+ * else.
+ */
+export function effortFix(message: string, sent: ReasoningEffort): ReasoningEffort | 'none' | undefined {
+  if (!/reasoning[_ ]?effort|output_config|\beffort\b|chat_template_kwargs/i.test(message)) return undefined;
+  if (
+    sent === 'xhigh' &&
+    /xhigh|invalid|unsupported value|must be one of|not one of|allowed values/i.test(message)
+  )
+    return 'high';
+  return 'none';
+}
+
 /** Thrown to end a turn without sending anything further, leaving the conversation intact. */
 export class PauseTurn extends Error {
   constructor(message: string) {
@@ -183,6 +206,8 @@ export class Agent {
   private running = false;
   /** Output size of the last request, and the room a provider said is really left (used once, for the retry). */
   private lastMaxTokens: number | undefined;
+  /** The effort level sent with the last request (to read a refusal against). */
+  private lastEffort: ReasoningEffort | undefined;
   private roomOverride: number | undefined;
   private compacting = false;
   private idleWaiters: (() => void)[] = [];
@@ -330,6 +355,7 @@ export class Agent {
     const max = this.o.config.maxToolIterations || Infinity; // 0 = no limit
     let recovered = false;
     let outputFixes = 0;
+    let effortFixes = 0;
     for (let iter = 0; iter < max; iter++) {
       if (signal.aborted) return 'aborted';
       this.drainSteering();
@@ -346,6 +372,23 @@ export class Agent {
         result = await this.callModel(signal);
       } catch (e) {
         if (signal.aborted) return 'aborted';
+        const sent = this.lastEffort;
+        const lower =
+          e instanceof ProviderError && e.status === 400 && sent ? effortFix(e.message, sent) : undefined;
+        if (lower && effortFixes < 2) {
+          // The model refused the effort level: remember what it takes, say so once, and ask again.
+          effortFixes++;
+          this.o.model.effortCap = lower;
+          this.emit({
+            type: 'status',
+            text:
+              lower === 'none'
+                ? `${this.o.model.model} takes no reasoning effort setting; continuing without it`
+                : `${this.o.model.model} does not take "${sent}"; using "${lower}"`,
+          });
+          iter--;
+          continue;
+        }
         const fix = e instanceof ProviderError && e.status === 400 ? outputLimitFix(e.message) : undefined;
         if (fix && outputFixes < 3) {
           // The reply size we asked for was refused: take the provider's real figure and ask again.
@@ -602,6 +645,8 @@ export class Agent {
     const want = Math.min(this.o.config.maxTokens || Infinity, m.maxOutput ?? Infinity, room);
     const maxTokens = Number.isFinite(want) ? Math.max(MIN_REPLY_TOKENS, want) : undefined;
     this.lastMaxTokens = maxTokens;
+    const effort = this.effortFor(m);
+    this.lastEffort = effort;
     const stream = m.provider.stream({
       model: m.model,
       system: this.o.system(),
@@ -609,6 +654,7 @@ export class Agent {
       tools: this.o.tools.specs(),
       ...(maxTokens ? { maxTokens } : {}),
       ...(this.o.config.thinkingBudget ? { thinkingBudget: this.o.config.thinkingBudget } : {}),
+      ...(effort ? { reasoningEffort: effort } : {}),
       signal,
     });
     const speed = new SpeedMeter((tps) => this.emit({ type: 'speed', tokensPerSecond: tps }));
@@ -632,6 +678,14 @@ export class Agent {
       ...(tokensPerSecond ? { tokensPerSecond } : {}),
     });
     return r;
+  }
+
+  /** The configured effort, held to what this model has shown it accepts. */
+  private effortFor(m: ResolvedModel): ReasoningEffort | undefined {
+    const want = this.o.config.reasoningEffort;
+    const cap = m.effortCap;
+    if (!want || cap === 'none') return undefined;
+    return cap && REASONING_EFFORTS.indexOf(want) > REASONING_EFFORTS.indexOf(cap) ? cap : want;
   }
 
   // ---- tool execution ---------------------------------------------------------------------------
