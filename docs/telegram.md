@@ -61,17 +61,18 @@ mid-task.
   button, you can reply with text: that denies the action and tells the agent what to do instead.
 - **Questions** from the agent come with its options as buttons, or reply with your own answer.
 
-| Command     | What it does                                                     |
-| ----------- | ---------------------------------------------------------------- |
-| `/new`      | Start a new conversation                                         |
-| `/continue` | Pick up the latest saved conversation in the folder              |
-| `/stop`     | Stop the current task                                            |
-| `/status`   | Model, approval mode, sandbox, context, last speed and folder    |
-| `/mode`     | Show or set approvals: `/mode ask`, `edits`, `auto` or `plan`    |
-| `/model`    | Show or switch the model: `/model ollama/qwen3:8b`               |
-| `/context`  | Show or set the context window: `/context 128k`, `/context auto` |
-| `/compact`  | Summarise the older conversation now                             |
-| `/help`     | List the commands                                                |
+| Command     | What it does                                                        |
+| ----------- | ------------------------------------------------------------------- |
+| `/new`      | Start a new conversation                                            |
+| `/continue` | Pick up the latest saved conversation in the folder                 |
+| `/stop`     | Stop the current task                                               |
+| `/status`   | Model, approval mode, sandbox, context, last speed and folder       |
+| `/mode`     | Show or set approvals: `/mode ask`, `edits`, `auto` or `plan`       |
+| `/model`    | Show or switch the model: `/model ollama/qwen3:8b`                  |
+| `/context`  | Show or set the context window: `/context 128k`, `/context auto`    |
+| `/effort`   | Show or set the reasoning effort: `/effort high`, `/effort default` |
+| `/compact`  | Summarise the older conversation now                                |
+| `/help`     | List the commands                                                   |
 
 Conversations are saved like terminal ones, so `nexus --continue` in the same folder can pick up what you started
 from your phone, and the other way round with `/continue`.

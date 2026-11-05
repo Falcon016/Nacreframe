@@ -15,6 +15,7 @@ import {
   type TgUser,
 } from './api.js';
 import { escapeHtml, splitMarkdown, toTelegramHtml } from './format.js';
+import { REASONING_EFFORTS, type ReasoningEffort } from '../llm/types.js';
 
 export interface BotOptions {
   api: TelegramApi;
@@ -40,6 +41,7 @@ const COMMANDS = [
   { command: 'model', description: 'Show or switch the model' },
   { command: 'compact', description: 'Summarise the older conversation now' },
   { command: 'context', description: 'Show or set the context window (e.g. /context 128k)' },
+  { command: 'effort', description: 'Reasoning effort: low, medium, high, xhigh or default' },
   { command: 'help', description: 'What this bot can do' },
 ];
 
@@ -356,6 +358,21 @@ class ChatSession {
         } catch (e) {
           await this.say(`Could not switch: ${escapeHtml((e as Error).message)}`);
         }
+        return;
+      }
+      case 'effort': {
+        const a = arg.toLowerCase();
+        if (a) {
+          if (a !== 'default' && !(REASONING_EFFORTS as readonly string[]).includes(a))
+            return void (await this.say('Use /effort low, medium, high, xhigh, or /effort default.'));
+          rt.setReasoningEffort(a === 'default' ? undefined : (a as ReasoningEffort));
+        }
+        const e = rt.config.reasoningEffort;
+        await this.say(
+          e
+            ? `<b>Reasoning effort</b> ${e}${a ? ' (saved)' : ''}. /effort default leaves it to the model.`
+            : "<b>Reasoning effort</b> the model's default. Set it with /effort high (or low, medium, xhigh).",
+        );
         return;
       }
       case 'context': {

@@ -33,7 +33,7 @@ export class OpenAICompatProvider implements Provider {
     const res = await postJsonStream({
       url: `${this.baseUrl}/chat/completions`,
       headers: this.headers(),
-      body: buildBody(req),
+      body: buildBody(req, { templateKwargs: !/^https:\/\/api\.openai\.com\//.test(this.baseUrl) }),
       signal: req.signal,
       ...(this.opts.fetchImpl ? { fetchImpl: this.opts.fetchImpl } : {}),
     });
@@ -173,7 +173,14 @@ function toModelInfo(m: RawModel): ModelInfo {
   };
 }
 
-export function buildBody(req: StreamRequest): Record<string, unknown> {
+/**
+ * `templateKwargs`: also pass the effort to the chat template (`chat_template_kwargs`), which is how vLLM and
+ * llama.cpp templates read it. OpenAI's own API refuses fields it does not know, so it gets `reasoning_effort` only.
+ */
+export function buildBody(
+  req: StreamRequest,
+  opts: { templateKwargs?: boolean } = {},
+): Record<string, unknown> {
   const tools = req.tools.map((t) => ({
     type: 'function',
     function: { name: t.name, description: t.description, parameters: t.inputSchema },
@@ -184,6 +191,10 @@ export function buildBody(req: StreamRequest): Record<string, unknown> {
     stream_options: { include_usage: true },
     ...(req.maxTokens ? { max_tokens: req.maxTokens } : {}),
     ...(req.temperature !== undefined ? { temperature: req.temperature } : {}),
+    ...(req.reasoningEffort ? { reasoning_effort: req.reasoningEffort } : {}),
+    ...(req.reasoningEffort && opts.templateKwargs
+      ? { chat_template_kwargs: { reasoning_effort: req.reasoningEffort } }
+      : {}),
     messages: [{ role: 'system', content: req.system }, ...req.messages.flatMap(toWire)],
     ...(tools.length ? { tools } : {}),
   };

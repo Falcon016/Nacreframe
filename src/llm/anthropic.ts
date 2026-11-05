@@ -122,6 +122,7 @@ export function buildBody(req: StreamRequest): Record<string, unknown> {
     system: [{ type: 'text', text: req.system, cache_control: { type: 'ephemeral' } }],
     messages,
     ...(tools.length ? { tools } : {}),
+    ...(req.reasoningEffort ? { output_config: { effort: req.reasoningEffort } } : {}),
   };
   if (req.thinkingBudget && req.thinkingBudget >= 1024) {
     body.thinking = { type: 'enabled', budget_tokens: req.thinkingBudget };

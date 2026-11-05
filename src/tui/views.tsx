@@ -714,6 +714,7 @@ export function Footer({
   contextWindow,
   swarmCount,
   queued,
+  effort,
 }: {
   mode: ApprovalMode;
   sandbox: string;
@@ -721,6 +722,8 @@ export function Footer({
   contextWindow: number;
   swarmCount: number;
   queued: number;
+  /** The reasoning effort set with /effort; nothing is shown for the model's default. */
+  effort?: string | undefined;
 }) {
   const t = useTheme();
   const { columns } = useWindowSize();
@@ -744,6 +747,7 @@ export function Footer({
     ),
     part('shift+tab', 9, <Text color={t.faint}>shift+tab</Text>),
     part(`sandbox ${sb}`, 5, <Text color={t.dim}>sandbox {sb}</Text>),
+    ...(effort ? [part(`effort ${effort}`, 4, <Text color={t.sky}>effort {effort}</Text>)] : []),
     ...(swarmCount ? [part(`swarm ×${swarmCount}`, 3, <Text color={t.rose}>swarm ×{swarmCount}</Text>)] : []),
     ...(snap.browser.open ? [part('browser', 4, <Text color={t.blue}>browser</Text>)] : []),
     ...(queued ? [part(`${queued} queued`, 1, <Text color={t.gold}>{queued} queued</Text>)] : []),

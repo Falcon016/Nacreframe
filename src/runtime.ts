@@ -31,6 +31,7 @@ import type { Question, TodoItem } from './tools/types.js';
 import { webFetchTool } from './tools/web.js';
 import { Emitter } from './util/emitter.js';
 import { projectDirIn } from './legacy.js';
+import type { ReasoningEffort } from './llm/types.js';
 
 export interface RuntimeOptions {
   cwd: string;
@@ -113,6 +114,8 @@ export type RuntimeEvents = {
   mode: ApprovalMode;
   sandbox: string;
   model: string;
+  /** The reasoning effort was changed (undefined: back to the model's default). */
+  effort: ReasoningEffort | undefined;
 };
 
 /** Everything the UIs need, assembled once. Shared by the TUI, print mode and RPC mode. */
@@ -323,6 +326,25 @@ export class Runtime {
   }
 
   // ---- runtime controls -------------------------------------------------------------------------
+
+  /**
+   * How hard reasoning models think, for every agent (swarm members too), saved in the user config. `undefined`
+   * goes back to each model's own default. Models that refused a level before are asked again.
+   */
+  setReasoningEffort(effort: ReasoningEffort | undefined): void {
+    if (effort) this.config.reasoningEffort = effort;
+    else delete this.config.reasoningEffort;
+    const models = new Set([
+      this.agent.model,
+      ...(this.swarm?.names.map((n) => this.swarm!.agent(n)?.model) ?? []),
+    ]);
+    for (const m of models) if (m) delete m.effortCap;
+    editUserConfig((c) => {
+      const { reasoningEffort: _old, ...rest } = c;
+      return effort ? { ...rest, reasoningEffort: effort } : rest;
+    }, this.loaded.paths);
+    this.events.emit('effort', effort);
+  }
 
   setApprovalMode(mode: ApprovalMode): void {
     this.policy.setMode(mode);

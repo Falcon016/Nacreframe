@@ -33,6 +33,10 @@ export interface Usage {
   cacheWriteTokens?: number;
 }
 
+/** Levels for `/effort`, low to high. */
+export const REASONING_EFFORTS = ['low', 'medium', 'high', 'xhigh'] as const;
+export type ReasoningEffort = (typeof REASONING_EFFORTS)[number];
+
 export type StopReason = 'end_turn' | 'tool_use' | 'max_tokens' | 'refusal' | 'other';
 
 export interface StreamRequest {
@@ -45,6 +49,8 @@ export interface StreamRequest {
   temperature?: number;
   /** Extended-thinking token budget (Anthropic). 0 or undefined disables. */
   thinkingBudget?: number;
+  /** Reasoning effort for models that take one. Undefined: the model's default. */
+  reasoningEffort?: ReasoningEffort;
   signal?: AbortSignal;
 }
 
