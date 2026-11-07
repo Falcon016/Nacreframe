@@ -1,10 +1,19 @@
 import { join } from 'node:path';
-import { AuthStore } from '../config/auth.js';
 import { BUILTIN_PROVIDERS, loadConfig, type LoadedConfig } from '../config/load.js';
-import { providerSchema, type Config } from '../config/schema.js';
+import type { Config } from '../config/schema.js';
 import type { Check } from '../doctor.js';
-import { ProviderRegistry } from '../llm/registry.js';
-import { ProviderError, type ModelInfo } from '../llm/types.js';
+import {
+  builtinUrl,
+  PendingAuth,
+  probeProvider,
+  PROVIDER_PRESETS,
+  providerNameProblem,
+  validateUrl,
+  withProvider,
+  type Listing,
+  type ProviderPreset,
+} from '../llm/connect.js';
+import type { ModelInfo } from '../llm/types.js';
 import type { AppPaths } from '../paths.js';
 import { BIN, NAME, VERSION } from '../version.js';
 import { applyPlan, type SetupPlan } from './plan.js';
@@ -36,76 +45,8 @@ interface ProviderOutcome {
   models?: ModelInfo[];
 }
 
-interface Preset {
-  id: string;
-  label: string;
-  blurb: string;
-  kind: 'cloud' | 'local';
-  keyUrl?: string;
-  startHint?: string;
-}
-
-const PRESETS: Preset[] = [
-  {
-    id: 'anthropic',
-    label: 'Anthropic',
-    blurb: 'Claude models',
-    kind: 'cloud',
-    keyUrl: 'https://console.anthropic.com/settings/keys',
-  },
-  {
-    id: 'openai',
-    label: 'OpenAI',
-    blurb: 'GPT models',
-    kind: 'cloud',
-    keyUrl: 'https://platform.openai.com/api-keys',
-  },
-  {
-    id: 'ollama',
-    label: 'Ollama',
-    blurb: 'models on this computer',
-    kind: 'local',
-    startHint: 'Start it with `ollama serve`, then fetch a model, e.g. `ollama pull qwen3:8b`.',
-  },
-  {
-    id: 'lmstudio',
-    label: 'LM Studio',
-    blurb: 'models on this computer',
-    kind: 'local',
-    startHint: 'In LM Studio open the Developer tab and start the local server.',
-  },
-  {
-    id: 'llamacpp',
-    label: 'llama.cpp',
-    blurb: 'a llama-server on this computer',
-    kind: 'local',
-    startHint: 'Start it with `llama-server -m <model.gguf> --port 8080`.',
-  },
-];
-
-const builtinUrl = (id: string): string =>
-  ((BUILTIN_PROVIDERS[id] as { baseUrl?: string } | undefined)?.baseUrl ?? '').replace(/\/+$/, '');
-
-/** The credential store, plus keys typed during this run that are not saved yet. */
-class PendingAuth extends AuthStore {
-  readonly pending = new Map<string, string>();
-  constructor(paths: AppPaths) {
-    super(paths);
-  }
-  override get(provider: string): string | undefined {
-    return this.pending.get(provider) ?? super.get(provider);
-  }
-}
-
-type Listing =
-  | { ok: true; models: ModelInfo[] }
-  | { ok: false; kind: 'rejected' | 'unreachable' | 'other'; message: string };
-
-function errorText(e: unknown): string {
-  const cause = (e as { cause?: { code?: string; message?: string } }).cause;
-  const base = e instanceof Error ? e.message : String(e);
-  return cause?.code ? `${base} (${cause.code})` : base;
-}
+type Preset = ProviderPreset;
+const PRESETS = PROVIDER_PRESETS;
 
 export async function runWizard(ctx: WizardContext): Promise<number> {
   const t = ctx.term;
@@ -229,41 +170,14 @@ export async function runWizard(ctx: WizardContext): Promise<number> {
 
 // ---- providers -----------------------------------------------------------------------------------
 
-async function listModels(
+function listModels(
   ctx: WizardContext,
   config: Config,
   auth: PendingAuth,
   id: string,
   timeoutMs: number,
 ): Promise<Listing> {
-  const ctrl = new AbortController();
-  const timer = setTimeout(() => ctrl.abort(), timeoutMs);
-  try {
-    const registry = new ProviderRegistry(config, auth, ctx.env, ctx.fetchImpl);
-    const provider = registry.get(id);
-    if (!provider.listModels) return { ok: true, models: [] };
-    return { ok: true, models: await provider.listModels(ctrl.signal) };
-  } catch (e) {
-    if (e instanceof ProviderError && (e.status === 401 || e.status === 403))
-      return { ok: false, kind: 'rejected', message: `HTTP ${e.status}` };
-    if (e instanceof ProviderError && e.status)
-      return { ok: false, kind: 'other', message: `HTTP ${e.status}` };
-    if (ctrl.signal.aborted) return { ok: false, kind: 'unreachable', message: 'timed out' };
-    return { ok: false, kind: 'unreachable', message: errorText(e) };
-  } finally {
-    clearTimeout(timer);
-  }
-}
-
-/** The loaded config with one provider added or pointed somewhere else. */
-function withProvider(config: Config, p: ProviderPlan): Config {
-  const base = config.providers[p.id];
-  const next = providerSchema.parse({
-    ...(base ?? {}),
-    type: p.type,
-    ...(p.baseUrl ? { baseUrl: p.baseUrl } : {}),
-  });
-  return { ...config, providers: { ...config.providers, [p.id]: next } };
+  return probeProvider(config, auth, id, timeoutMs, ctx.env, ctx.fetchImpl);
 }
 
 async function chooseProvider(
@@ -447,7 +361,19 @@ async function setupServer(
         `${label} is running`,
         `${r.models.length} model${r.models.length === 1 ? '' : 's'} available`,
       );
-      return { provider, label, models: r.models };
+      // It answering does not make it the one you want (say, the old address from last time): ask.
+      const use = await ctx.prompt.select({
+        message: `Use ${label} at ${url}?`,
+        choices: [
+          { value: 'use' as const, label: 'Use this server' },
+          { value: 'url' as const, label: 'Use a different address' },
+          { value: 'back' as const, label: 'Choose another provider' },
+        ],
+      });
+      if (use === 'use') return { provider, label, models: r.models };
+      if (use === 'back') return 'back';
+      url = await askUrl(ctx, label, url);
+      continue;
     }
     if (r.kind === 'rejected')
       sp.fail(`${label} refused the connection`, `${r.message} — it may need an API key`);
@@ -464,17 +390,19 @@ async function setupServer(
     });
     if (action === 'back') return 'back';
     if (action === 'keep') return { provider, label };
-    if (action === 'url') {
-      url = (
-        await ctx.prompt.text({
-          message: `${label} address`,
-          initial: url,
-          help: 'The OpenAI-compatible base URL, usually ending in /v1.',
-          validate: validateUrl,
-        })
-      ).replace(/\/+$/, '');
-    }
+    if (action === 'url') url = await askUrl(ctx, label, url);
   }
+}
+
+async function askUrl(ctx: WizardContext, label: string, current: string): Promise<string> {
+  return (
+    await ctx.prompt.text({
+      message: `${label} address`,
+      initial: current,
+      help: 'The OpenAI-compatible base URL, usually ending in /v1.',
+      validate: validateUrl,
+    })
+  ).replace(/\/+$/, '');
 }
 
 async function setupCustom(
@@ -486,18 +414,14 @@ async function setupCustom(
     message: 'A short name for this provider',
     placeholder: 'custom',
     help: 'Models will be written as <name>/<model>. Press Enter to use "custom".',
-    validate: (v) =>
-      v === ''
-        ? undefined
-        : !/^[a-z][a-z0-9_-]{0,23}$/.test(v)
-          ? 'Use lowercase letters, digits, "-" or "_" (start with a letter).'
-          : config.providers[v]
-            ? `"${v}" is already taken; choose another name.`
-            : undefined,
+    validate: (v) => (v === '' ? undefined : providerNameProblem(v)),
   });
   const id = typedName || 'custom';
+  // Typing the name of a server added earlier changes it.
+  const earlier = config.providers[id]?.baseUrl;
   const address = await ctx.prompt.text({
     message: 'Server address',
+    ...(earlier ? { initial: earlier } : {}),
     placeholder: 'http://localhost:8000/v1',
     help: 'The OpenAI-compatible base URL, usually ending in /v1.',
     validate: validateUrl,
@@ -515,17 +439,6 @@ async function setupCustom(
     return 'back';
   }
   return { ...result, ...(key ? { apiKey: key } : {}) };
-}
-
-function validateUrl(v: string): string | undefined {
-  try {
-    const u = new URL(v);
-    return u.protocol === 'http:' || u.protocol === 'https:'
-      ? undefined
-      : 'The address must start with http:// or https://';
-  } catch {
-    return 'That does not look like an address, e.g. http://localhost:8000/v1';
-  }
 }
 
 // ---- model and safety ----------------------------------------------------------------------------

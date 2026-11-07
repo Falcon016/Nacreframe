@@ -4,6 +4,11 @@
 
 First release of the ground-up rewrite (replaces the earlier turtlebot harness).
 
+- **`/login` and `/logout`**, after pi's: pick a provider, then give it an API key (masked) or an address
+  (pre-filled, so swapping llama.cpp servers is one edit); add a server of your own; each is checked by listing its
+  models before it is saved, then you pick one, and a model in use reconnects at once. `/logout` removes a saved key
+  and, for a server you added, the server. `nexus setup` run again now lets you change a saved server that still
+  answers instead of keeping it, and can re-point a server added earlier.
 - **Reasoning effort**: `/effort` picks low, medium, high or xhigh (or the model's default) for every agent, and
   saves it; the footer shows it, the dashboard has a selector, and the Telegram bot has `/effort`. It is sent as
   `reasoning_effort` plus the chat template's `reasoning_effort` (llama.cpp, Ollama, vLLM, LM Studio; only the

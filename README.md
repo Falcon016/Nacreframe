@@ -111,7 +111,8 @@ newline, <kbd>Esc</kbd> to interrupt, `/` for commands. Typing while the agent w
 ### Local servers
 
 Built-in provider names: `anthropic`, `openai`, `ollama` (`:11434`), `lmstudio` (`:1234`), `llamacpp` (`:8080`).
-Point one somewhere else in your config, e.g. a llama.cpp server on port 11434:
+`/login` in the UI points one at another address (pre-filled with the current one), adds a server of your own, or
+takes an API key, and checks it before saving. Or set it in your config, e.g. a llama.cpp server on port 11434:
 
 ```json
 { "providers": { "llamacpp": { "baseUrl": "http://127.0.0.1:11434/v1" } } }
@@ -123,6 +124,7 @@ not report one, 32,768 tokens is assumed and you are told; set `"contextWindows"
 | Command                                       | What it does                                                       |
 | --------------------------------------------- | ------------------------------------------------------------------ |
 | `/model [provider/model]`                     | Pick a model (lists what your providers offer)                     |
+| `/login [provider]` · `/logout [provider]`    | Swap a server address or add one; save or remove an API key        |
 | `/mode [ask\|edits\|auto\|plan]`              | Approval mode                                                      |
 | `/sandbox [off\|guard\|container]`            | Sandbox level                                                      |
 | `/swarm duo\|trio\|quad\|custom`              | Start a team (2, 3 or 4 agents, or one you put together)           |
@@ -210,7 +212,7 @@ Layered: built-in defaults → user config → project `.nexusharness/config.jso
 OS's conventions (`nexus doctor` prints them). Annotated example: [examples/config.json](examples/config.json).
 Reference: [docs/configuration.md](docs/configuration.md).
 
-API keys come from the environment (`ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, ...) or `nexus auth set`. They are never
+API keys come from the environment (`ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, ...), `/login` or `nexus auth set`. They are never
 read from project config and never written to the repository.
 
 ## Extending

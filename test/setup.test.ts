@@ -98,10 +98,10 @@ const BAD_KEY = 'test-key-bad-0002';
 
 /** Anthropic's model list for the good key, 401 for anything else, and nothing else reachable. */
 const fakeNetwork =
-  (mock?: { url: string }): typeof fetch =>
+  (mock?: { url: string }, also: { url: string }[] = []): typeof fetch =>
   async (input, init) => {
     const url = String(input);
-    if (mock && url.startsWith(mock.url)) return fetch(input, init);
+    if ([...(mock ? [mock] : []), ...also].some((m) => url.startsWith(m.url))) return fetch(input, init);
     if (url.startsWith('https://api.anthropic.com/v1/models')) {
       const key = new Headers(init?.headers).get('x-api-key');
       if (key === GOOD_KEY || key === 'env-key-from-shell')
@@ -309,7 +309,19 @@ describe('setup wizard', () => {
     const mock = await startMockLlm();
     try {
       const w = wizard(
-        ['Something else', '', mock.url, '', 'mock-1', 'ask', 'guard', true, 'Not now', 'Save and finish'],
+        [
+          'Something else',
+          '',
+          mock.url,
+          '',
+          'Use this server',
+          'mock-1',
+          'ask',
+          'guard',
+          true,
+          'Not now',
+          'Save and finish',
+        ],
         {
           mock,
         },
@@ -330,6 +342,69 @@ describe('setup wizard', () => {
     }
   });
 
+  it('lets you swap a saved server that still answers for another one (and re-point a custom one)', async () => {
+    const oldServer = await startMockLlm();
+    const newServer = await startMockLlm();
+    try {
+      mkdirSync(paths.config, { recursive: true });
+      writeFileSync(
+        configFile(),
+        JSON.stringify({
+          model: 'llamacpp/mock-1',
+          providers: {
+            llamacpp: { type: 'openai', baseUrl: oldServer.url },
+            gpu: { type: 'openai', baseUrl: oldServer.url },
+          },
+        }),
+      );
+      const w = wizard(
+        [
+          'llama.cpp',
+          'Use a different address', // the old one answered, but we want the other server
+          newServer.url,
+          'Use this server',
+          'mock-2',
+          'ask',
+          'guard',
+          false,
+          'Not now',
+          'Save and finish',
+        ],
+        { fetchImpl: fakeNetwork(oldServer, [newServer]) },
+      );
+      expect(await w.run()).toBe(0);
+      w.prompt.assertDone();
+      expect(w.prompt.asked).toContain(`Use llama.cpp at ${oldServer.url}?`);
+      expect(readJson(configFile())).toMatchObject({
+        providers: { llamacpp: { baseUrl: newServer.url } },
+        model: 'llamacpp/mock-2',
+      });
+
+      // A custom server added earlier can be re-pointed by its name.
+      const c = wizard(
+        [
+          'Something else',
+          'gpu',
+          newServer.url,
+          '',
+          'Use this server',
+          'mock-1',
+          'ask',
+          'guard',
+          false,
+          'Not now',
+          'Save and finish',
+        ],
+        { fetchImpl: fakeNetwork(oldServer, [newServer]) },
+      );
+      expect(await c.run()).toBe(0);
+      expect(readJson(configFile())).toMatchObject({ providers: { gpu: { baseUrl: newServer.url } } });
+    } finally {
+      oldServer.server.close();
+      newServer.server.close();
+    }
+  });
+
   it('helps when a local server is not running: start it, point elsewhere, or carry on', async () => {
     const mock = await startMockLlm();
     try {
@@ -339,6 +414,7 @@ describe('setup wizard', () => {
           'Ollama',
           'Use a different address',
           mock.url,
+          'Use this server',
           'mock-2',
           'ask',
           'guard',

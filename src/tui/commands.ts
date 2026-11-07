@@ -5,15 +5,22 @@ import { Session, sessionDir } from '../agent/session.js';
 import type { ApprovalMode, SandboxMode } from '../config/schema.js';
 import { trustProject } from '../config/load.js';
 import { projectKey } from '../paths.js';
-import type { Runtime } from '../runtime.js';
+import type { LoginTarget, Runtime } from '../runtime.js';
 import { SWARM_PRESETS, type FlushPlan } from '../runtime.js';
 import { assembleTeam, parseTeam, PRESET_SUMMARY, roleByKey, ROLES, type TeamSlot } from '../swarm/roles.js';
 import { checkForUpdate, requestRelaunch, runUpdate, short } from '../update.js';
 import { BIN } from '../version.js';
-import type { Choice } from './dialogs.js';
+import type { AskOptions, Choice } from './dialogs.js';
 import { replayInto, type UiStore } from './store.js';
 import { MODE_STYLE } from './theme.js';
 import { REASONING_EFFORTS, type ReasoningEffort } from '../llm/types.js';
+import {
+  builtinUrl,
+  providerNameProblem,
+  validateUrl,
+  type Listing,
+  type ProviderPlan,
+} from '../llm/connect.js';
 
 export type Overlay = {
   title: string;
@@ -34,8 +41,8 @@ export interface CmdCtx {
   /** Show (true), hide (false) or flip (undefined) agents' reasoning. */
   setThinking(on?: boolean): void;
   refresh(): void;
-  /** Ask the user for a line of text; undefined if they skip it. */
-  ask(question: string): Promise<string | undefined>;
+  /** Ask for a line of text; undefined when skipped. `secret` masks it (API keys), `initial` pre-fills it. */
+  ask(question: string, opts?: AskOptions): Promise<string | undefined>;
 }
 
 /** Show a picker and wait for the choice; undefined if the user presses esc. */
@@ -49,6 +56,205 @@ function pick<T>(c: CmdCtx, title: string, items: Choice<T>[], initial?: number)
       onCancel: () => resolve(undefined),
     }),
   );
+}
+
+const NEW_SERVER = '\0new';
+
+const keyHint = (k: LoginTarget['key']) => (k === 'saved' ? 'key saved' : k ? `key from ${k}` : '');
+
+function targetHint(t: LoginTarget): string {
+  const where = t.kind === 'cloud' ? (t.key ? keyHint(t.key) : 'needs an API key') : (t.baseUrl ?? '');
+  return [where, t.kind !== 'cloud' ? keyHint(t.key) : '', t.current ? 'in use' : '']
+    .filter(Boolean)
+    .join(' · ');
+}
+
+/** Ask for a server address until it is valid; undefined if the user backs out. */
+async function askAddress(c: CmdCtx, label: string, initial: string): Promise<string | undefined> {
+  let start = initial;
+  for (;;) {
+    const v = await c.ask(`${label} server address`, {
+      title: `Connect ${label}`,
+      initial: start,
+      help: 'An OpenAI-compatible base URL, usually ending in /v1. Enter keeps it; ctrl+u clears it.',
+    });
+    if (v === undefined || v === '') return undefined;
+    const problem = validateUrl(v);
+    if (!problem) return v.replace(/\/+$/, '');
+    c.store.notice(problem, 'warn');
+    start = v;
+  }
+}
+
+/**
+ * `/login`, after pi's: pick a provider, then give it what it needs. A cloud provider takes an API key; a local or
+ * added server takes an address (pre-filled, so swapping llama.cpp servers is one edit) and a key only if it asks
+ * for one. Each is checked by listing its models before anything is saved, then you pick one of them.
+ */
+async function login(c: CmdCtx, arg: string): Promise<void> {
+  const { runtime, store } = c;
+  const targets = runtime.loginTargets();
+  let id: string | undefined = arg || undefined;
+  if (id && id !== NEW_SERVER && !targets.some((t) => t.id === id)) {
+    const problem = providerNameProblem(id);
+    if (problem) return store.notice(`Unknown provider "${id}". ${problem}`, 'error');
+    // `/login gpu` with a new name adds a server called gpu.
+  }
+  if (!id) {
+    const current = targets.findIndex((t) => t.current);
+    id = await pick<string>(
+      c,
+      'Log in to a provider',
+      [
+        ...targets.map((t) => ({ label: t.label, value: t.id, hint: targetHint(t) })),
+        { label: 'Add another server…', value: NEW_SERVER, hint: 'any OpenAI-compatible address' },
+      ],
+      current >= 0 ? current : 0,
+    );
+    if (!id) return;
+  }
+
+  let target = targets.find((t) => t.id === id);
+  if (!target) {
+    let name = id === NEW_SERVER ? '' : id;
+    while (!name) {
+      const v = await c.ask('A short name for this server', {
+        title: 'Add a server',
+        help: 'Its models will be written as <name>/<model>, e.g. gpu/qwen3-32b.',
+      });
+      if (!v) return;
+      const problem =
+        providerNameProblem(v) ??
+        (targets.some((t) => t.id === v) ? `"${v}" is already set up; pick it from /login.` : undefined);
+      if (problem) store.notice(problem, 'warn');
+      else name = v;
+    }
+    target = { id: name, label: name, kind: 'custom', type: 'openai', key: undefined, current: false };
+  }
+  const t = target;
+
+  let plan: ProviderPlan = { id: t.id, type: t.type };
+  let key: string | undefined;
+  let listing: Listing;
+
+  if (t.kind === 'cloud') {
+    const typed = await c.ask(`${t.label} API key`, {
+      title: `Log in to ${t.label}`,
+      secret: true,
+      help: [
+        t.preset?.keyUrl ? `Create one at ${t.preset.keyUrl}` : '',
+        t.key ? `Leave it empty to keep the ${t.key === 'saved' ? 'saved key' : `key from ${t.key}`}.` : '',
+      ]
+        .filter(Boolean)
+        .join(' '),
+    });
+    if (typed === undefined || (!typed && !t.key)) return store.notice('Login cancelled; nothing changed.');
+    key = typed || undefined;
+    store.setStatus(`Checking with ${t.label}…`);
+    listing = await runtime.probeProvider(plan, key);
+    store.setStatus(undefined);
+  } else {
+    const url = await askAddress(c, t.label, t.baseUrl ?? builtinUrl(t.id));
+    if (!url) return store.notice('Login cancelled; nothing changed.');
+    plan = { ...plan, baseUrl: url };
+    store.setStatus(`Asking ${url} for its models…`);
+    listing = await runtime.probeProvider(plan);
+    store.setStatus(undefined);
+    if (!listing.ok && listing.kind === 'rejected') {
+      const typed = await c.ask(`${t.label} wants an API key (${listing.message}).`, {
+        title: `Log in to ${t.label}`,
+        secret: true,
+        help: 'The key the server was started with, e.g. llama-server --api-key.',
+      });
+      if (!typed) return store.notice('Login cancelled; nothing changed.');
+      key = typed;
+      store.setStatus(`Asking ${url} for its models…`);
+      listing = await runtime.probeProvider(plan, key);
+      store.setStatus(undefined);
+    }
+  }
+
+  if (!listing.ok) {
+    if (listing.kind === 'rejected')
+      return store.notice(`${t.label} refused that key (${listing.message}). Nothing was saved.`, 'error');
+    const where = plan.baseUrl ?? t.label;
+    const choice = await pick<'save' | 'cancel'>(c, `${where} did not answer (${listing.message})`, [
+      { label: 'Cancel', value: 'cancel', hint: 'nothing is saved' },
+      { label: 'Save anyway', value: 'save', hint: t.preset?.startHint ?? 'use it once the server is up' },
+    ]);
+    if (choice !== 'save') return store.notice('Login cancelled; nothing changed.');
+  }
+
+  const saved = await runtime.saveProvider(plan, key);
+  const what = [plan.baseUrl ? `→ ${plan.baseUrl}` : '', key ? 'key saved' : ''].filter(Boolean).join(', ');
+  store.notice(`Logged in to ${t.label}${what ? ` (${what})` : ''}.`, 'success');
+  if (saved.reconnectError)
+    store.notice(`The current model could not reconnect: ${saved.reconnectError}`, 'warn');
+  c.refresh();
+
+  const models = listing.ok ? listing.models : [];
+  if (!models.length) return;
+  const current = runtime.modelSpec;
+  const specs = models.map((m) => `${t.id}/${m.id}`);
+  const spec = await pick<string>(
+    c,
+    `Use a model from ${t.label}? (esc keeps ${current ?? 'the current one'})`,
+    models.map((m, i) => ({
+      label: specs[i]!,
+      value: specs[i]!,
+      hint: [m.contextWindow ? `${(m.contextWindow / 1000).toFixed(0)}k ctx` : '', m.loaded ? 'loaded' : '']
+        .filter(Boolean)
+        .join(' · '),
+    })),
+    Math.max(0, specs.indexOf(current ?? '')),
+  );
+  if (!spec || (spec === current && !saved.reconnectError)) return;
+  try {
+    const m = await runtime.setModel(spec);
+    store.notice(
+      `Model → ${spec} · context ${m.contextWindow.toLocaleString()} tokens (${m.contextSource})`,
+      'success',
+    );
+  } catch (e) {
+    store.notice((e as Error).message, 'error');
+  }
+}
+
+/** `/logout`: forget a saved key; for a server you added, optionally forget the server too. */
+async function logout(c: CmdCtx, arg: string): Promise<void> {
+  const { runtime, store } = c;
+  const targets = runtime.loginTargets().filter((t) => t.key === 'saved' || t.kind === 'custom');
+  if (!targets.length) return store.notice('No saved keys or added servers to remove.');
+  let id: string | undefined = arg || undefined;
+  if (!id)
+    id = await pick<string>(
+      c,
+      'Log out of a provider',
+      targets.map((t) => ({ label: t.label, value: t.id, hint: targetHint(t) })),
+    );
+  if (!id) return;
+  const t = targets.find((x) => x.id === id);
+  if (!t) return store.notice(`"${id}" has no saved key or added server.`, 'warn');
+  let forgetServer = false;
+  if (t.kind === 'custom') {
+    const choice = await pick<'server' | 'key'>(c, `Log out of ${t.label}`, [
+      { label: 'Remove the server', value: 'server', hint: `forget ${t.baseUrl ?? 'it'} and its key` },
+      ...(t.key === 'saved' ? [{ label: 'Only remove the key', value: 'key' as const }] : []),
+    ]);
+    if (!choice) return;
+    forgetServer = choice === 'server';
+  }
+  const done = runtime.logout(t.id, forgetServer);
+  const parts = [done.key ? 'key removed' : '', done.server ? 'server removed' : ''].filter(Boolean);
+  store.notice(
+    parts.length ? `Logged out of ${t.label}: ${parts.join(', ')}.` : `Nothing saved for ${t.label}.`,
+    'success',
+  );
+  const env = runtime.loginTargets().find((x) => x.id === t.id)?.key;
+  if (env && env !== 'saved') store.notice(`${t.label} still has a key from ${env}.`, 'warn');
+  if (runtime.modelSpec?.split('/')[0] === t.id)
+    store.notice(`The current model is from ${t.label}; pick another with /model.`, 'warn');
+  c.refresh();
 }
 
 const fmtBytes = (n: number) =>
@@ -270,6 +476,18 @@ export const BUILTINS: BuiltinCommand[] = [
         onSelect: (v: string) => void choose(v),
       });
     },
+  },
+  {
+    name: 'login',
+    usage: 'login [provider]',
+    description: 'Connect a provider: an API key, or a server address to swap',
+    run: (args, c) => login(c, args.trim()),
+  },
+  {
+    name: 'logout',
+    usage: 'logout [provider]',
+    description: "Remove a provider's saved key (and a server you added)",
+    run: (args, c) => logout(c, args.trim()),
   },
   {
     name: 'mode',

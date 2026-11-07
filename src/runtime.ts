@@ -7,7 +7,7 @@ import { Session, sessionDir } from './agent/session.js';
 import { browserTools } from './browser/tools.js';
 import { BrowserService } from './browser/service.js';
 import { AuthStore } from './config/auth.js';
-import { loadConfig, trustProject, type LoadedConfig } from './config/load.js';
+import { BUILTIN_PROVIDERS, loadConfig, trustProject, type LoadedConfig } from './config/load.js';
 import type { ApprovalMode, Config, PartialConfig, SandboxMode, SwarmAgentConfig } from './config/schema.js';
 import { loadExtensions, loadPromptTemplates, type SlashCommand } from './ext/extensions.js';
 import { BUILTIN_SKILLS_DIR, SkillStore } from './ext/skills.js';
@@ -32,6 +32,16 @@ import { webFetchTool } from './tools/web.js';
 import { Emitter } from './util/emitter.js';
 import { projectDirIn } from './legacy.js';
 import type { ReasoningEffort } from './llm/types.js';
+import {
+  builtinUrl,
+  PendingAuth,
+  probeProvider,
+  PROVIDER_PRESETS,
+  withProvider,
+  type Listing,
+  type ProviderPlan,
+  type ProviderPreset,
+} from './llm/connect.js';
 
 export interface RuntimeOptions {
   cwd: string;
@@ -106,6 +116,23 @@ function contextWarnings(spec: string, m: ResolvedModel): string[] {
     `${spec}: the server did not report a context window, so ${m.contextWindow.toLocaleString()} tokens is assumed. ` +
       `Set the real size with /context <tokens> in the terminal (e.g. /context 128k), or contextWindows in your config, so compaction triggers at the right point.`,
   ];
+}
+
+const isBuiltinProvider = (id: string): boolean => Object.hasOwn(BUILTIN_PROVIDERS, id);
+
+/** A provider as `/login` shows it. */
+export interface LoginTarget {
+  id: string;
+  label: string;
+  /** cloud: needs a key; local: a server address (built in); custom: a server added by hand. */
+  kind: 'cloud' | 'local' | 'custom';
+  type: 'openai' | 'anthropic';
+  baseUrl?: string;
+  /** Where its key comes from now: `saved` (auth.json), `$ENV`, or none. */
+  key: 'saved' | `$${string}` | undefined;
+  /** The current model is one of its models. */
+  current: boolean;
+  preset?: ProviderPreset;
 }
 
 export type RuntimeEvents = {
@@ -326,6 +353,98 @@ export class Runtime {
   }
 
   // ---- runtime controls -------------------------------------------------------------------------
+
+  /** The providers `/login` offers: the built-in ones, then any added servers, with how each is set up now. */
+  loginTargets(): LoginTarget[] {
+    const current = this.modelSpec?.split('/')[0];
+    const keyFor = (id: string): LoginTarget['key'] => {
+      const env = this.config.providers[id]?.apiKeyEnv;
+      return this.auth.get(id) ? 'saved' : env && this.registry.connection.env[env] ? `$${env}` : undefined;
+    };
+    const presets = PROVIDER_PRESETS.map((p): LoginTarget => ({
+      id: p.id,
+      label: p.label,
+      kind: p.kind,
+      type: this.config.providers[p.id]?.type ?? 'openai',
+      ...(this.config.providers[p.id]?.baseUrl ? { baseUrl: this.config.providers[p.id]!.baseUrl! } : {}),
+      key: keyFor(p.id),
+      current: current === p.id,
+      preset: p,
+    }));
+    const added = Object.entries(this.config.providers)
+      .filter(([id]) => !PROVIDER_PRESETS.some((p) => p.id === id) && !isBuiltinProvider(id))
+      .map(([id, cfg]): LoginTarget => ({
+        id,
+        label: id,
+        kind: 'custom',
+        type: cfg.type,
+        ...(cfg.baseUrl ? { baseUrl: cfg.baseUrl } : {}),
+        key: keyFor(id),
+        current: current === id,
+      }));
+    return [...presets, ...added];
+  }
+
+  /** Check a provider's address and key by asking it for its models. Nothing is saved. */
+  async probeProvider(plan: ProviderPlan, key?: string, timeoutMs = 6000): Promise<Listing> {
+    const auth = new PendingAuth(this.loaded.paths);
+    if (key) auth.pending.set(plan.id, key);
+    const { env, fetchImpl } = this.registry.connection;
+    return probeProvider(withProvider(this.config, plan), auth, plan.id, timeoutMs, env, fetchImpl);
+  }
+
+  /**
+   * Save a provider's address (user config) and key (auth.json, owner-only), and use them from now on. A model of
+   * that provider in use is reconnected at once.
+   */
+  async saveProvider(plan: ProviderPlan, key?: string): Promise<{ reconnectError?: string }> {
+    const url = (plan.baseUrl ?? builtinUrl(plan.id)).replace(/\/+$/, '');
+    this.config.providers[plan.id] = withProvider(this.config, {
+      ...plan,
+      ...(url ? { baseUrl: url } : {}),
+    }).providers[plan.id]!;
+    editUserConfig((c) => {
+      const providers = isPlain(c.providers) ? { ...c.providers } : {};
+      const before = isPlain(providers[plan.id])
+        ? { ...(providers[plan.id] as Record<string, unknown>) }
+        : {};
+      delete before.baseUrl;
+      // The built-in address is not written down, so a later default change still reaches this provider.
+      const custom = url && url !== builtinUrl(plan.id);
+      providers[plan.id] = { ...before, type: plan.type, ...(custom ? { baseUrl: url } : {}) };
+      return { ...c, providers };
+    }, this.loaded.paths);
+    if (key) this.auth.set(plan.id, key);
+    this.registry.forget(plan.id);
+    const spec = this.modelSpec;
+    if (spec?.split('/')[0] !== plan.id) return {};
+    try {
+      await this.setModel(spec); // the model in use now talks to the new address / key
+      return {};
+    } catch (e) {
+      return { reconnectError: (e as Error).message };
+    }
+  }
+
+  /**
+   * Forget a provider's saved key. `forgetServer` also removes a server added by hand (not the built-in ones)
+   * from the config. Returns what was removed.
+   */
+  logout(id: string, forgetServer = false): { key: boolean; server: boolean } {
+    const key = this.auth.remove(id);
+    let server = false;
+    if (forgetServer && !isBuiltinProvider(id) && this.config.providers[id]) {
+      delete this.config.providers[id];
+      editUserConfig((c) => {
+        if (!isPlain(c.providers)) return c;
+        const { [id]: _gone, ...providers } = c.providers;
+        return { ...c, providers };
+      }, this.loaded.paths);
+      server = true;
+    }
+    this.registry.forget(id);
+    return { key, server };
+  }
 
   /**
    * How hard reasoning models think, for every agent (swarm members too), saved in the user config. `undefined`
