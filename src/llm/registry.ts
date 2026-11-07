@@ -45,6 +45,16 @@ export class ProviderRegistry {
     private fetchImpl?: typeof fetch,
   ) {}
 
+  /** Drop the client made for a provider, so the next use reads its address and key again. */
+  forget(providerId: string): void {
+    this.cache.delete(providerId);
+  }
+
+  /** The environment and network this registry uses, for checking a provider before it is saved. */
+  get connection(): { env: NodeJS.ProcessEnv; fetchImpl?: typeof fetch } {
+    return { env: this.env, ...(this.fetchImpl ? { fetchImpl: this.fetchImpl } : {}) };
+  }
+
   get(providerId: string): Provider {
     const hit = this.cache.get(providerId);
     if (hit) return hit;

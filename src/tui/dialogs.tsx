@@ -6,19 +6,34 @@ import { diffColor } from './markdown.js';
 import { GLYPH } from './theme.js';
 import { Keys } from './views.js';
 
+/** How a typed answer is asked for: masked (keys), pre-filled (an address to edit), with a line of help. */
+export interface AskOptions {
+  /** Show • for each character; spaces and line breaks in pasted text are dropped. */
+  secret?: boolean;
+  /** Text already in the box, to edit or accept with Enter. */
+  initial?: string;
+  help?: string;
+  /** The dialog's title instead of "Question". */
+  title?: string;
+}
+
 /** One-line text prompt used for feedback and free-form answers. */
 function LineInput({
   label,
   onSubmit,
   onCancel,
+  secret = false,
+  initial = '',
 }: {
   label: string;
   onSubmit(v: string): void;
   onCancel(): void;
+  secret?: boolean;
+  initial?: string;
 }) {
   const t = useTheme();
-  const [v, setV] = useState('');
-  usePaste((s) => setV((x) => x + s.replace(/\s+/g, ' ')));
+  const [v, setV] = useState(initial);
+  usePaste((s) => setV((x) => x + (secret ? s.replace(/\s+/g, '') : s.replace(/\s+/g, ' '))));
   useInput((input, key) => {
     if (key.escape) return onCancel();
     if (key.return) return onSubmit(v.trim());
@@ -29,7 +44,7 @@ function LineInput({
   return (
     <Box>
       <Text color={t.accent}>{label} </Text>
-      <Text>{v}</Text>
+      <Text>{secret ? '•'.repeat(v.length) : v}</Text>
       <Text inverse> </Text>
     </Box>
   );
@@ -196,11 +211,13 @@ export function QuestionDialog({
   question,
   options,
   onAnswer,
+  input,
 }: {
   agent: string;
   question: string;
   options?: string[];
   onAnswer(a: string): void;
+  input?: AskOptions;
 }) {
   const t = useTheme();
   const [typing, setTyping] = useState(!options?.length);
@@ -209,15 +226,18 @@ export function QuestionDialog({
     <Box flexDirection="column" borderStyle="round" borderColor={t.teal} paddingX={1}>
       <Text>
         <Text bold color={t.teal}>
-          {GLYPH.node} Question
+          {GLYPH.node} {input?.title ?? 'Question'}
         </Text>
         {agent !== 'main' ? <Text color={color}> from {agent}</Text> : null}
       </Text>
       <Text>{question}</Text>
+      {input?.help ? <Text color={t.dim}>{input.help}</Text> : null}
       <Box marginTop={1} flexDirection="column">
         {typing ? (
           <LineInput
             label="❯"
+            {...(input?.secret ? { secret: true } : {})}
+            {...(input?.initial ? { initial: input.initial } : {})}
             onSubmit={(v) => onAnswer(v || '(no answer)')}
             onCancel={() => (options?.length ? setTyping(false) : onAnswer('(skipped)'))}
           />

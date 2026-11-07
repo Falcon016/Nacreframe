@@ -6,7 +6,7 @@ import type { Runtime } from '../runtime.js';
 import type { Question, TodoItem } from '../tools/types.js';
 import { BUILTINS, type CmdCtx, type Overlay } from './commands.js';
 import { ThemeContext } from './context.js';
-import { ApprovalDialog, QuestionDialog, SelectList } from './dialogs.js';
+import { ApprovalDialog, QuestionDialog, SelectList, type AskOptions } from './dialogs.js';
 import { Input } from './Input.js';
 import type { UiStore } from './store.js';
 import type { Theme } from './theme.js';
@@ -21,6 +21,15 @@ interface Props {
   initialPrompt?: string;
 }
 
+// A fresh dialog for each question, so text typed for one never carries over to the next.
+const questionIds = new WeakMap<object, number>();
+let nextQuestionId = 0;
+function questionKey(q: object): number {
+  let id = questionIds.get(q);
+  if (id === undefined) questionIds.set(q, (id = ++nextQuestionId));
+  return id;
+}
+
 export function App({ runtime, store, theme, initialPrompt }: Props) {
   const { exit } = useApp();
   const snap = useSyncExternalStore(store.subscribe, store.getSnapshot);
@@ -33,9 +42,12 @@ export function App({ runtime, store, theme, initialPrompt }: Props) {
     req: ApprovalRequest;
     resolve(r: ApprovalResponse): void;
   } | null>(null);
-  const [question, setQuestion] = useState<{ agent: string; q: Question; resolve(a: string): void } | null>(
-    null,
-  );
+  const [question, setQuestion] = useState<{
+    agent: string;
+    q: Question;
+    opts?: AskOptions;
+    resolve(a: string): void;
+  } | null>(null);
   const [overlay, setOverlay] = useState<Overlay | null>(null);
   const [showPanes, setShowPanes] = useState(true);
   const [history, setHistory] = useState<string[]>([]);
@@ -162,11 +174,12 @@ export function App({ runtime, store, theme, initialPrompt }: Props) {
       exit: quit,
       togglePanes: () => setShowPanes((s) => !s),
       setThinking: (on?: boolean) => toggleThinking(on),
-      ask: (question: string) =>
+      ask: (question: string, opts?: AskOptions) =>
         new Promise<string | undefined>((resolve) =>
           setQuestion({
             agent: 'main',
             q: { question },
+            ...(opts ? { opts } : {}),
             resolve: (a) => {
               setQuestion(null);
               resolve(a === '(skipped)' || a === '(no answer)' ? undefined : a);
@@ -269,10 +282,12 @@ export function App({ runtime, store, theme, initialPrompt }: Props) {
           <ApprovalDialog req={approval.req} pending={runtime.broker.pending} onResolve={approval.resolve} />
         ) : question ? (
           <QuestionDialog
+            key={questionKey(question)}
             agent={question.agent}
             question={question.q.question}
             {...(question.q.options ? { options: question.q.options } : {})}
             onAnswer={question.resolve}
+            {...(question.opts ? { input: question.opts } : {})}
           />
         ) : overlay ? (
           <SelectList

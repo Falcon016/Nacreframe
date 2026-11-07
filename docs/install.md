@@ -158,7 +158,9 @@ Then it shows a summary and saves:
   kept, and the previous file is copied to `config.json.bak`;
 - API keys go to `auth.json` next to it, with owner-only permissions. Keys are never written to `config.json`.
 
-Run it again whenever you like to switch provider or tighten safety.
+Run it again whenever you like to switch provider or tighten safety. A saved server that still answers is offered
+as it is, with **Use a different address** to point it somewhere else. Inside the UI, `/login` does the same without
+leaving your conversation (see [configuration](configuration.md#login-and-logout)).
 
 ### Without a terminal (scripts, CI, provisioning)
 

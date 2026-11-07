@@ -165,6 +165,50 @@ describe('interactive UI', () => {
     }
   });
 
+  it('swaps a server with /login: the address is pre-filled, checked, saved, then a model is picked', async () => {
+    const other = await startMockLlm(0, { models: [{ id: 'swap-1' }, { id: 'swap-2' }] });
+    const ui = await boot();
+    try {
+      await until(() => ui.screen().includes('NexusHarness'));
+      await ui.type('/login mock');
+      ui.key('\r');
+      await until(() => ui.screen().includes('Connect mock'));
+      await sleep(250);
+      expect(ui.screen()).toContain(mock.url); // the saved address, ready to edit
+      ui.key('\u0015'); // ctrl+u clears it
+      await sleep(50);
+      await ui.type(other.url);
+      await sleep(50);
+      ui.key('\r');
+      await until(() => ui.screen().includes(`Logged in to mock (→ ${other.url})`));
+      await until(() => ui.screen().includes('Use a model from mock?'));
+      await sleep(250);
+      ui.key('\u001b[B'); // down to swap-2
+      await sleep(100);
+      ui.key('\r');
+      await until(() => ui.screen().includes('Model → mock/swap-2'));
+      expect(ui.runtime.config.providers.mock?.baseUrl).toBe(other.url);
+      const saved = JSON.parse(
+        readFileSync(join(dirname(ui.work), '.home', 'config', 'config.json'), 'utf8'),
+      );
+      expect(saved.providers.mock.baseUrl).toBe(other.url);
+
+      // A key is masked as it is typed, and esc leaves everything as it was.
+      await ui.type('/login openai');
+      ui.key('\r');
+      await until(() => ui.screen().includes('Log in to OpenAI'));
+      await sleep(250);
+      await ui.type('sk-hidden');
+      await until(() => ui.screen().includes('•••••••••'));
+      expect(ui.screen()).not.toContain('sk-hidden');
+      ui.key('\u001b');
+      await until(() => ui.screen().includes('Login cancelled; nothing changed.'));
+    } finally {
+      other.server.close();
+      await ui.stop();
+    }
+  });
+
   it('renders the banner, streams a reply and shows markdown', async () => {
     const ui = await boot();
     try {

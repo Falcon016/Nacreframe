@@ -71,6 +71,26 @@ Unsloth Studio...). Local `localhost` endpoints need no key. The context window 
 router's `/v1/models`, or `/props`; LM Studio; Ollama `/api/ps`). If it is not reported, 32,768 tokens is assumed and
 you get a warning: set the size with `/context <tokens>` (saved as `contextWindows`), or the provider's `contextWindow`, so
 compaction triggers at the right size.
+
+### `/login` and `/logout`
+
+`/login` connects a provider from inside the terminal UI, after [pi](https://github.com/badlogic/pi-mono)'s:
+
+- **Pick a provider.** The list shows the built-in ones and any you added, with where each points, whether a key is
+  saved (or comes from an environment variable) and which one is in use. **Add another server…** adds one of your
+  own under a short name (its models become `<name>/<model>`). `/login llamacpp` skips the list.
+- **Cloud providers** (Anthropic, OpenAI) ask for an API key, shown as dots. Leave it empty to keep the one you have.
+- **Local and added servers** ask for the address, pre-filled with the current one: edit it, or <kbd>Ctrl</kbd>+<kbd>U</kbd>
+  and type a new one. If the server answers 401 you are asked for its key (`llama-server --api-key`).
+- **Everything is checked before it is saved**, by asking the provider for its models. A refused key saves nothing;
+  a server that does not answer can be saved anyway (for one you will start later).
+- It saves the address to your user `config.json` (the built-in address is not written down) and the key to
+  `auth.json` with owner-only permissions, then offers the provider's models. A model in use from that provider
+  switches to the new address straight away.
+
+`/logout` removes a saved key, and for a server you added, can forget the server too. Keys from environment variables
+are not touched. Subscription logins (Claude Pro/Max, ChatGPT) are not supported: use an API key.
+
 Built-in providers: `anthropic`, `openai`, `ollama` (:11434), `lmstudio` (:1234), `llamacpp` (:8080). Ollama's default
 port is also 11434, so if you run llama.cpp there, override `providers.llamacpp.baseUrl` and use the `llamacpp/` prefix. Tool calling must be supported by the model/server you pick.
 
